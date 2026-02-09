@@ -1,0 +1,29 @@
+bot:
+  command_prefix: "!"
+  status: "Watching voice channels"
+
+defaults:
+  max_channel_time_sec: 3600
+  mute_on_blacklist_join: true
+  kick_on_blacklist_join: false
+
+channels:
+  monitored: []
+  move_target: null
+
+logging:
+  level: INFO
+  format: json
+
+pair_stacking:
+  enabled: true
+  target_channel_id: 000000000000000000  # ID канала-назначения
+  pairs:
+    # - [111111111111111111, 222222222222222222]
+    # Добавлять новые пары здесь или через дашборд
+
+kick_timeout:
+  enabled: true
+  default_timeout_sec: 3600
+  targets: []
+  # Управление через дашборд, здесь только начальные значения
