@@ -1,0 +1,63 @@
+name: Build & Deploy
+
+on:
+  push:
+    branches: [main]
+
+# ВАЖНО для публичных репо: ограничить workflow только для push
+# (не для pull_request — иначе любой может выполнить код на твоём VPS)
+
+jobs:
+  deploy:
+    runs-on: self-hosted
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Create .env file
+        run: |
+          cat > .env << 'EOF'
+          DISCORD_TOKEN=${{ secrets.DISCORD_TOKEN }}
+          DISCORD_GUILD_ID=${{ secrets.DISCORD_GUILD_ID }}
+          DATABASE_URL=${{ secrets.DATABASE_URL }}
+          API_HOST=0.0.0.0
+          API_PORT=8000
+          API_SECRET_KEY=${{ secrets.API_SECRET_KEY }}
+          SCHEDULER_CHECK_INTERVAL=30
+          DEFAULT_TIMEZONE=Europe/Moscow
+          EOF
+
+      - name: Stop old containers
+        run: docker compose down --remove-orphans || true
+
+      - name: Build and start containers
+        run: docker compose up -d --build
+
+      - name: Wait for services to start
+        run: sleep 10
+
+      - name: Health check — database
+        run: docker compose exec -T db pg_isready -U bot
+
+      - name: Health check — bot is running
+        run: docker compose ps --format json | python3 -c "
+          import json, sys
+          services = json.loads(sys.stdin.read())
+          if isinstance(services, dict):
+              services = [services]
+          for s in services:
+              if s.get('Service') == 'bot' and 'running' in s.get('State', ''):
+                  print('✅ Bot is running')
+                  sys.exit(0)
+          print('❌ Bot is not running')
+          sys.exit(1)
+          "
+
+      - name: Show container status
+        if: always()
+        run: docker compose ps
+
+      - name: Show recent bot logs
+        if: failure()
+        run: docker compose logs bot --tail=50
