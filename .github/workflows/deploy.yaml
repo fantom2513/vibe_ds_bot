@@ -4,9 +4,6 @@ on:
   push:
     branches: [main]
 
-# ВАЖНО для публичных репо: ограничить workflow только для push
-# (не для pull_request — иначе любой может выполнить код на твоём VPS)
-
 jobs:
   deploy:
     runs-on: self-hosted
@@ -41,18 +38,22 @@ jobs:
         run: docker compose exec -T db pg_isready -U bot
 
       - name: Health check — bot is running
-        run: docker compose ps --format json | python3 -c "
-          import json, sys
-          services = json.loads(sys.stdin.read())
-          if isinstance(services, dict):
-              services = [services]
-          for s in services:
-              if s.get('Service') == 'bot' and 'running' in s.get('State', ''):
-                  print('✅ Bot is running')
-                  sys.exit(0)
-          print('❌ Bot is not running')
-          sys.exit(1)
-          "
+        run: |
+          STATUS=$(docker compose ps bot --format json | python3 -c "
+          import json,sys
+          data=sys.stdin.read().strip()
+          try:
+            s=json.loads(data)
+            if isinstance(s,list): s=s[0]
+            print(s.get('State',''))
+          except: print('')
+          ")
+          if echo "$STATUS" | grep -q "running"; then
+            echo "Bot is running"
+          else
+            echo "Bot is NOT running"
+            exit 1
+          fi
 
       - name: Show container status
         if: always()
