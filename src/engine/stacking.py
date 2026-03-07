@@ -78,6 +78,17 @@ class StackingDetector:
             if partner.voice.channel.id != channel.id:
                 continue
 
+            # Переносим только если в канале никого кроме пары
+            if len(channel.members) != 2:
+                logger.debug(
+                    "stacking_skipped_not_alone",
+                    user_id=member.id,
+                    partner_id=partner_id,
+                    channel_id=channel.id,
+                    members_count=len(channel.members),
+                )
+                continue
+
             if channel.id == rule.target_channel_id:
                 continue
             pair_key = rule.pair_key()
