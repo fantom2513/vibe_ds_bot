@@ -106,6 +106,7 @@ class StackingDetector:
                 self._recently_moved.discard(pair_key)
                 continue
 
+            from_channel = channel
             moved_any = False
             for m in (member, partner):
                 try:
@@ -118,6 +119,19 @@ class StackingDetector:
                         target_channel_id=rule.target_channel_id,
                         error=str(e),
                     )
+
+            if moved_any:
+                try:
+                    from src.bot.notifier import get_notifier
+                    from src.bot.embeds import build_pair_move_embed
+                    notifier = get_notifier()
+                    if notifier and notifier.log_pair_moves:
+                        await notifier.send(
+                            build_pair_move_embed(member, partner, from_channel, target)
+                        )
+                except Exception as e:
+                    logger.warning("stacking_notify_failed", error=str(e))
+
             return moved_any
 
         return False

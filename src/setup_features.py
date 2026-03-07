@@ -7,7 +7,8 @@ import asyncpg
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.interval import IntervalTrigger
 
-from src.config.settings import get_settings, get_stacking_pairs, load_config_yaml
+from src.bot.notifier import BotNotifier, set_notifier
+from src.config.settings import get_notifications_config, get_settings, get_stacking_pairs, load_config_yaml
 from src.engine.stacking import PairRule, StackingDetector
 from src.scheduler import kick_timeout_job
 from src.utils.logging import get_logger
@@ -106,17 +107,42 @@ def setup_kick_timeout_scheduler(
     return scheduler
 
 
+def setup_notifier(bot) -> BotNotifier:
+    """
+    Создать BotNotifier из config.yaml и зарегистрировать глобальный singleton.
+    Вызывать до on_ready; setup() вызывается отдельно после on_ready.
+    """
+    config = load_config_yaml()
+    notif_cfg = get_notifications_config(config)
+    notifier = BotNotifier(
+        bot=bot,
+        log_channel_id=notif_cfg["log_channel_id"],
+        log_dry_run_events=notif_cfg["log_dry_run_events"],
+        log_pair_moves=notif_cfg["log_pair_moves"],
+        log_kick_timeouts=notif_cfg["log_kick_timeouts"],
+        log_rule_actions=notif_cfg["log_rule_actions"],
+    )
+    set_notifier(notifier)
+    bot.notifier = notifier
+    logger.info(
+        "notifier_created",
+        log_channel_id=notif_cfg["log_channel_id"],
+    )
+    return notifier
+
+
 async def setup_all_features(
     bot,
     pool: asyncpg.Pool,
     scheduler: Optional[AsyncIOScheduler] = None,
 ) -> Optional[AsyncIOScheduler]:
     """
-    Вызвать setup_stacking + setup_kick_timeout_scheduler.
+    Вызвать setup_stacking + setup_kick_timeout_scheduler + setup_notifier.
     Установить bot.guild_id = settings.DISCORD_GUILD_ID.
     """
     settings = get_settings()
     bot.guild_id = settings.DISCORD_GUILD_ID
     await setup_stacking(bot, pool)
     setup_kick_timeout_scheduler(bot, scheduler)
+    setup_notifier(bot)
     return scheduler

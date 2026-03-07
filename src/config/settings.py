@@ -32,6 +32,13 @@ _DEFAULT_YAML = {
         "default_timeout_sec": 3600,
         "targets": [],
     },
+    "notifications": {
+        "log_channel_id": None,
+        "log_dry_run_events": True,
+        "log_pair_moves": True,
+        "log_kick_timeouts": True,
+        "log_rule_actions": True,
+    },
 }
 
 
@@ -144,6 +151,21 @@ def get_kick_timeout_targets(config: dict) -> list[dict]:
             continue
         result.append({"discord_id": int(discord_id), "timeout_sec": int(timeout_sec)})
     return result
+
+
+def get_notifications_config(config: dict) -> dict:
+    """
+    Из config["notifications"] вернуть словарь конфигурации уведомлений.
+    """
+    section = config.get("notifications") or {}
+    defaults = _DEFAULT_YAML["notifications"]
+    return {
+        "log_channel_id": section.get("log_channel_id", defaults["log_channel_id"]),
+        "log_dry_run_events": section.get("log_dry_run_events", defaults["log_dry_run_events"]),
+        "log_pair_moves": section.get("log_pair_moves", defaults["log_pair_moves"]),
+        "log_kick_timeouts": section.get("log_kick_timeouts", defaults["log_kick_timeouts"]),
+        "log_rule_actions": section.get("log_rule_actions", defaults["log_rule_actions"]),
+    }
 
 
 def get_settings() -> Settings:

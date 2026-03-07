@@ -11,7 +11,7 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.interval import IntervalTrigger
 
-from src.db.repositories import logs_repo, rules_repo, schedules_repo
+from src.db.repositories import logs_repo, rules_repo, schedules_repo, stats_repo
 from src.engine import actions as actions_module
 from src.engine import tracker
 from src.utils.logging import get_logger
@@ -61,8 +61,15 @@ async def _check_overtime(
             if member.voice.channel.id != channel_id:
                 continue
 
+            is_dry_run = rule.get("is_dry_run", False)
             ok = await actions_module.execute_action(
-                action_type, member, action_params, guild
+                action_type,
+                member,
+                action_params,
+                guild,
+                is_dry_run=is_dry_run,
+                rule_id=rule_id,
+                pool=pool,
             )
             await logs_repo.log_action(
                 pool,
@@ -212,15 +219,51 @@ def setup_scheduler(
     return scheduler
 
 
+async def _send_weekly_report(pool: asyncpg.Pool) -> None:
+    """Отправить еженедельный отчёт в лог-канал."""
+    from src.bot.notifier import get_notifier
+    from src.bot.embeds import build_weekly_report_embed
+
+    notifier = get_notifier()
+    if not notifier:
+        return
+    try:
+        stats = await stats_repo.get_weekly_stats(pool)
+        embed = build_weekly_report_embed(stats)
+        await notifier.send(embed)
+        logger.info("weekly_report_sent")
+    except Exception as e:
+        logger.exception("weekly_report_failed", error=str(e))
+
+
+def register_weekly_report_job(
+    scheduler: AsyncIOScheduler,
+    pool: asyncpg.Pool,
+    timezone: str = "UTC",
+) -> None:
+    """Зарегистрировать задачу еженедельного отчёта (каждое воскресенье в 00:00)."""
+    scheduler.add_job(
+        _send_weekly_report,
+        trigger=CronTrigger(day_of_week="sun", hour=0, minute=0, timezone=timezone),
+        args=[pool],
+        id="weekly_report",
+        name="weekly_report",
+        replace_existing=True,
+    )
+    logger.info("weekly_report_job_registered", timezone=timezone)
+
+
 async def start_scheduler(
     pool: asyncpg.Pool,
     scheduler: AsyncIOScheduler,
+    report_timezone: str = "UTC",
 ) -> None:
     """
     Зарегистрировать cron-задачи из таблицы schedules и запустить планировщик.
     Вызывать после setup_scheduler, когда event loop уже запущен.
     """
     await _register_schedule_jobs(pool, scheduler)
+    register_weekly_report_job(scheduler, pool, timezone=report_timezone)
     scheduler.start()
     logger.info("scheduler_started")
 

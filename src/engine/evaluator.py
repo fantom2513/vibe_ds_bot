@@ -17,6 +17,7 @@ class ActionToRun:
     action_type: str
     params: dict[str, Any]
     rule_id: int
+    is_dry_run: bool = False
 
 
 async def evaluate(
@@ -54,6 +55,7 @@ async def evaluate(
                 action_type=rule.action_type,
                 params=dict(rule.action_params),
                 rule_id=rule.id,
+                is_dry_run=rule.is_dry_run,
             )
         )
     return result

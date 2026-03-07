@@ -11,6 +11,7 @@ class Rule:
     id: int
     name: str
     is_active: bool
+    is_dry_run: bool
     target_list: Optional[str]  # 'whitelist' | 'blacklist'
     channel_ids: Optional[List[int]]
     max_time_sec: Optional[int]
@@ -28,6 +29,7 @@ class Rule:
             id=row["id"],
             name=row.get("name", ""),
             is_active=row.get("is_active", True),
+            is_dry_run=row.get("is_dry_run", False),
             target_list=row.get("target_list"),
             channel_ids=channel_ids,
             max_time_sec=row.get("max_time_sec"),

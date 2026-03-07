@@ -114,6 +114,9 @@ async def check_kick_timeouts(bot: "commands.Bot") -> None:
             if not member or not member.voice or not member.voice.channel or member.voice.channel.id != channel_id:
                 continue
 
+            voice_channel = member.voice.channel
+            elapsed = _elapsed_seconds(joined_at)
+
             try:
                 await member.move_to(None, reason="kick timeout")
             except Exception as e:
@@ -139,5 +142,15 @@ async def check_kick_timeouts(bot: "commands.Bot") -> None:
                 channel_id=channel_id,
                 timeout_sec=effective_timeout,
             )
+            try:
+                from src.bot.notifier import get_notifier
+                from src.bot.embeds import build_kick_timeout_embed
+                notifier = get_notifier()
+                if notifier and notifier.log_kick_timeouts:
+                    await notifier.send(
+                        build_kick_timeout_embed(member, voice_channel, elapsed)
+                    )
+            except Exception as e:
+                logger.warning("kick_timeout_notify_failed", error=str(e))
     except Exception as e:
         logger.exception("check_kick_timeouts_failed", error=str(e))

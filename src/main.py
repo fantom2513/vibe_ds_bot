@@ -66,7 +66,7 @@ async def main() -> None:
     database.register_config_listener(on_config_changed)
     database.start_config_listener()
 
-    await scheduler_jobs.start_scheduler(pool, scheduler)
+    await scheduler_jobs.start_scheduler(pool, scheduler, report_timezone=settings.DEFAULT_TIMEZONE)
 
     server_config = Config(
         app=app,

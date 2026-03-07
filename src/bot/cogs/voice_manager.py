@@ -101,7 +101,13 @@ class VoiceManager(commands.Cog):
                 )
                 for action in to_run:
                     ok = await actions.execute_action(
-                        action.action_type, member, action.params, member.guild
+                        action.action_type,
+                        member,
+                        action.params,
+                        member.guild,
+                        is_dry_run=action.is_dry_run,
+                        rule_id=action.rule_id,
+                        pool=pool,
                     )
                     if ok:
                         await logs_repo.log_action(

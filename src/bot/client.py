@@ -50,6 +50,9 @@ class VoiceBot(commands.Bot):
         else:
             await self.tree.sync()
             logger.info("slash_commands_synced_global")
+        notifier = getattr(self, "notifier", None)
+        if notifier is not None:
+            await notifier.setup()
 
 
 def create_bot(command_prefix: str = "!") -> VoiceBot:

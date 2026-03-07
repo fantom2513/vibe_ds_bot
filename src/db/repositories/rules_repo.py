@@ -12,6 +12,13 @@ def _row_to_dict(row: asyncpg.Record) -> dict[str, Any]:
     return {k: row[k] for k in row.keys()}
 
 
+_RULE_COLUMNS = """
+    id, name, description, is_active, is_dry_run, target_list, channel_ids,
+    max_time_sec, action_type, action_params, schedule_cron, schedule_tz,
+    priority, created_at, updated_at
+"""
+
+
 async def get_rules(
     pool: asyncpg.Pool,
     active_only: bool = False,
@@ -21,19 +28,15 @@ async def get_rules(
     ORDER BY priority.
     """
     if active_only:
-        query = """
-            SELECT id, name, description, is_active, target_list, channel_ids,
-                   max_time_sec, action_type, action_params, schedule_cron, schedule_tz,
-                   priority, created_at, updated_at
+        query = f"""
+            SELECT {_RULE_COLUMNS}
             FROM rules
             WHERE is_active
             ORDER BY priority
         """
     else:
-        query = """
-            SELECT id, name, description, is_active, target_list, channel_ids,
-                   max_time_sec, action_type, action_params, schedule_cron, schedule_tz,
-                   priority, created_at, updated_at
+        query = f"""
+            SELECT {_RULE_COLUMNS}
             FROM rules
             ORDER BY priority
         """
@@ -45,10 +48,8 @@ async def get_all_active_rules(pool: asyncpg.Pool) -> list[dict[str, Any]]:
     """
     Все активные правила (для планировщика overtime). ORDER BY priority.
     """
-    query = """
-        SELECT id, name, description, is_active, target_list, channel_ids,
-               max_time_sec, action_type, action_params, schedule_cron, schedule_tz,
-               priority, created_at, updated_at
+    query = f"""
+        SELECT {_RULE_COLUMNS}
         FROM rules
         WHERE is_active
         ORDER BY priority
@@ -66,20 +67,16 @@ async def get_active_rules(
     ORDER BY priority.
     """
     if channel_id is None:
-        query = """
-            SELECT id, name, description, is_active, target_list, channel_ids,
-                   max_time_sec, action_type, action_params, schedule_cron, schedule_tz,
-                   priority, created_at, updated_at
+        query = f"""
+            SELECT {_RULE_COLUMNS}
             FROM rules
             WHERE is_active AND channel_ids IS NULL
             ORDER BY priority
         """
         rows = await pool.fetch(query)
     else:
-        query = """
-            SELECT id, name, description, is_active, target_list, channel_ids,
-                   max_time_sec, action_type, action_params, schedule_cron, schedule_tz,
-                   priority, created_at, updated_at
+        query = f"""
+            SELECT {_RULE_COLUMNS}
             FROM rules
             WHERE is_active AND (channel_ids IS NULL OR $1 = ANY(channel_ids))
             ORDER BY priority
@@ -93,10 +90,8 @@ async def get_rule_by_id(
     rule_id: int,
 ) -> Optional[dict[str, Any]]:
     """Получить правило по id."""
-    query = """
-        SELECT id, name, description, is_active, target_list, channel_ids,
-               max_time_sec, action_type, action_params, schedule_cron, schedule_tz,
-               priority, created_at, updated_at
+    query = f"""
+        SELECT {_RULE_COLUMNS}
         FROM rules
         WHERE id = $1
     """
@@ -109,19 +104,19 @@ async def create_rule(
     data: dict[str, Any],
 ) -> dict[str, Any]:
     """
-    Создать правило. data: name (обяз.), description, is_active, target_list,
+    Создать правило. data: name (обяз.), description, is_active, is_dry_run, target_list,
     channel_ids, max_time_sec, action_type (обяз.), action_params, schedule_cron,
     schedule_tz, priority. created_at/updated_at проставляются автоматически.
     """
     now = datetime.now(timezone.utc)
     query = """
         INSERT INTO rules (
-            name, description, is_active, target_list, channel_ids,
+            name, description, is_active, is_dry_run, target_list, channel_ids,
             max_time_sec, action_type, action_params, schedule_cron, schedule_tz,
             priority, created_at, updated_at
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
-        RETURNING id, name, description, is_active, target_list, channel_ids,
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+        RETURNING id, name, description, is_active, is_dry_run, target_list, channel_ids,
                   max_time_sec, action_type, action_params, schedule_cron, schedule_tz,
                   priority, created_at, updated_at
     """
@@ -130,6 +125,7 @@ async def create_rule(
         data.get("name", ""),
         data.get("description"),
         data.get("is_active", True),
+        data.get("is_dry_run", False),
         data.get("target_list"),
         data.get("channel_ids"),
         data.get("max_time_sec"),
@@ -153,23 +149,21 @@ async def update_rule(
     Обновить правило. data может содержать любые поля таблицы (кроме id).
     updated_at обновляется автоматически.
     """
-    # Сначала получаем текущую запись
     current = await get_rule_by_id(pool, rule_id)
     if not current:
         return None
 
     now = datetime.now(timezone.utc)
     merged = {**current, **data, "updated_at": now}
-    # Убираем id из merged для UPDATE
     merged.pop("id", None)
 
     query = """
         UPDATE rules SET
-            name = $1, description = $2, is_active = $3, target_list = $4,
-            channel_ids = $5, max_time_sec = $6, action_type = $7, action_params = $8,
-            schedule_cron = $9, schedule_tz = $10, priority = $11, updated_at = $12
-        WHERE id = $13
-        RETURNING id, name, description, is_active, target_list, channel_ids,
+            name = $1, description = $2, is_active = $3, is_dry_run = $4, target_list = $5,
+            channel_ids = $6, max_time_sec = $7, action_type = $8, action_params = $9,
+            schedule_cron = $10, schedule_tz = $11, priority = $12, updated_at = $13
+        WHERE id = $14
+        RETURNING id, name, description, is_active, is_dry_run, target_list, channel_ids,
                   max_time_sec, action_type, action_params, schedule_cron, schedule_tz,
                   priority, created_at, updated_at
     """
@@ -178,6 +172,7 @@ async def update_rule(
         merged.get("name"),
         merged.get("description"),
         merged.get("is_active"),
+        merged.get("is_dry_run", False),
         merged.get("target_list"),
         merged.get("channel_ids"),
         merged.get("max_time_sec"),

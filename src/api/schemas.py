@@ -13,6 +13,7 @@ class RuleCreate(BaseModel):
     name: str = Field(..., max_length=100)
     description: Optional[str] = None
     is_active: bool = True
+    is_dry_run: bool = False
     target_list: Optional[Literal["whitelist", "blacklist"]] = None
     channel_ids: Optional[list[int]] = None
     max_time_sec: Optional[int] = None
@@ -27,6 +28,7 @@ class RuleUpdate(BaseModel):
     name: Optional[str] = Field(None, max_length=100)
     description: Optional[str] = None
     is_active: Optional[bool] = None
+    is_dry_run: Optional[bool] = None
     target_list: Optional[Literal["whitelist", "blacklist"]] = None
     channel_ids: Optional[list[int]] = None
     max_time_sec: Optional[int] = None
@@ -42,6 +44,7 @@ class RuleResponse(BaseModel):
     name: str
     description: Optional[str] = None
     is_active: bool
+    is_dry_run: bool
     target_list: Optional[str] = None
     channel_ids: Optional[list[int]] = None
     max_time_sec: Optional[int] = None
