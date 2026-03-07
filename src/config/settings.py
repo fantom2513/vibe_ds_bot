@@ -115,8 +115,21 @@ class Settings(BaseSettings):
     @classmethod
     def parse_allowed_ids(cls, v: Any) -> list[int]:
         if isinstance(v, str):
+            v = v.strip()
+            if not v:
+                return []
+            # JSON array format: [123, 456]
+            if v.startswith("["):
+                import json
+                return [int(x) for x in json.loads(v)]
+            # comma-separated format: 123,456
             return [int(x.strip()) for x in v.split(",") if x.strip()]
-        return v
+        if isinstance(v, int):
+            # pydantic-settings parsed a bare number via json.loads
+            return [v]
+        if isinstance(v, list):
+            return [int(x) for x in v]
+        return []
 
 
 _settings: Settings | None = None
