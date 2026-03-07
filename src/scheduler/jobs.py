@@ -112,58 +112,72 @@ def _make_schedule_callback(
     return _run
 
 
+def register_schedule_job(
+    scheduler: AsyncIOScheduler,
+    schedule: dict,
+    pool: asyncpg.Pool,
+) -> Optional[str]:
+    """
+    Зарегистрировать CronTrigger job для расписания.
+    schedule — dict с ключами: id, rule_id, cron_expr, action, timezone.
+    Возвращает job_id при успехе, None при ошибке.
+    """
+    schedule_id = schedule.get("id")
+    rule_id = schedule.get("rule_id")
+    cron_expr = schedule.get("cron_expr")
+    action = schedule.get("action")
+    tz = schedule.get("timezone") or "UTC"
+
+    if not cron_expr or action not in ("enable", "disable"):
+        logger.warning(
+            "schedule_skipped_invalid",
+            schedule_id=schedule_id,
+            cron_expr=cron_expr,
+            action=action,
+        )
+        return None
+
+    try:
+        trigger = CronTrigger.from_crontab(cron_expr, timezone=tz)
+    except Exception as e:
+        logger.warning(
+            "schedule_skipped_bad_cron",
+            schedule_id=schedule_id,
+            cron_expr=cron_expr,
+            error=str(e),
+        )
+        return None
+
+    job_id = f"schedule_{schedule_id}"
+    callback = _make_schedule_callback(pool, schedule_id, rule_id, action)
+    scheduler.add_job(
+        callback,
+        trigger=trigger,
+        id=job_id,
+        name=f"schedule_{rule_id}_{action}",
+        replace_existing=True,
+    )
+    logger.info(
+        "schedule_registered",
+        schedule_id=schedule_id,
+        rule_id=rule_id,
+        action=action,
+        cron_expr=cron_expr,
+    )
+    return job_id
+
+
 async def _register_schedule_jobs(
     pool: asyncpg.Pool,
     scheduler: AsyncIOScheduler,
 ) -> None:
     """
-    Загрузить активные расписания и зарегистрировать cron-задачи.
+    Загрузить активные расписания из БД и зарегистрировать cron-задачи.
     При срабатывании: enable — включить правило (is_active=True), disable — выключить.
     """
     schedules = await schedules_repo.get_active_schedules(pool)
     for s in schedules:
-        schedule_id = s.get("id")
-        rule_id = s.get("rule_id")
-        cron_expr = s.get("cron_expr")
-        action = s.get("action")
-        tz = s.get("timezone") or "UTC"
-
-        if not cron_expr or action not in ("enable", "disable"):
-            logger.warning(
-                "schedule_skipped_invalid",
-                schedule_id=schedule_id,
-                cron_expr=cron_expr,
-                action=action,
-            )
-            continue
-
-        try:
-            trigger = CronTrigger.from_crontab(cron_expr, timezone=tz)
-        except Exception as e:
-            logger.warning(
-                "schedule_skipped_bad_cron",
-                schedule_id=schedule_id,
-                cron_expr=cron_expr,
-                error=str(e),
-            )
-            continue
-
-        job_id = f"schedule_{schedule_id}"
-        callback = _make_schedule_callback(pool, schedule_id, rule_id, action)
-        scheduler.add_job(
-            callback,
-            trigger=trigger,
-            id=job_id,
-            name=f"schedule_{rule_id}_{action}",
-            replace_existing=True,
-        )
-        logger.info(
-            "schedule_registered",
-            schedule_id=schedule_id,
-            rule_id=rule_id,
-            action=action,
-            cron_expr=cron_expr,
-        )
+        register_schedule_job(scheduler, s, pool)
 
 
 def setup_scheduler(

@@ -13,6 +13,7 @@ from src.db import database
 from src.db.repositories import logs_repo, rules_repo, schedules_repo, users_repo
 from src.engine import actions, evaluator, tracker
 from src.scheduler import jobs as scheduler_jobs
+from src.api.deps import set_scheduler
 from src.setup_features import reload_stacking, setup_all_features
 from src.utils.logging import get_logger, setup_logging
 
@@ -50,6 +51,7 @@ async def main() -> None:
         get_guild=get_guild,
         check_interval_sec=settings.SCHEDULER_CHECK_INTERVAL,
     )
+    set_scheduler(scheduler)
     await setup_all_features(bot, pool, scheduler)
 
     def on_config_changed() -> None:

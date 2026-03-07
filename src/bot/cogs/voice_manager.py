@@ -19,6 +19,24 @@ class VoiceManager(commands.Cog):
         self.bot = bot
 
     @commands.Cog.listener()
+    async def on_ready(self) -> None:
+        pool = getattr(self.bot, "pool", None)
+        tracker = getattr(self.bot, "tracker", None)
+        guild_id = getattr(self.bot, "guild_id", None)
+        guild = self.bot.get_guild(guild_id) if guild_id else None
+        if guild and pool and tracker:
+            await tracker.sync_from_guild(pool, guild)
+
+    @commands.Cog.listener()
+    async def on_resumed(self) -> None:
+        pool = getattr(self.bot, "pool", None)
+        tracker = getattr(self.bot, "tracker", None)
+        guild_id = getattr(self.bot, "guild_id", None)
+        guild = self.bot.get_guild(guild_id) if guild_id else None
+        if guild and pool and tracker:
+            await tracker.sync_from_guild(pool, guild)
+
+    @commands.Cog.listener()
     async def on_voice_state_update(
         self,
         member: discord.Member,

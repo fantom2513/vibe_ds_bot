@@ -1,13 +1,27 @@
 """
-Зависимости FastAPI: пул БД и проверка API-ключа.
+Зависимости FastAPI: пул БД, проверка API-ключа, scheduler.
 """
-from typing import Annotated
+from typing import Annotated, Optional
 
 import asyncpg
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from fastapi import Depends, HTTPException, Request
 from fastapi.security import APIKeyHeader
 
 from src.config.settings import get_settings
+
+_scheduler: Optional[AsyncIOScheduler] = None
+
+
+def set_scheduler(s: AsyncIOScheduler) -> None:
+    global _scheduler
+    _scheduler = s
+
+
+def get_scheduler() -> AsyncIOScheduler:
+    if _scheduler is None:
+        raise RuntimeError("Scheduler not initialized")
+    return _scheduler
 
 API_KEY_HEADER = APIKeyHeader(name="X-API-Key", auto_error=False)
 

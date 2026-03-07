@@ -6,6 +6,11 @@ from datetime import datetime, timezone
 from typing import Any, Optional
 
 import asyncpg
+import discord
+
+from src.utils.logging import get_logger
+
+_log = get_logger("tracker")
 
 # Ключ in-memory: (discord_id, channel_id), значение: joined_at (datetime)
 _sessions: dict[tuple[int, int], datetime] = {}
@@ -25,21 +30,28 @@ async def start_session(
     pool: asyncpg.Pool,
     discord_id: int,
     channel_id: int,
+    joined_at: Optional[datetime] = None,
 ) -> None:
     """
     Зарегистрировать вход в канал: добавить в память и INSERT в voice_sessions.
+    Если joined_at передан — это путь восстановления (recovery): не INSERT в БД,
+    только обновить in-memory состояние.
     """
-    now = datetime.now(timezone.utc)
-    _sessions[(discord_id, channel_id)] = now
-    await pool.execute(
-        """
-        INSERT INTO voice_sessions (discord_id, channel_id, joined_at, left_at)
-        VALUES ($1, $2, $3, NULL)
-        """,
-        discord_id,
-        channel_id,
-        now,
-    )
+    if joined_at is None:
+        joined_at = datetime.now(timezone.utc)
+        _sessions[(discord_id, channel_id)] = joined_at
+        await pool.execute(
+            """
+            INSERT INTO voice_sessions (discord_id, channel_id, joined_at, left_at)
+            VALUES ($1, $2, $3, NULL)
+            """,
+            discord_id,
+            channel_id,
+            joined_at,
+        )
+    else:
+        # Recovery path: сессия уже открыта в БД, только восстанавливаем in-memory
+        _sessions[(discord_id, channel_id)] = joined_at
 
 
 async def end_session(
@@ -78,6 +90,47 @@ def _duration_seconds(joined_at: datetime) -> float:
     now = datetime.now(timezone.utc)
     delta = now - (joined_at if joined_at.tzinfo else joined_at.replace(tzinfo=timezone.utc))
     return delta.total_seconds()
+
+
+async def sync_from_guild(
+    pool: asyncpg.Pool,
+    guild: discord.Guild,
+) -> None:
+    """
+    Восстановить in-memory сессии для пользователей, уже сидящих в голосовых каналах.
+    Вызывается при on_ready и on_resumed.
+    Не создаёт дублей: если сессия уже в памяти — пропускаем.
+    Если открытая запись в voice_sessions есть в БД — восстанавливаем joined_at из неё.
+    Если нет — вызываем start_session (INSERT новой записи).
+    """
+    recovered = 0
+    for channel in guild.voice_channels:
+        for member in channel.members:
+            key = (member.id, channel.id)
+            if key in _sessions:
+                continue
+            try:
+                row = await pool.fetchrow(
+                    """
+                    SELECT joined_at FROM voice_sessions
+                    WHERE discord_id = $1 AND channel_id = $2 AND left_at IS NULL
+                    ORDER BY joined_at DESC
+                    LIMIT 1
+                    """,
+                    member.id,
+                    channel.id,
+                )
+            except Exception as e:
+                _log.warning("tracker.sync_db_error", discord_id=member.id, error=str(e))
+                continue
+            if row:
+                # Восстанавливаем из БД: реальное joined_at известно
+                await start_session(pool, member.id, channel.id, joined_at=row["joined_at"])
+            else:
+                # Нет открытой записи в БД — создаём новую
+                await start_session(pool, member.id, channel.id)
+            recovered += 1
+    _log.info("tracker.sync", recovered=recovered)
 
 
 async def get_overtime_users(

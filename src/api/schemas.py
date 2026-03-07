@@ -97,6 +97,13 @@ class ScheduleCreate(BaseModel):
     timezone: str = Field(default="UTC", max_length=50)
 
 
+class ScheduleUpdate(BaseModel):
+    cron_expr: Optional[str] = Field(None, max_length=100)
+    action: Optional[Literal["enable", "disable"]] = None
+    timezone: Optional[str] = Field(None, max_length=50)
+    is_active: Optional[bool] = None
+
+
 class ScheduleResponse(BaseModel):
     id: int
     rule_id: int
