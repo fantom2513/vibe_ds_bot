@@ -15,6 +15,7 @@ app = FastAPI(
 
 
 @app.get("/health")
+@app.get("/api/health")
 def health() -> dict[str, str]:
     """Health check для контейнера и балансировщиков. Без аутентификации."""
     return {"status": "ok"}
