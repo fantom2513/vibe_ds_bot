@@ -38,7 +38,7 @@ class RuleGroup(app_commands.Group):
         return getattr(self.bot, "pool", None)
 
     @app_commands.command(name="list", description="Показать все правила")
-    @app_commands.default_member_permissions(discord.Permissions(administrator=True))
+    @app_commands.default_permissions(administrator=True)
     async def rule_list(self, interaction: discord.Interaction) -> None:
         await interaction.response.defer(ephemeral=True)
         if not self.pool:
@@ -69,7 +69,7 @@ class RuleGroup(app_commands.Group):
         await interaction.followup.send(embed=embed, ephemeral=True)
 
     @app_commands.command(name="toggle", description="Включить/выключить правило")
-    @app_commands.default_member_permissions(discord.Permissions(administrator=True))
+    @app_commands.default_permissions(administrator=True)
     @app_commands.describe(rule_id="ID правила")
     async def rule_toggle(self, interaction: discord.Interaction, rule_id: int) -> None:
         await interaction.response.defer(ephemeral=True)
@@ -89,7 +89,7 @@ class RuleGroup(app_commands.Group):
                     admin_id=interaction.user.id)
 
     @app_commands.command(name="info", description="Подробная информация о правиле")
-    @app_commands.default_member_permissions(discord.Permissions(administrator=True))
+    @app_commands.default_permissions(administrator=True)
     @app_commands.describe(rule_id="ID правила")
     async def rule_info(self, interaction: discord.Interaction, rule_id: int) -> None:
         await interaction.response.defer(ephemeral=True)
@@ -139,7 +139,7 @@ class UserGroup(app_commands.Group):
         return getattr(self.bot, "pool", None)
 
     @app_commands.command(name="add", description="Добавить пользователя в список")
-    @app_commands.default_member_permissions(discord.Permissions(administrator=True))
+    @app_commands.default_permissions(administrator=True)
     @app_commands.describe(
         discord_user="Пользователь Discord",
         list_type="Тип списка",
@@ -171,7 +171,7 @@ class UserGroup(app_commands.Group):
                     admin_id=interaction.user.id)
 
     @app_commands.command(name="remove", description="Удалить пользователя из списка")
-    @app_commands.default_member_permissions(discord.Permissions(administrator=True))
+    @app_commands.default_permissions(administrator=True)
     @app_commands.describe(
         discord_user="Пользователь Discord",
         list_type="Тип списка",
@@ -203,7 +203,7 @@ class UserGroup(app_commands.Group):
                     removed=removed, admin_id=interaction.user.id)
 
     @app_commands.command(name="check", description="Проверить в каких списках пользователь")
-    @app_commands.default_member_permissions(discord.Permissions(administrator=True))
+    @app_commands.default_permissions(administrator=True)
     @app_commands.describe(discord_user="Пользователь Discord")
     async def user_check(
         self,
@@ -249,7 +249,7 @@ class StatsGroup(app_commands.Group):
         return getattr(self.bot, "pool", None)
 
     @app_commands.command(name="today", description="Статистика действий за сегодня")
-    @app_commands.default_member_permissions(discord.Permissions(administrator=True))
+    @app_commands.default_permissions(administrator=True)
     async def stats_today(self, interaction: discord.Interaction) -> None:
         await interaction.response.defer(ephemeral=True)
         if not self.pool:
@@ -263,7 +263,7 @@ class StatsGroup(app_commands.Group):
         await interaction.followup.send(embed=embed, ephemeral=True)
 
     @app_commands.command(name="user", description="Статистика пользователя за 30 дней")
-    @app_commands.default_member_permissions(discord.Permissions(administrator=True))
+    @app_commands.default_permissions(administrator=True)
     @app_commands.describe(discord_user="Пользователь Discord")
     async def stats_user(
         self,
