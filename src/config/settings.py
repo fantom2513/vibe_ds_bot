@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Any
 
 import yaml
-from pydantic import Field
+from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -92,6 +92,31 @@ class Settings(BaseSettings):
         default=60,
         description="Макс. действий (mute/kick/move) в минуту на гильдию; 0 — без лимита",
     )
+
+    # Discord OAuth2
+    DISCORD_CLIENT_ID: str = Field(default="", description="Discord OAuth2 Client ID")
+    DISCORD_CLIENT_SECRET: str = Field(default="", description="Discord OAuth2 Client Secret")
+    DISCORD_REDIRECT_URI: str = Field(
+        default="http://localhost/auth/discord/callback",
+        description="OAuth2 redirect URI",
+    )
+
+    # Dashboard JWT
+    JWT_SECRET: str = Field(default="", description="Секрет для подписи JWT токенов дашборда")
+    JWT_EXPIRE_HOURS: int = Field(default=24, description="Срок жизни JWT в часах")
+
+    # Allowlist
+    ALLOWED_DISCORD_IDS: list[int] = Field(
+        default=[],
+        description="Discord ID пользователей с доступом к дашборду",
+    )
+
+    @field_validator("ALLOWED_DISCORD_IDS", mode="before")
+    @classmethod
+    def parse_allowed_ids(cls, v: Any) -> list[int]:
+        if isinstance(v, str):
+            return [int(x.strip()) for x in v.split(",") if x.strip()]
+        return v
 
 
 _settings: Settings | None = None

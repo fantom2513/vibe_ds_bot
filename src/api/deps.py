@@ -1,12 +1,12 @@
 """
-Зависимости FastAPI: пул БД, проверка API-ключа, scheduler.
+Зависимости FastAPI: пул БД, аутентификация, scheduler, бот.
 """
 from typing import Annotated, Optional
 
 import asyncpg
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from fastapi import Depends, HTTPException, Request
-from fastapi.security import APIKeyHeader
+from jose import JWTError, jwt
 
 from src.config.settings import get_settings
 
@@ -23,8 +23,6 @@ def get_scheduler() -> AsyncIOScheduler:
         raise RuntimeError("Scheduler not initialized")
     return _scheduler
 
-API_KEY_HEADER = APIKeyHeader(name="X-API-Key", auto_error=False)
-
 
 async def get_db_pool(request: Request) -> asyncpg.Pool:
     """Возвращает пул БД из состояния приложения (app.state.pool)."""
@@ -34,13 +32,33 @@ async def get_db_pool(request: Request) -> asyncpg.Pool:
     return pool
 
 
-async def verify_api_key(
-    api_key: Annotated[str | None, Depends(API_KEY_HEADER)],
-) -> None:
+async def get_current_user(request: Request) -> dict:
     """
-    Проверяет заголовок X-API-Key против API_SECRET_KEY.
-    При несовпадении или отсутствии ключа — HTTP 401.
+    Читает JWT из httpOnly cookie access_token.
+    При отсутствии или невалидном токене — HTTP 401.
     """
     settings = get_settings()
-    if not api_key or api_key != settings.API_SECRET_KEY:
-        raise HTTPException(status_code=401, detail="Invalid or missing API key")
+    token = request.cookies.get("access_token")
+    if not token:
+        raise HTTPException(
+            status_code=401,
+            detail="Not authenticated",
+            headers={"WWW-Authenticate": "Cookie"},
+        )
+    try:
+        payload = jwt.decode(token, settings.JWT_SECRET, algorithms=["HS256"])
+        return {
+            "sub": payload["sub"],
+            "username": payload["username"],
+            "avatar": payload.get("avatar"),
+        }
+    except JWTError:
+        raise HTTPException(status_code=401, detail="Invalid token")
+
+
+async def get_bot(request: Request):
+    """Возвращает экземпляр бота из app.state.bot."""
+    bot = getattr(request.app.state, "bot", None)
+    if bot is None:
+        raise HTTPException(status_code=503, detail="Bot not available")
+    return bot

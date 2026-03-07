@@ -7,7 +7,7 @@ from typing import Annotated
 import asyncpg
 from fastapi import APIRouter, Depends, HTTPException
 
-from src.api.deps import get_db_pool, verify_api_key
+from src.api.deps import get_current_user, get_db_pool
 from src.api.schemas import KickTargetCreate, KickTargetResponse, KickTargetUpdate
 
 router = APIRouter(prefix="/kick-targets", tags=["kick-targets"])
@@ -30,7 +30,7 @@ def _row_to_response(row: asyncpg.Record) -> KickTargetResponse:
 
 @router.get("", response_model=list[KickTargetResponse])
 async def list_kick_targets(
-    _: Annotated[None, Depends(verify_api_key)],
+    _: Annotated[None, Depends(get_current_user)],
     pool: Annotated[asyncpg.Pool, Depends(get_db_pool)],
 ) -> list[KickTargetResponse]:
     """
@@ -47,7 +47,7 @@ async def list_kick_targets(
 @router.post("", response_model=KickTargetResponse, status_code=201)
 async def create_kick_target(
     body: KickTargetCreate,
-    _: Annotated[None, Depends(verify_api_key)],
+    _: Annotated[None, Depends(get_current_user)],
     pool: Annotated[asyncpg.Pool, Depends(get_db_pool)],
 ) -> KickTargetResponse:
     """
@@ -90,7 +90,7 @@ async def create_kick_target(
 @router.get("/{discord_id}", response_model=KickTargetResponse)
 async def get_kick_target(
     discord_id: int,
-    _: Annotated[None, Depends(verify_api_key)],
+    _: Annotated[None, Depends(get_current_user)],
     pool: Annotated[asyncpg.Pool, Depends(get_db_pool)],
 ) -> KickTargetResponse:
     """Получить настройки таймаута кика для пользователя по его Discord ID."""
@@ -104,7 +104,7 @@ async def get_kick_target(
 async def update_kick_target(
     discord_id: int,
     body: KickTargetUpdate,
-    _: Annotated[None, Depends(verify_api_key)],
+    _: Annotated[None, Depends(get_current_user)],
     pool: Annotated[asyncpg.Pool, Depends(get_db_pool)],
 ) -> KickTargetResponse:
     """
@@ -160,7 +160,7 @@ async def update_kick_target(
 @router.delete("/{discord_id}", status_code=204)
 async def delete_kick_target(
     discord_id: int,
-    _: Annotated[None, Depends(verify_api_key)],
+    _: Annotated[None, Depends(get_current_user)],
     pool: Annotated[asyncpg.Pool, Depends(get_db_pool)],
 ) -> None:
     """Полностью удалить пользователя из списка автокика по Discord ID."""

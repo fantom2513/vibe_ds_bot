@@ -7,7 +7,7 @@ import asyncpg
 from apscheduler.jobstores.base import JobLookupError
 from fastapi import APIRouter, Depends, HTTPException
 
-from src.api.deps import get_db_pool, get_scheduler, verify_api_key
+from src.api.deps import get_current_user, get_db_pool, get_scheduler
 from src.api.schemas import ScheduleCreate, ScheduleResponse, ScheduleUpdate
 from src.db import database
 from src.db.repositories import schedules_repo
@@ -18,7 +18,7 @@ router = APIRouter()
 
 @router.get("/schedules", response_model=list[ScheduleResponse])
 async def list_schedules(
-    _: Annotated[None, Depends(verify_api_key)],
+    _: Annotated[None, Depends(get_current_user)],
     pool: Annotated[asyncpg.Pool, Depends(get_db_pool)],
 ) -> list[ScheduleResponse]:
     """
@@ -34,7 +34,7 @@ async def list_schedules(
 @router.post("/schedules", response_model=ScheduleResponse)
 async def create_schedule(
     body: ScheduleCreate,
-    _: Annotated[None, Depends(verify_api_key)],
+    _: Annotated[None, Depends(get_current_user)],
     pool: Annotated[asyncpg.Pool, Depends(get_db_pool)],
 ) -> ScheduleResponse:
     """
@@ -76,7 +76,7 @@ async def create_schedule(
 async def update_schedule(
     schedule_id: int,
     body: ScheduleUpdate,
-    _: Annotated[None, Depends(verify_api_key)],
+    _: Annotated[None, Depends(get_current_user)],
     pool: Annotated[asyncpg.Pool, Depends(get_db_pool)],
 ) -> ScheduleResponse:
     """Обновить расписание. Перерегистрирует APScheduler job с новыми параметрами."""
@@ -104,7 +104,7 @@ async def update_schedule(
 @router.delete("/schedules/{schedule_id}", status_code=204)
 async def delete_schedule(
     schedule_id: int,
-    _: Annotated[None, Depends(verify_api_key)],
+    _: Annotated[None, Depends(get_current_user)],
     pool: Annotated[asyncpg.Pool, Depends(get_db_pool)],
 ) -> None:
     """Удалить расписание по ID."""

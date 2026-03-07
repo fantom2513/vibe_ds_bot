@@ -6,7 +6,7 @@ from typing import Annotated, Optional
 import asyncpg
 from fastapi import APIRouter, Depends, Query
 
-from src.api.deps import get_db_pool, verify_api_key
+from src.api.deps import get_current_user, get_db_pool
 from src.api.schemas import ActionLogResponse
 from src.db.repositories import logs_repo
 
@@ -15,7 +15,7 @@ router = APIRouter()
 
 @router.get("/logs", response_model=list[ActionLogResponse])
 async def list_logs(
-    _: Annotated[None, Depends(verify_api_key)],
+    _: Annotated[None, Depends(get_current_user)],
     pool: Annotated[asyncpg.Pool, Depends(get_db_pool)],
     limit: int = Query(default=50, ge=1, le=500, description="Количество записей (макс. 500)"),
     offset: int = Query(default=0, ge=0, description="Смещение для пагинации"),

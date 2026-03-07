@@ -31,6 +31,7 @@ async def main() -> None:
     app.state.pool = pool
 
     bot = create_bot(command_prefix=config_yaml.get("bot", {}).get("command_prefix", "!"))
+    app.state.bot = bot
     bot.pool = pool
     bot.tracker = tracker
     bot.rules_repo = rules_repo

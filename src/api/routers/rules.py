@@ -6,7 +6,7 @@ from typing import Annotated
 import asyncpg
 from fastapi import APIRouter, Depends, HTTPException
 
-from src.api.deps import get_db_pool, verify_api_key
+from src.api.deps import get_current_user, get_db_pool
 from src.api.schemas import RuleCreate, RuleResponse, RuleUpdate
 from src.db import database
 from src.db.repositories import rules_repo
@@ -16,7 +16,7 @@ router = APIRouter()
 
 @router.get("/rules", response_model=list[RuleResponse])
 async def list_rules(
-    _: Annotated[None, Depends(verify_api_key)],
+    _: Annotated[None, Depends(get_current_user)],
     pool: Annotated[asyncpg.Pool, Depends(get_db_pool)],
 ) -> list[RuleResponse]:
     """
@@ -37,7 +37,7 @@ async def list_rules(
 @router.post("/rules", response_model=RuleResponse)
 async def create_rule(
     body: RuleCreate,
-    _: Annotated[None, Depends(verify_api_key)],
+    _: Annotated[None, Depends(get_current_user)],
     pool: Annotated[asyncpg.Pool, Depends(get_db_pool)],
 ) -> RuleResponse:
     """
@@ -77,7 +77,7 @@ async def create_rule(
 @router.get("/rules/{rule_id}", response_model=RuleResponse)
 async def get_rule(
     rule_id: int,
-    _: Annotated[None, Depends(verify_api_key)],
+    _: Annotated[None, Depends(get_current_user)],
     pool: Annotated[asyncpg.Pool, Depends(get_db_pool)],
 ) -> RuleResponse:
     """Получить правило по ID."""
@@ -91,7 +91,7 @@ async def get_rule(
 async def update_rule(
     rule_id: int,
     body: RuleUpdate,
-    _: Annotated[None, Depends(verify_api_key)],
+    _: Annotated[None, Depends(get_current_user)],
     pool: Annotated[asyncpg.Pool, Depends(get_db_pool)],
 ) -> RuleResponse:
     """
@@ -111,7 +111,7 @@ async def update_rule(
 @router.delete("/rules/{rule_id}", status_code=204)
 async def delete_rule(
     rule_id: int,
-    _: Annotated[None, Depends(verify_api_key)],
+    _: Annotated[None, Depends(get_current_user)],
     pool: Annotated[asyncpg.Pool, Depends(get_db_pool)],
 ) -> None:
     """Удалить правило по ID. Связанные расписания удаляются автоматически (CASCADE)."""
@@ -124,7 +124,7 @@ async def delete_rule(
 @router.patch("/rules/{rule_id}/toggle", response_model=RuleResponse)
 async def toggle_rule(
     rule_id: int,
-    _: Annotated[None, Depends(verify_api_key)],
+    _: Annotated[None, Depends(get_current_user)],
     pool: Annotated[asyncpg.Pool, Depends(get_db_pool)],
 ) -> RuleResponse:
     """

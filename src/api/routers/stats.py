@@ -6,7 +6,7 @@ from typing import Annotated
 import asyncpg
 from fastapi import APIRouter, Depends, HTTPException
 
-from src.api.deps import get_db_pool, verify_api_key
+from src.api.deps import get_current_user, get_db_pool
 from src.api.schemas import StatsOverviewResponse, UserStatsResponse
 
 router = APIRouter()
@@ -14,7 +14,7 @@ router = APIRouter()
 
 @router.get("/stats/overview", response_model=StatsOverviewResponse)
 async def stats_overview(
-    _: Annotated[None, Depends(verify_api_key)],
+    _: Annotated[None, Depends(get_current_user)],
     pool: Annotated[asyncpg.Pool, Depends(get_db_pool)],
 ) -> StatsOverviewResponse:
     """Агрегаты по всем логам: общее число действий и по типам."""
@@ -42,7 +42,7 @@ async def stats_overview(
 @router.get("/stats/user/{discord_id}", response_model=UserStatsResponse)
 async def stats_user(
     discord_id: int,
-    _: Annotated[None, Depends(verify_api_key)],
+    _: Annotated[None, Depends(get_current_user)],
     pool: Annotated[asyncpg.Pool, Depends(get_db_pool)],
 ) -> UserStatsResponse:
     """Агрегаты по логам для пользователя."""

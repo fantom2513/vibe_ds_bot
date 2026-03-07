@@ -1,0 +1,47 @@
+@import './tokens.css';
+@import './typography.css';
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--bg-base);
+  color: var(--text-primary);
+  font-family: -apple-system, 'Segoe UI', sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: var(--bg-base); }
+::-webkit-scrollbar-thumb {
+  background: var(--border-base);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover { background: #3a3d4a; }
+
+/* Tables */
+.table-row:hover td {
+  background: var(--bg-elevated) !important;
+}
+
+/* Ant Design drawer/modal titles */
+.ant-drawer-title,
+.ant-modal-title {
+  font-family: 'Syne', sans-serif !important;
+  font-weight: 600 !important;
+}
+
+/* JSON in expandable rows */
+.json-preview {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11px;
+  color: var(--text-mono);
+  background: var(--bg-base);
+  border: 1px solid var(--border-subtle);
+  border-radius: 4px;
+  padding: 8px 12px;
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-all;
+}

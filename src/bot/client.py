@@ -2,6 +2,7 @@
 Discord-бот: intents, загрузка cogs (voice_manager, admin_commands), on_ready.
 Пул БД и трекер передаются через атрибуты (bot.pool, bot.tracker) до запуска.
 """
+from datetime import datetime
 from typing import Any, Optional
 
 import discord
@@ -28,6 +29,7 @@ class VoiceBot(commands.Bot):
         intents.voice_states = True
         intents.members = True  # GUILD_MEMBERS — privileged
         super().__init__(command_prefix=command_prefix, intents=intents, **kwargs)
+        self.start_time: datetime = datetime.utcnow()
 
     async def setup_hook(self) -> None:
         """Загрузка cogs при старте."""

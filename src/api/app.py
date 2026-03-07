@@ -6,7 +6,7 @@ FastAPI приложение Voice Bot API.
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from src.api.routers import dashboard, kick_targets, logs, rules, schedules, stacking_pairs, stats, users
+from src.api.routers import auth, dashboard, kick_targets, logs, rules, schedules, settings, stacking_pairs, stats, users
 
 app = FastAPI(
     title="Voice Bot API",
@@ -21,12 +21,13 @@ def health() -> dict[str, str]:
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["http://localhost", "http://localhost:80", "http://localhost:5173"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
+app.include_router(auth.router, prefix="/auth", tags=["auth"])
 app.include_router(rules.router, prefix="/api", tags=["rules"])
 app.include_router(users.router, prefix="/api", tags=["users"])
 app.include_router(schedules.router, prefix="/api", tags=["schedules"])
@@ -35,3 +36,4 @@ app.include_router(dashboard.router, prefix="/api", tags=["dashboard"])
 app.include_router(stats.router, prefix="/api", tags=["stats"])
 app.include_router(kick_targets.router, prefix="/api", tags=["kick-targets"])
 app.include_router(stacking_pairs.router, prefix="/api", tags=["stacking-pairs"])
+app.include_router(settings.router, prefix="/api", tags=["settings"])

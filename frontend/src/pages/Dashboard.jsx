@@ -1,104 +1,228 @@
-import { useState, useEffect } from 'react'
-import { api } from '../api/client'
+import { useState, useEffect, useCallback } from 'react'
+import { Row, Col, Table, Avatar, Alert, Spin, Empty, Typography, Space } from 'antd'
+import {
+  OrderedListOutlined,
+  TeamOutlined,
+  ThunderboltOutlined,
+  HistoryOutlined,
+} from '@ant-design/icons'
+import { getDashboard } from '../api/dashboard'
+import { getStatsOverview } from '../api/stats'
+import StatCard from '../components/StatCard'
+import ActionTag from '../components/ActionTag'
+import Timestamp from '../components/Timestamp'
+import DiscordId from '../components/DiscordId'
+
+const PAGE_HEADER = {
+  display: 'flex',
+  justifyContent: 'space-between',
+  alignItems: 'center',
+  marginBottom: 20,
+  paddingBottom: 16,
+  borderBottom: '1px solid var(--border-subtle)',
+}
 
 export default function Dashboard() {
-  const [data, setData] = useState({ active_rules: [], recent_logs: [], voice_online_count: null })
+  const [dashboard, setDashboard] = useState(null)
+  const [stats, setStats] = useState(null)
+  const [recentLogs, setRecentLogs] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
 
-  useEffect(() => {
-    let cancelled = false
-    api.get('/api/dashboard')
-      .then((res) => {
-        if (!cancelled) setData(res)
-      })
-      .catch((err) => {
-        if (!cancelled) setError(err.message)
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false)
-      })
-    return () => { cancelled = true }
+  const fetchData = useCallback(async () => {
+    try {
+      const [dash, st] = await Promise.all([getDashboard(), getStatsOverview()])
+      setDashboard(dash)
+      setStats(st)
+      setRecentLogs(dash.recent_logs || [])
+    } catch (e) {
+      setError(e.message)
+    } finally {
+      setLoading(false)
+    }
   }, [])
 
-  if (loading) return <div className="card">Загрузка…</div>
-  if (error) return <div className="alert alert-error">{error}</div>
+  useEffect(() => {
+    fetchData()
+  }, [fetchData])
+
+  // SSE real-time updates (Part 2.4 — wired up here)
+  useEffect(() => {
+    const es = new EventSource('/api/dashboard/stream')
+
+    es.onmessage = (e) => {
+      const event = JSON.parse(e.data)
+      if (event.type === 'ping') return
+      if (event.type === 'voice_update') {
+        fetchData()
+      }
+      if (event.type === 'action_log') {
+        setRecentLogs(prev => [
+          {
+            id: Date.now(),
+            executed_at: event.timestamp,
+            discord_id: event.discord_id,
+            action_type: event.action_type,
+            rule_id: event.rule_id,
+            is_dry_run: event.is_dry_run,
+            channel_id: null,
+          },
+          ...prev,
+        ].slice(0, 20))
+      }
+    }
+
+    es.onerror = () => {
+      console.warn('SSE disconnected, reconnecting...')
+    }
+
+    return () => es.close()
+  }, [fetchData])
+
+  if (loading) {
+    return (
+      <div style={{ display: 'flex', justifyContent: 'center', paddingTop: 60 }}>
+        <Spin size="large" />
+      </div>
+    )
+  }
+
+  if (error) return <Alert type="error" message={error} />
+
+  const onlineColumns = [
+    {
+      title: '',
+      dataIndex: 'avatar',
+      width: 40,
+      render: (url) => <Avatar src={url} size="small" />,
+    },
+    { title: 'Пользователь', dataIndex: 'username' },
+    { title: 'Канал', dataIndex: 'channel_name' },
+    {
+      title: 'Время в канале',
+      dataIndex: 'joined_at',
+      render: (v) => <Timestamp iso={v} />,
+    },
+  ]
+
+  const logColumns = [
+    {
+      title: 'Время',
+      dataIndex: 'executed_at',
+      render: (v) => <Timestamp iso={v} />,
+      width: 130,
+    },
+    {
+      title: 'Discord ID',
+      dataIndex: 'discord_id',
+      render: (v) => <DiscordId id={v} />,
+    },
+    {
+      title: 'Действие',
+      dataIndex: 'action_type',
+      render: (v, r) => <ActionTag type={v} isDryRun={r.is_dry_run} />,
+      width: 140,
+    },
+    { title: 'Rule ID', dataIndex: 'rule_id', width: 80, render: v => v ?? '—' },
+  ]
+
+  const onlineUsers = dashboard?.online_users || []
+  const todayActions = stats?.total_actions || 0
 
   return (
     <>
-      <div className="card">
-        <h2>Обзор</h2>
-        <div className="form-row" style={{ marginBottom: 0 }}>
-          <div>
-            <span style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>В голосе</span>
-            <div style={{ fontSize: '1.5rem', fontWeight: 600 }}>{data.voice_online_count ?? '—'}</div>
-          </div>
-          <div>
-            <span style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>Активных правил</span>
-            <div style={{ fontSize: '1.5rem', fontWeight: 600 }}>{data.active_rules?.length ?? 0}</div>
-          </div>
+      <div style={PAGE_HEADER}>
+        <div>
+          <Typography.Title
+            level={4}
+            style={{ margin: 0, fontFamily: 'Syne, sans-serif', color: 'var(--text-primary)', fontWeight: 600 }}
+          >
+            Dashboard
+          </Typography.Title>
+          <Typography.Text style={{ color: 'var(--text-secondary)', fontSize: 12 }}>
+            Обзор активности бота в реальном времени
+          </Typography.Text>
         </div>
       </div>
 
-      <div className="card">
-        <h2>Активные правила</h2>
-        {data.active_rules?.length ? (
-          <div className="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>Название</th>
-                  <th>Действие</th>
-                  <th>Список</th>
-                  <th>Приоритет</th>
-                </tr>
-              </thead>
-              <tbody>
-                {data.active_rules.map((r) => (
-                  <tr key={r.id}>
-                    <td>{r.name}</td>
-                    <td>{r.action_type}</td>
-                    <td>{r.target_list || '—'}</td>
-                    <td>{r.priority}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        ) : (
-          <p className="empty-state">Нет активных правил</p>
-        )}
-      </div>
+      <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
+        <Col xs={24} sm={12} lg={6}>
+          <StatCard
+            title="Активных правил"
+            value={dashboard?.active_rules?.length ?? 0}
+            icon={<OrderedListOutlined />}
+            color="#5865F2"
+          />
+        </Col>
+        <Col xs={24} sm={12} lg={6}>
+          <StatCard
+            title="В голосе сейчас"
+            value={dashboard?.voice_online_count ?? 0}
+            icon={<TeamOutlined />}
+            color="#23c55e"
+          />
+        </Col>
+        <Col xs={24} sm={12} lg={6}>
+          <StatCard
+            title="Действий всего"
+            value={todayActions}
+            icon={<ThunderboltOutlined />}
+            color="#f59e0b"
+          />
+        </Col>
+        <Col xs={24} sm={12} lg={6}>
+          <StatCard
+            title="Последних событий"
+            value={recentLogs.length}
+            icon={<HistoryOutlined />}
+            color="#3b82f6"
+          />
+        </Col>
+      </Row>
 
-      <div className="card">
-        <h2>Последние логи</h2>
-        {data.recent_logs?.length ? (
-          <div className="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>Время</th>
-                  <th>discord_id</th>
-                  <th>Действие</th>
-                  <th>rule_id</th>
-                </tr>
-              </thead>
-              <tbody>
-                {data.recent_logs.map((log) => (
-                  <tr key={log.id}>
-                    <td>{new Date(log.executed_at).toLocaleString()}</td>
-                    <td>{log.discord_id}</td>
-                    <td>{log.action_type || '—'}</td>
-                    <td>{log.rule_id ?? '—'}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        ) : (
-          <p className="empty-state">Нет логов</p>
-        )}
-      </div>
+      <Row gutter={[16, 16]}>
+        <Col xs={24} lg={12}>
+          <Typography.Title
+            level={5}
+            style={{ fontFamily: 'Syne, sans-serif', color: 'var(--text-primary)', marginBottom: 12 }}
+          >
+            Сейчас в голосе
+          </Typography.Title>
+          {onlineUsers.length === 0 ? (
+            <Empty description="Никого нет в голосовых каналах" />
+          ) : (
+            <Table
+              dataSource={onlineUsers}
+              columns={onlineColumns}
+              rowKey="user_id"
+              size="small"
+              pagination={false}
+              rowClassName={() => 'table-row'}
+            />
+          )}
+        </Col>
+
+        <Col xs={24} lg={12}>
+          <Typography.Title
+            level={5}
+            style={{ fontFamily: 'Syne, sans-serif', color: 'var(--text-primary)', marginBottom: 12 }}
+          >
+            Последние события
+          </Typography.Title>
+          {recentLogs.length === 0 ? (
+            <Empty description="Нет событий" />
+          ) : (
+            <Table
+              dataSource={recentLogs}
+              columns={logColumns}
+              rowKey="id"
+              size="small"
+              pagination={false}
+              rowClassName={() => 'table-row'}
+            />
+          )}
+        </Col>
+      </Row>
     </>
   )
 }

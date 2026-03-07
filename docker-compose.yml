@@ -1,32 +1,52 @@
 services:
-  db:
+
+  postgres:
     image: postgres:16-alpine
-    environment:
-      POSTGRES_USER: bot
-      POSTGRES_PASSWORD: password
-      POSTGRES_DB: voice_bot
+    container_name: discord-bot-postgres
+    env_file: .env
     volumes:
       - postgres_data:/var/lib/postgresql/data
-    ports:
-      - "5432:5432"
+    networks:
+      - internal
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U bot"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
       interval: 5s
       timeout: 5s
       retries: 5
 
-  bot:
-    build: .
+  bot-api:
+    build:
+      context: .
+      dockerfile: Dockerfile.bot
+    container_name: discord-bot-api
     env_file: .env
-    depends_on:
-      db:
-        condition: service_healthy
-    ports:
-      - "8000:8000"
     volumes:
       - ./config.yaml:/app/config.yaml:ro
+      - ./sounds:/app/data/sounds
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - internal
     restart: unless-stopped
     command: ["sh", "-c", "alembic upgrade head && exec python -m src.main"]
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.frontend
+    container_name: discord-bot-frontend
+    ports:
+      - "80:80"
+    depends_on:
+      - bot-api
+    networks:
+      - internal
+    restart: unless-stopped
+
+networks:
+  internal:
+    driver: bridge
 
 volumes:
   postgres_data:

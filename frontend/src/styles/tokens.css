@@ -1,0 +1,36 @@
+:root {
+  /* Backgrounds */
+  --bg-base:        #0d0e11;
+  --bg-surface:     #13151a;
+  --bg-elevated:    #1a1d24;
+  --bg-input:       #1e2128;
+
+  /* Borders */
+  --border-subtle:  #1f2229;
+  --border-base:    #2a2d36;
+  --border-focus:   #5865F2;
+
+  /* Text */
+  --text-primary:   #e8eaf0;
+  --text-secondary: #8b8fa8;
+  --text-muted:     #4a4d5e;
+  --text-mono:      #a8b4c8;
+
+  /* Brand */
+  --accent:         #5865F2;
+  --accent-hover:   #4752c4;
+
+  /* Status */
+  --status-success: #23c55e;
+  --status-warning: #f59e0b;
+  --status-error:   #ef4444;
+  --status-info:    #3b82f6;
+
+  /* Action type colors */
+  --action-mute:    #f59e0b;
+  --action-unmute:  #23c55e;
+  --action-move:    #3b82f6;
+  --action-kick:    #ef4444;
+  --action-dry:     #6b7280;
+  --action-pair:    #8b5cf6;
+}

@@ -6,7 +6,7 @@ from typing import Annotated, Literal
 import asyncpg
 from fastapi import APIRouter, Depends, HTTPException, Query
 
-from src.api.deps import get_db_pool, verify_api_key
+from src.api.deps import get_current_user, get_db_pool
 from src.api.schemas import UserListBulk, UserListCreate, UserListResponse
 from src.db import database
 from src.db.repositories import users_repo
@@ -17,7 +17,7 @@ router = APIRouter()
 @router.get("/users", response_model=list[UserListResponse])
 async def list_users(
     list_type: Annotated[Literal["whitelist", "blacklist"], Query(description="Тип списка: `whitelist` или `blacklist`")],
-    _: Annotated[None, Depends(verify_api_key)],
+    _: Annotated[None, Depends(get_current_user)],
     pool: Annotated[asyncpg.Pool, Depends(get_db_pool)],
 ) -> list[UserListResponse]:
     """
@@ -33,7 +33,7 @@ async def list_users(
 @router.post("/users", response_model=UserListResponse)
 async def add_user(
     body: UserListCreate,
-    _: Annotated[None, Depends(verify_api_key)],
+    _: Annotated[None, Depends(get_current_user)],
     pool: Annotated[asyncpg.Pool, Depends(get_db_pool)],
 ) -> UserListResponse:
     """
@@ -66,7 +66,7 @@ async def add_user(
 async def remove_user(
     discord_id: int,
     list_type: Annotated[Literal["whitelist", "blacklist"], Query(description="Тип списка из которого удалить")],
-    _: Annotated[None, Depends(verify_api_key)],
+    _: Annotated[None, Depends(get_current_user)],
     pool: Annotated[asyncpg.Pool, Depends(get_db_pool)],
 ) -> None:
     """
@@ -83,7 +83,7 @@ async def remove_user(
 @router.post("/users/bulk")
 async def bulk_add_users(
     body: UserListBulk,
-    _: Annotated[None, Depends(verify_api_key)],
+    _: Annotated[None, Depends(get_current_user)],
     pool: Annotated[asyncpg.Pool, Depends(get_db_pool)],
 ) -> dict:
     """

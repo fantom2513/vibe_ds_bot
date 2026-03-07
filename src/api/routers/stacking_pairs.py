@@ -6,7 +6,7 @@ from typing import Annotated
 import asyncpg
 from fastapi import APIRouter, Depends, HTTPException
 
-from src.api.deps import get_db_pool, verify_api_key
+from src.api.deps import get_current_user, get_db_pool
 from src.api.schemas import StackingPairCreate, StackingPairResponse
 
 router = APIRouter(prefix="/stacking-pairs", tags=["stacking-pairs"])
@@ -32,7 +32,7 @@ def _normalize_pair(user_id_1: int, user_id_2: int) -> tuple[int, int]:
 
 @router.get("", response_model=list[StackingPairResponse])
 async def list_stacking_pairs(
-    _: Annotated[None, Depends(verify_api_key)],
+    _: Annotated[None, Depends(get_current_user)],
     pool: Annotated[asyncpg.Pool, Depends(get_db_pool)],
 ) -> list[StackingPairResponse]:
     """
@@ -50,7 +50,7 @@ async def list_stacking_pairs(
 @router.post("", response_model=StackingPairResponse, status_code=201)
 async def create_stacking_pair(
     body: StackingPairCreate,
-    _: Annotated[None, Depends(verify_api_key)],
+    _: Annotated[None, Depends(get_current_user)],
     pool: Annotated[asyncpg.Pool, Depends(get_db_pool)],
 ) -> StackingPairResponse:
     """
@@ -94,7 +94,7 @@ async def create_stacking_pair(
 @router.patch("/{pair_id}/toggle", response_model=StackingPairResponse)
 async def toggle_stacking_pair(
     pair_id: int,
-    _: Annotated[None, Depends(verify_api_key)],
+    _: Annotated[None, Depends(get_current_user)],
     pool: Annotated[asyncpg.Pool, Depends(get_db_pool)],
 ) -> StackingPairResponse:
     """
@@ -118,7 +118,7 @@ async def toggle_stacking_pair(
 @router.delete("/{pair_id}", status_code=204)
 async def delete_stacking_pair(
     pair_id: int,
-    _: Annotated[None, Depends(verify_api_key)],
+    _: Annotated[None, Depends(get_current_user)],
     pool: Annotated[asyncpg.Pool, Depends(get_db_pool)],
 ) -> None:
     """Удалить пару стакинга по ID."""

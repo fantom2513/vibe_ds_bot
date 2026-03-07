@@ -2,9 +2,12 @@
 Cog: голосовые события. on_voice_state_update — tracker, evaluator, actions, логирование.
 Pool, tracker, evaluator, actions и репозитории берутся из self.bot.
 """
+import asyncio
+
 import discord
 from discord.ext import commands
 
+from src.api.sse import broadcaster
 from src.engine.rules import rules_from_dicts
 from src.scheduler.kick_timeout_job import clear_session_timeout
 from src.utils.logging import get_logger
@@ -69,6 +72,14 @@ class VoiceManager(commands.Cog):
                     username=member.display_name,
                     channel_id=after.channel.id,
                 )
+            asyncio.create_task(broadcaster.broadcast({
+                "type": "voice_update",
+                "user_id": str(member.id),
+                "username": member.display_name,
+                "avatar": str(member.display_avatar.url),
+                "channel": after.channel.name,
+                "action": "move" if before.channel else "join",
+            }))
 
             # Pair stacking: если пара в одном канале — перенос в целевой; при срабатывании правила не выполняем
             stacking = getattr(self.bot, "stacking_detector", None)
@@ -118,6 +129,16 @@ class VoiceManager(commands.Cog):
                             after.channel.id,
                             details={"channel_id": after.channel.id},
                         )
+                        from datetime import datetime
+                        asyncio.create_task(broadcaster.broadcast({
+                            "type": "action_log",
+                            "discord_id": str(member.id),
+                            "username": member.display_name,
+                            "action_type": action.action_type,
+                            "rule_id": action.rule_id,
+                            "is_dry_run": action.is_dry_run,
+                            "timestamp": datetime.utcnow().isoformat(),
+                        }))
             return
 
         # Выход из канала
@@ -133,6 +154,14 @@ class VoiceManager(commands.Cog):
                 username=member.display_name,
                 channel_id=before.channel.id,
             )
+            asyncio.create_task(broadcaster.broadcast({
+                "type": "voice_update",
+                "user_id": str(member.id),
+                "username": member.display_name,
+                "avatar": str(member.display_avatar.url),
+                "channel": None,
+                "action": "leave",
+            }))
 
 
 async def setup(bot: commands.Bot) -> None:

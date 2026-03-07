@@ -24,23 +24,34 @@ jobs:
           API_SECRET_KEY=${{ secrets.API_SECRET_KEY }}
           SCHEDULER_CHECK_INTERVAL=30
           DEFAULT_TIMEZONE=Europe/Moscow
+          POSTGRES_USER=${{ secrets.POSTGRES_USER }}
+          POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }}
+          POSTGRES_DB=${{ secrets.POSTGRES_DB }}
+          DISCORD_CLIENT_ID=${{ secrets.DISCORD_CLIENT_ID }}
+          DISCORD_CLIENT_SECRET=${{ secrets.DISCORD_CLIENT_SECRET }}
+          DISCORD_REDIRECT_URI=${{ secrets.DISCORD_REDIRECT_URI }}
+          JWT_SECRET=${{ secrets.JWT_SECRET }}
+          JWT_EXPIRE_HOURS=24
+          ALLOWED_DISCORD_IDS=${{ secrets.ALLOWED_DISCORD_IDS }}
           EOF
 
       - name: Stop old containers
         run: docker compose down --remove-orphans || true
 
-      - name: Build and start containers
-        run: docker compose up -d --build
-
-      - name: Wait for services to start
-        run: sleep 10
+      - name: Build and deploy
+        run: |
+          docker compose build bot-api frontend
+          docker compose up -d
+          sleep 10
+          curl -f http://localhost/api/health || exit 1
+          curl -f http://localhost/ || exit 1
 
       - name: Health check — database
-        run: docker compose exec -T db pg_isready -U bot
+        run: docker compose exec -T postgres pg_isready -U ${POSTGRES_USER:-bot}
 
-      - name: Health check — bot is running
+      - name: Health check — bot-api is running
         run: |
-          STATUS=$(docker compose ps bot --format json | python3 -c "
+          STATUS=$(docker compose ps bot-api --format json | python3 -c "
           import json,sys
           data=sys.stdin.read().strip()
           try:
@@ -50,9 +61,9 @@ jobs:
           except: print('')
           ")
           if echo "$STATUS" | grep -q "running"; then
-            echo "Bot is running"
+            echo "Bot API is running"
           else
-            echo "Bot is NOT running"
+            echo "Bot API is NOT running"
             exit 1
           fi
 
@@ -60,6 +71,6 @@ jobs:
         if: always()
         run: docker compose ps
 
-      - name: Show recent bot logs
+      - name: Show recent bot-api logs
         if: failure()
-        run: docker compose logs bot --tail=50
+        run: docker compose logs bot-api --tail=50

@@ -1,235 +1,287 @@
 import { useState, useEffect } from 'react'
-import { api } from '../api/client'
+import {
+  Table, Button, Drawer, Form, Select, Input, InputNumber, Switch, Tag,
+  Popconfirm, message, Alert, Spin, Empty, Space, Typography,
+} from 'antd'
+import { PlusOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons'
+import { getRules, createRule, updateRule, deleteRule, toggleRule } from '../api/rules'
+import ActionTag from '../components/ActionTag'
 
-const ACTION_TYPES = ['mute', 'unmute', 'move', 'kick']
-const TARGET_LIST_OPTIONS = ['', 'whitelist', 'blacklist']
-
-function parseChannelIds(v) {
-  if (!v || typeof v !== 'string') return null
-  const arr = v.trim().split(/[\s,]+/).map((s) => parseInt(s, 10)).filter((n) => !isNaN(n))
-  return arr.length ? arr : null
-}
-
-function formatChannelIds(arr) {
-  return Array.isArray(arr) && arr.length ? arr.join(', ') : ''
+const PAGE_HEADER = {
+  display: 'flex',
+  justifyContent: 'space-between',
+  alignItems: 'center',
+  marginBottom: 20,
+  paddingBottom: 16,
+  borderBottom: '1px solid var(--border-subtle)',
 }
 
 export default function Rules() {
-  const [list, setList] = useState([])
+  const [rules, setRules] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const [drawerOpen, setDrawerOpen] = useState(false)
   const [editing, setEditing] = useState(null)
-  const [form, setForm] = useState({
-    name: '',
-    description: '',
-    is_active: true,
-    target_list: '',
-    channel_ids: '',
-    max_time_sec: '',
-    action_type: 'mute',
-    action_params: '{}',
-    schedule_cron: '',
-    schedule_tz: 'UTC',
-    priority: 0,
-  })
+  const [saving, setSaving] = useState(false)
+  const [form] = Form.useForm()
 
-  const load = () => {
-    setLoading(true)
-    api.get('/api/rules')
-      .then(setList)
-      .catch((err) => setError(err.message))
-      .finally(() => setLoading(false))
+  const load = async () => {
+    try {
+      const data = await getRules()
+      setRules(data)
+    } catch (e) {
+      setError(e.message)
+    } finally {
+      setLoading(false)
+    }
   }
 
   useEffect(() => { load() }, [])
 
   const openCreate = () => {
     setEditing(null)
-    setForm({
-      name: '',
-      description: '',
-      is_active: true,
-      target_list: '',
-      channel_ids: '',
-      max_time_sec: '',
-      action_type: 'mute',
-      action_params: '{}',
-      schedule_cron: '',
-      schedule_tz: 'UTC',
-      priority: 0,
-    })
+    form.resetFields()
+    form.setFieldsValue({ is_active: true, is_dry_run: false, priority: 0, action_params: '{}' })
+    setDrawerOpen(true)
   }
 
-  const openEdit = (r) => {
-    setEditing(r.id)
-    setForm({
-      name: r.name,
-      description: r.description || '',
-      is_active: r.is_active,
-      target_list: r.target_list || '',
-      channel_ids: formatChannelIds(r.channel_ids),
-      max_time_sec: r.max_time_sec ?? '',
-      action_type: r.action_type || 'mute',
-      action_params: typeof r.action_params === 'object' ? JSON.stringify(r.action_params, null, 2) : (r.action_params || '{}'),
-      schedule_cron: r.schedule_cron || '',
-      schedule_tz: r.schedule_tz || 'UTC',
-      priority: r.priority ?? 0,
+  const openEdit = (rule) => {
+    setEditing(rule)
+    form.setFieldsValue({
+      target_list: rule.target_list,
+      channel_ids: rule.channel_ids,
+      max_time_sec: rule.max_time_sec,
+      action_type: rule.action_type,
+      action_params: typeof rule.action_params === 'object'
+        ? JSON.stringify(rule.action_params, null, 2)
+        : (rule.action_params || '{}'),
+      priority: rule.priority ?? 0,
+      is_active: rule.is_active,
+      is_dry_run: rule.is_dry_run,
     })
+    setDrawerOpen(true)
   }
 
-  const parseParams = () => {
+  const handleSave = async () => {
+    let values
     try {
-      return form.action_params ? JSON.parse(form.action_params) : {}
-    } catch (_) {
-      return {}
+      values = await form.validateFields()
+    } catch { return }
+
+    // Validate action_params JSON
+    try {
+      values.action_params = JSON.parse(values.action_params || '{}')
+    } catch {
+      message.error('action_params — невалидный JSON')
+      return
+    }
+
+    setSaving(true)
+    try {
+      if (editing) {
+        await updateRule(editing.id, values)
+        message.success('Правило обновлено')
+      } else {
+        await createRule(values)
+        message.success('Правило создано')
+      }
+      setDrawerOpen(false)
+      load()
+    } catch (e) {
+      message.error(e.response?.data?.detail || 'Ошибка сохранения')
+    } finally {
+      setSaving(false)
     }
   }
 
-  const saveRule = (e) => {
-    e.preventDefault()
-    const payload = {
-      name: form.name,
-      description: form.description || null,
-      is_active: form.is_active,
-      target_list: form.target_list || null,
-      channel_ids: parseChannelIds(form.channel_ids),
-      max_time_sec: form.max_time_sec === '' ? null : parseInt(form.max_time_sec, 10),
-      action_type: form.action_type,
-      action_params: parseParams(),
-      schedule_cron: form.schedule_cron || null,
-      schedule_tz: form.schedule_tz || 'UTC',
-      priority: parseInt(form.priority, 10) || 0,
-    }
-    if (editing) {
-      api.put(`/api/rules/${editing}`, payload).then(() => { load(); setEditing(null) }).catch((err) => setError(err.message))
-    } else {
-      api.post('/api/rules', payload).then(() => { load(); openCreate(); setError(null) }).catch((err) => setError(err.message))
+  const handleDelete = async (id) => {
+    try {
+      await deleteRule(id)
+      message.success('Правило удалено')
+      load()
+    } catch (e) {
+      message.error(e.response?.data?.detail || 'Ошибка удаления')
     }
   }
 
-  const toggleRule = (id) => {
-    api.patch(`/api/rules/${id}/toggle`).then(load).catch((err) => setError(err.message))
+  const handleToggle = async (rule) => {
+    try {
+      await toggleRule(rule.id)
+      load()
+    } catch (e) {
+      message.error(e.response?.data?.detail || 'Ошибка')
+    }
   }
 
-  const deleteRule = (id) => {
-    if (!confirm('Удалить правило?')) return
-    api.delete(`/api/rules/${id}`).then(() => { load(); setEditing(null) }).catch((err) => setError(err.message))
-  }
+  const columns = [
+    {
+      title: 'ID',
+      dataIndex: 'id',
+      width: 60,
+      render: v => (
+        <span style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 11, color: 'var(--text-mono)' }}>
+          {v}
+        </span>
+      ),
+    },
+    {
+      title: 'Target List',
+      dataIndex: 'target_list',
+      width: 110,
+      render: v => v
+        ? <Tag color={v === 'whitelist' ? 'green' : 'red'}>{v}</Tag>
+        : <span style={{ color: 'var(--text-muted)' }}>—</span>,
+    },
+    {
+      title: 'Каналы',
+      dataIndex: 'channel_ids',
+      render: v => Array.isArray(v) && v.length
+        ? <span style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 11 }}>{v.join(', ')}</span>
+        : <span style={{ color: 'var(--text-muted)' }}>Все</span>,
+    },
+    {
+      title: 'Max Time',
+      dataIndex: 'max_time_sec',
+      width: 100,
+      render: v => v
+        ? <span style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 11 }}>{Math.round(v / 60)} мин</span>
+        : <span style={{ color: 'var(--text-muted)' }}>—</span>,
+    },
+    {
+      title: 'Действие',
+      dataIndex: 'action_type',
+      width: 130,
+      render: (v, r) => <ActionTag type={v} isDryRun={r.is_dry_run} />,
+    },
+    {
+      title: 'Приоритет',
+      dataIndex: 'priority',
+      width: 90,
+      render: v => (
+        <span style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 11 }}>{v}</span>
+      ),
+    },
+    {
+      title: 'Активно',
+      dataIndex: 'is_active',
+      width: 90,
+      render: (v, r) => (
+        <Switch checked={v} size="small" onChange={() => handleToggle(r)} />
+      ),
+    },
+    {
+      title: '',
+      key: 'actions',
+      width: 90,
+      render: (_, r) => (
+        <Space size={4}>
+          <Button
+            size="small"
+            icon={<EditOutlined />}
+            onClick={() => openEdit(r)}
+          />
+          <Popconfirm
+            title="Удалить правило?"
+            onConfirm={() => handleDelete(r.id)}
+            okText="Да"
+            cancelText="Нет"
+          >
+            <Button size="small" danger icon={<DeleteOutlined />} />
+          </Popconfirm>
+        </Space>
+      ),
+    },
+  ]
 
-  if (loading) return <div className="card">Загрузка…</div>
+  if (loading) return <div style={{ textAlign: 'center', paddingTop: 60 }}><Spin size="large" /></div>
+  if (error) return <Alert type="error" message={error} />
 
   return (
     <>
-      {error && <div className="alert alert-error">{error}</div>}
-      <div className="card">
-        <h2>Правила</h2>
-        <div style={{ marginBottom: '1rem' }}>
-          <button type="button" className="btn btn-primary" onClick={openCreate}>
-            Создать
-          </button>
+      <div style={PAGE_HEADER}>
+        <div>
+          <Typography.Title
+            level={4}
+            style={{ margin: 0, fontFamily: 'Syne, sans-serif', color: 'var(--text-primary)', fontWeight: 600 }}
+          >
+            Rules
+          </Typography.Title>
+          <Typography.Text style={{ color: 'var(--text-secondary)', fontSize: 12 }}>
+            Управление правилами обработки голосовых событий
+          </Typography.Text>
         </div>
-        <div className="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>ID</th>
-                <th>Название</th>
-                <th>Активно</th>
-                <th>Список</th>
-                <th>Действие</th>
-                <th>max_time_sec</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
-              {list.map((r) => (
-                <tr key={r.id}>
-                  <td>{r.id}</td>
-                  <td>{r.name}</td>
-                  <td><span className={`badge ${r.is_active ? 'badge-on' : 'badge-off'}`}>{r.is_active ? 'Да' : 'Нет'}</span></td>
-                  <td>{r.target_list || '—'}</td>
-                  <td>{r.action_type}</td>
-                  <td>{r.max_time_sec ?? '—'}</td>
-                  <td className="actions-cell">
-                    <button type="button" className="btn btn-secondary btn-sm" onClick={() => toggleRule(r.id)}>Вкл/Выкл</button>
-                    <button type="button" className="btn btn-secondary btn-sm" onClick={() => openEdit(r)}>Изменить</button>
-                    <button type="button" className="btn btn-danger btn-sm" onClick={() => deleteRule(r.id)}>Удалить</button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-        {list.length === 0 && <p className="empty-state">Нет правил</p>}
+        <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>
+          Новое правило
+        </Button>
       </div>
 
-      {(editing !== null || (editing === null && form.name !== '')) && (
-        <div className="card">
-          <h2>{editing ? 'Редактировать правило' : 'Новое правило'}</h2>
-          <form onSubmit={saveRule}>
-            <div className="form-row">
-              <div className="form-group">
-                <label>Название *</label>
-                <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
-              </div>
-              <div className="form-group">
-                <label>Действие</label>
-                <select value={form.action_type} onChange={(e) => setForm({ ...form, action_type: e.target.value })}>
-                  {ACTION_TYPES.map((a) => <option key={a} value={a}>{a}</option>)}
-                </select>
-              </div>
-            </div>
-            <div className="form-group">
-              <label>Описание</label>
-              <input value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
-            </div>
-            <div className="form-row">
-              <div className="form-group">
-                <label>Список (whitelist/blacklist)</label>
-                <select value={form.target_list} onChange={(e) => setForm({ ...form, target_list: e.target.value })}>
-                  {TARGET_LIST_OPTIONS.map((o) => <option key={o || 'none'} value={o}>{o || '—'}</option>)}
-                </select>
-              </div>
-              <div className="form-group">
-                <label>channel_ids (через запятую)</label>
-                <input value={form.channel_ids} onChange={(e) => setForm({ ...form, channel_ids: e.target.value })} placeholder="123, 456" />
-              </div>
-              <div className="form-group">
-                <label>max_time_sec</label>
-                <input type="number" value={form.max_time_sec} onChange={(e) => setForm({ ...form, max_time_sec: e.target.value })} placeholder="60" />
-              </div>
-              <div className="form-group">
-                <label>Приоритет</label>
-                <input type="number" value={form.priority} onChange={(e) => setForm({ ...form, priority: e.target.value })} />
-              </div>
-            </div>
-            <div className="form-row">
-              <div className="form-group">
-                <label>schedule_cron</label>
-                <input value={form.schedule_cron} onChange={(e) => setForm({ ...form, schedule_cron: e.target.value })} />
-              </div>
-              <div className="form-group">
-                <label>schedule_tz</label>
-                <input value={form.schedule_tz} onChange={(e) => setForm({ ...form, schedule_tz: e.target.value })} />
-              </div>
-            </div>
-            <div className="form-group">
-              <label>action_params (JSON)</label>
-              <textarea rows={3} value={form.action_params} onChange={(e) => setForm({ ...form, action_params: e.target.value })} />
-            </div>
-            <div className="form-group">
-              <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <input type="checkbox" checked={form.is_active} onChange={(e) => setForm({ ...form, is_active: e.target.checked })} />
-                Активно
-              </label>
-            </div>
-            <div style={{ display: 'flex', gap: '0.5rem' }}>
-              <button type="submit" className="btn btn-primary">Сохранить</button>
-              <button type="button" className="btn btn-secondary" onClick={() => { setEditing(null); setForm({ ...form, name: '' }) }}>Отмена</button>
-            </div>
-          </form>
-        </div>
+      {rules.length === 0 ? (
+        <Empty description="Нет правил" />
+      ) : (
+        <Table
+          dataSource={rules}
+          columns={columns}
+          rowKey="id"
+          size="small"
+          pagination={{ pageSize: 20, size: 'small', showTotal: t => `Всего: ${t}` }}
+          rowClassName={() => 'table-row'}
+        />
       )}
+
+      <Drawer
+        title={editing ? 'Редактировать правило' : 'Новое правило'}
+        open={drawerOpen}
+        onClose={() => setDrawerOpen(false)}
+        width={520}
+        extra={
+          <Button type="primary" loading={saving} onClick={handleSave}>
+            Сохранить
+          </Button>
+        }
+      >
+        <Form form={form} layout="vertical">
+          <Form.Item name="target_list" label="Target List">
+            <Select placeholder="Все пользователи" allowClear>
+              <Select.Option value="whitelist">whitelist</Select.Option>
+              <Select.Option value="blacklist">blacklist</Select.Option>
+            </Select>
+          </Form.Item>
+          <Form.Item name="channel_ids" label="Channel IDs (пустой = все каналы)">
+            <Select mode="tags" placeholder="Введите ID канала и нажмите Enter" tokenSeparators={[',']} />
+          </Form.Item>
+          <Form.Item name="max_time_sec" label="Max Time (секунды)">
+            <InputNumber style={{ width: '100%' }} min={1} placeholder="например 3600" />
+          </Form.Item>
+          <Form.Item name="action_type" label="Action Type" rules={[{ required: true }]}>
+            <Select>
+              {['mute', 'unmute', 'move', 'kick'].map(t => (
+                <Select.Option key={t} value={t}>{t}</Select.Option>
+              ))}
+            </Select>
+          </Form.Item>
+          <Form.Item
+            name="action_params"
+            label="Action Params (JSON)"
+            rules={[{
+              validator: (_, v) => {
+                try { JSON.parse(v || '{}'); return Promise.resolve() }
+                catch { return Promise.reject('Невалидный JSON') }
+              }
+            }]}
+          >
+            <Input.TextArea rows={3} style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 11 }} />
+          </Form.Item>
+          <Form.Item name="priority" label="Приоритет">
+            <InputNumber style={{ width: '100%' }} defaultValue={0} />
+          </Form.Item>
+          <Form.Item name="is_active" label="Активно" valuePropName="checked">
+            <Switch />
+          </Form.Item>
+          <Form.Item name="is_dry_run" label="Dry Run" valuePropName="checked">
+            <Switch />
+          </Form.Item>
+        </Form>
+      </Drawer>
     </>
   )
 }
