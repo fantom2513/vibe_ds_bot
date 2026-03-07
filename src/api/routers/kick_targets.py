@@ -33,7 +33,13 @@ async def list_kick_targets(
     _: Annotated[None, Depends(verify_api_key)],
     pool: Annotated[asyncpg.Pool, Depends(get_db_pool)],
 ) -> list[KickTargetResponse]:
-    """Список всех таргетов кика по таймауту."""
+    """
+    Список всех пользователей с таймаутом кика.
+
+    Бот автоматически выкидывает пользователя из войса, если он сидит дольше заданного времени.
+    Если задан `max_timeout_sec` — таймаут рандомизируется в диапазоне `[timeout_sec, max_timeout_sec]`
+    при каждом новом входе в канал.
+    """
     rows = await pool.fetch(f"{_SELECT} ORDER BY id")
     return [_row_to_response(r) for r in rows]
 
@@ -44,7 +50,24 @@ async def create_kick_target(
     _: Annotated[None, Depends(verify_api_key)],
     pool: Annotated[asyncpg.Pool, Depends(get_db_pool)],
 ) -> KickTargetResponse:
-    """Добавить таргет. 409 при дубликате discord_id."""
+    """
+    Добавить пользователя в список автокика по таймауту.
+
+    - **discord_id** — Discord ID пользователя (ПКМ на пользователе → Скопировать ID)
+    - **timeout_sec** — минимальное время в войсе в секундах перед киком (по умолчанию 1800 = 30 мин)
+    - **max_timeout_sec** — если задан, таймаут будет случайным от `timeout_sec` до `max_timeout_sec`
+
+    Пример (рандомный кик от 30 до 90 минут):
+    ```json
+    {
+      "discord_id": 123456789012345678,
+      "timeout_sec": 1800,
+      "max_timeout_sec": 5400
+    }
+    ```
+
+    409 если пользователь уже добавлен.
+    """
     try:
         now = datetime.now(timezone.utc)
         row = await pool.fetchrow(
@@ -70,7 +93,7 @@ async def get_kick_target(
     _: Annotated[None, Depends(verify_api_key)],
     pool: Annotated[asyncpg.Pool, Depends(get_db_pool)],
 ) -> KickTargetResponse:
-    """Получить таргет по discord_id."""
+    """Получить настройки таймаута кика для пользователя по его Discord ID."""
     row = await pool.fetchrow(f"{_SELECT} WHERE discord_id = $1", discord_id)
     if not row:
         raise HTTPException(status_code=404, detail="Kick target not found")
@@ -84,7 +107,18 @@ async def update_kick_target(
     _: Annotated[None, Depends(verify_api_key)],
     pool: Annotated[asyncpg.Pool, Depends(get_db_pool)],
 ) -> KickTargetResponse:
-    """Обновить таргет (timeout_sec, max_timeout_sec, is_active, username)."""
+    """
+    Обновить настройки таймаута кика для пользователя.
+
+    Передавай только поля, которые нужно изменить. Например, чтобы отключить кик:
+    ```json
+    {"is_active": false}
+    ```
+    Или изменить диапазон:
+    ```json
+    {"timeout_sec": 3600, "max_timeout_sec": 7200}
+    ```
+    """
     row = await pool.fetchrow(f"{_SELECT} WHERE discord_id = $1", discord_id)
     if not row:
         raise HTTPException(status_code=404, detail="Kick target not found")
@@ -129,7 +163,7 @@ async def delete_kick_target(
     _: Annotated[None, Depends(verify_api_key)],
     pool: Annotated[asyncpg.Pool, Depends(get_db_pool)],
 ) -> None:
-    """Удалить таргет по discord_id."""
+    """Полностью удалить пользователя из списка автокика по Discord ID."""
     result = await pool.execute("DELETE FROM kick_targets WHERE discord_id = $1", discord_id)
     if result == "DELETE 0":
         raise HTTPException(status_code=404, detail="Kick target not found")

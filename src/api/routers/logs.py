@@ -17,15 +17,25 @@ router = APIRouter()
 async def list_logs(
     _: Annotated[None, Depends(verify_api_key)],
     pool: Annotated[asyncpg.Pool, Depends(get_db_pool)],
-    limit: int = Query(default=50, ge=1, le=500),
-    offset: int = Query(default=0, ge=0),
-    discord_id: Optional[int] = Query(None),
-    rule_id: Optional[int] = Query(None),
-    action_type: Optional[str] = Query(None),
-    date_from: Optional[str] = Query(None, description="ISO datetime"),
-    date_to: Optional[str] = Query(None, description="ISO datetime"),
+    limit: int = Query(default=50, ge=1, le=500, description="Количество записей (макс. 500)"),
+    offset: int = Query(default=0, ge=0, description="Смещение для пагинации"),
+    discord_id: Optional[int] = Query(None, description="Фильтр по Discord ID пользователя"),
+    rule_id: Optional[int] = Query(None, description="Фильтр по ID правила"),
+    action_type: Optional[str] = Query(None, description="Фильтр по типу действия: kick, mute, unmute, move, kick_timeout, pair_move"),
+    date_from: Optional[str] = Query(None, description="Начало периода (ISO 8601, например 2026-03-01T00:00:00Z)"),
+    date_to: Optional[str] = Query(None, description="Конец периода (ISO 8601, например 2026-03-07T23:59:59Z)"),
 ) -> list[ActionLogResponse]:
-    """Список логов с фильтрами и пагинацией."""
+    """
+    История всех действий бота с фильтрами и пагинацией.
+
+    Типы действий (`action_type`):
+    - `kick` — выброс из войса по правилу (blacklist/whitelist)
+    - `mute` — заглушение по правилу
+    - `unmute` — снятие заглушения
+    - `move` — перемещение в другой канал по правилу
+    - `kick_timeout` — выброс по истечении таймаута (`kick-targets`)
+    - `pair_move` — автоматическое перемещение пары (`stacking-pairs`)
+    """
     filters: dict = {
         "discord_id": discord_id,
         "rule_id": rule_id,

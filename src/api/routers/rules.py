@@ -19,7 +19,17 @@ async def list_rules(
     _: Annotated[None, Depends(verify_api_key)],
     pool: Annotated[asyncpg.Pool, Depends(get_db_pool)],
 ) -> list[RuleResponse]:
-    """Список всех правил."""
+    """
+    Список всех правил (активных и неактивных).
+
+    Правило определяет, что делать с пользователем при входе в голосовой канал:
+    - **target_list** — применять только к `whitelist` или `blacklist` пользователям
+    - **channel_ids** — список каналов, на которые распространяется правило (пусто = все каналы)
+    - **max_time_sec** — максимальное время в канале в секундах, после которого выполняется действие
+    - **action_type** — действие: `kick` (выкинуть из войса), `mute` (заглушить), `unmute`, `move` (переместить)
+    - **action_params** — параметры действия, например `{"target_channel_id": 123}` для `move`
+    - **priority** — приоритет правила (больше = выше)
+    """
     rows = await rules_repo.get_rules(pool, active_only=False)
     return [RuleResponse(**r) for r in rows]
 
@@ -30,7 +40,34 @@ async def create_rule(
     _: Annotated[None, Depends(verify_api_key)],
     pool: Annotated[asyncpg.Pool, Depends(get_db_pool)],
 ) -> RuleResponse:
-    """Создать правило."""
+    """
+    Создать новое правило.
+
+    Примеры:
+
+    **Кикать всех из блэклиста при входе в канал:**
+    ```json
+    {
+      "name": "Кик блэклиста",
+      "is_active": true,
+      "target_list": "blacklist",
+      "action_type": "kick"
+    }
+    ```
+
+    **Переместить пользователя в AFK через 1 час:**
+    ```json
+    {
+      "name": "AFK через час",
+      "is_active": true,
+      "max_time_sec": 3600,
+      "action_type": "move",
+      "action_params": {"target_channel_id": 123456789}
+    }
+    ```
+
+    После создания бот применяет правило мгновенно (LISTEN/NOTIFY).
+    """
     data = body.model_dump()
     row = await rules_repo.create_rule(pool, data)
     await database.notify_config_changed(pool)
@@ -43,7 +80,7 @@ async def get_rule(
     _: Annotated[None, Depends(verify_api_key)],
     pool: Annotated[asyncpg.Pool, Depends(get_db_pool)],
 ) -> RuleResponse:
-    """Получить правило по id."""
+    """Получить правило по ID."""
     row = await rules_repo.get_rule_by_id(pool, rule_id)
     if not row:
         raise HTTPException(status_code=404, detail="Rule not found")
@@ -57,7 +94,12 @@ async def update_rule(
     _: Annotated[None, Depends(verify_api_key)],
     pool: Annotated[asyncpg.Pool, Depends(get_db_pool)],
 ) -> RuleResponse:
-    """Обновить правило."""
+    """
+    Обновить правило полностью (PUT).
+
+    Передавай только те поля, которые нужно изменить — остальные останутся прежними.
+    После обновления бот перезагружает правила мгновенно.
+    """
     data = body.model_dump(exclude_unset=True)
     row = await rules_repo.update_rule(pool, rule_id, data)
     if not row:
@@ -72,7 +114,7 @@ async def delete_rule(
     _: Annotated[None, Depends(verify_api_key)],
     pool: Annotated[asyncpg.Pool, Depends(get_db_pool)],
 ) -> None:
-    """Удалить правило."""
+    """Удалить правило по ID. Связанные расписания удаляются автоматически (CASCADE)."""
     deleted = await rules_repo.delete_rule(pool, rule_id)
     if not deleted:
         raise HTTPException(status_code=404, detail="Rule not found")
@@ -85,7 +127,11 @@ async def toggle_rule(
     _: Annotated[None, Depends(verify_api_key)],
     pool: Annotated[asyncpg.Pool, Depends(get_db_pool)],
 ) -> RuleResponse:
-    """Переключить is_active правила."""
+    """
+    Включить/выключить правило (переключает `is_active`).
+
+    Удобно для быстрого отключения правила без его удаления.
+    """
     row = await rules_repo.get_rule_by_id(pool, rule_id)
     if not row:
         raise HTTPException(status_code=404, detail="Rule not found")

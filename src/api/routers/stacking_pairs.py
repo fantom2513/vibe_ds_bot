@@ -35,7 +35,12 @@ async def list_stacking_pairs(
     _: Annotated[None, Depends(verify_api_key)],
     pool: Annotated[asyncpg.Pool, Depends(get_db_pool)],
 ) -> list[StackingPairResponse]:
-    """Список всех пар стакинга."""
+    """
+    Список всех пар стакинга (активных и неактивных).
+
+    Пара стакинга — два пользователя, которых бот автоматически перемещает в целевой канал,
+    как только они оба оказываются в одном войс-канале одновременно.
+    """
     rows = await pool.fetch(
         "SELECT id, user_id_1, user_id_2, target_channel_id, is_active, created_at FROM stacking_pairs ORDER BY id"
     )
@@ -48,7 +53,27 @@ async def create_stacking_pair(
     _: Annotated[None, Depends(verify_api_key)],
     pool: Annotated[asyncpg.Pool, Depends(get_db_pool)],
 ) -> StackingPairResponse:
-    """Добавить пару. Порядок ID нормализуется (меньший первым). 409 при дубликате пары."""
+    """
+    Добавить пару стакинга.
+
+    Когда оба пользователя из пары окажутся в одном войс-канале — бот автоматически
+    переместит обоих в `target_channel_id`.
+
+    - **user_id_1**, **user_id_2** — Discord ID двух пользователей
+    - **target_channel_id** — ID целевого голосового канала, куда переместить пару
+
+    Порядок `user_id_1` и `user_id_2` не важен — нормализуется автоматически.
+    409 если такая пара уже существует.
+
+    Пример:
+    ```json
+    {
+      "user_id_1": 111111111111111111,
+      "user_id_2": 222222222222222222,
+      "target_channel_id": 333333333333333333
+    }
+    ```
+    """
     uid1, uid2 = _normalize_pair(body.user_id_1, body.user_id_2)
     try:
         row = await pool.fetchrow(
@@ -72,7 +97,11 @@ async def toggle_stacking_pair(
     _: Annotated[None, Depends(verify_api_key)],
     pool: Annotated[asyncpg.Pool, Depends(get_db_pool)],
 ) -> StackingPairResponse:
-    """Переключить is_active для пары."""
+    """
+    Включить/выключить пару стакинга (переключает `is_active`).
+
+    Выключенная пара не срабатывает, но остаётся в базе.
+    """
     row = await pool.fetchrow(
         """
         UPDATE stacking_pairs SET is_active = NOT is_active
@@ -92,7 +121,7 @@ async def delete_stacking_pair(
     _: Annotated[None, Depends(verify_api_key)],
     pool: Annotated[asyncpg.Pool, Depends(get_db_pool)],
 ) -> None:
-    """Удалить пару по id."""
+    """Удалить пару стакинга по ID."""
     result = await pool.execute("DELETE FROM stacking_pairs WHERE id = $1", pair_id)
     if result == "DELETE 0":
         raise HTTPException(status_code=404, detail="Stacking pair not found")
