@@ -12,6 +12,8 @@ from src.api.schemas import KickTargetCreate, KickTargetResponse, KickTargetUpda
 
 router = APIRouter(prefix="/kick-targets", tags=["kick-targets"])
 
+_SELECT = "SELECT id, discord_id, username, timeout_sec, max_timeout_sec, is_active, created_at, updated_at FROM kick_targets"
+
 
 def _row_to_response(row: asyncpg.Record) -> KickTargetResponse:
     return KickTargetResponse(
@@ -19,6 +21,7 @@ def _row_to_response(row: asyncpg.Record) -> KickTargetResponse:
         discord_id=row["discord_id"],
         username=row["username"],
         timeout_sec=row["timeout_sec"],
+        max_timeout_sec=row["max_timeout_sec"],
         is_active=row["is_active"],
         created_at=row["created_at"],
         updated_at=row["updated_at"],
@@ -31,9 +34,7 @@ async def list_kick_targets(
     pool: Annotated[asyncpg.Pool, Depends(get_db_pool)],
 ) -> list[KickTargetResponse]:
     """Список всех таргетов кика по таймауту."""
-    rows = await pool.fetch(
-        "SELECT id, discord_id, username, timeout_sec, is_active, created_at, updated_at FROM kick_targets ORDER BY id"
-    )
+    rows = await pool.fetch(f"{_SELECT} ORDER BY id")
     return [_row_to_response(r) for r in rows]
 
 
@@ -48,13 +49,14 @@ async def create_kick_target(
         now = datetime.now(timezone.utc)
         row = await pool.fetchrow(
             """
-            INSERT INTO kick_targets (discord_id, username, timeout_sec, is_active, created_at, updated_at)
-            VALUES ($1, $2, $3, true, $4, $4)
-            RETURNING id, discord_id, username, timeout_sec, is_active, created_at, updated_at
+            INSERT INTO kick_targets (discord_id, username, timeout_sec, max_timeout_sec, is_active, created_at, updated_at)
+            VALUES ($1, $2, $3, $4, true, $5, $5)
+            RETURNING id, discord_id, username, timeout_sec, max_timeout_sec, is_active, created_at, updated_at
             """,
             body.discord_id,
             body.username,
             body.timeout_sec,
+            body.max_timeout_sec,
             now,
         )
         return _row_to_response(row)
@@ -69,10 +71,7 @@ async def get_kick_target(
     pool: Annotated[asyncpg.Pool, Depends(get_db_pool)],
 ) -> KickTargetResponse:
     """Получить таргет по discord_id."""
-    row = await pool.fetchrow(
-        "SELECT id, discord_id, username, timeout_sec, is_active, created_at, updated_at FROM kick_targets WHERE discord_id = $1",
-        discord_id,
-    )
+    row = await pool.fetchrow(f"{_SELECT} WHERE discord_id = $1", discord_id)
     if not row:
         raise HTTPException(status_code=404, detail="Kick target not found")
     return _row_to_response(row)
@@ -85,11 +84,8 @@ async def update_kick_target(
     _: Annotated[None, Depends(verify_api_key)],
     pool: Annotated[asyncpg.Pool, Depends(get_db_pool)],
 ) -> KickTargetResponse:
-    """Обновить таргет (timeout_sec, is_active, username)."""
-    row = await pool.fetchrow(
-        "SELECT id, discord_id, username, timeout_sec, is_active, created_at, updated_at FROM kick_targets WHERE discord_id = $1",
-        discord_id,
-    )
+    """Обновить таргет (timeout_sec, max_timeout_sec, is_active, username)."""
+    row = await pool.fetchrow(f"{_SELECT} WHERE discord_id = $1", discord_id)
     if not row:
         raise HTTPException(status_code=404, detail="Kick target not found")
 
@@ -99,6 +95,10 @@ async def update_kick_target(
     if body.timeout_sec is not None:
         updates.append(f"timeout_sec = ${n}")
         args.append(body.timeout_sec)
+        n += 1
+    if body.max_timeout_sec is not None:
+        updates.append(f"max_timeout_sec = ${n}")
+        args.append(body.max_timeout_sec)
         n += 1
     if body.is_active is not None:
         updates.append(f"is_active = ${n}")
@@ -116,7 +116,7 @@ async def update_kick_target(
         f"""
         UPDATE kick_targets SET {", ".join(updates)}
         WHERE discord_id = ${n}
-        RETURNING id, discord_id, username, timeout_sec, is_active, created_at, updated_at
+        RETURNING id, discord_id, username, timeout_sec, max_timeout_sec, is_active, created_at, updated_at
         """,
         *args,
     )

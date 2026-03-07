@@ -6,6 +6,7 @@ import discord
 from discord.ext import commands
 
 from src.engine.rules import rules_from_dicts
+from src.scheduler.kick_timeout_job import clear_session_timeout
 from src.utils.logging import get_logger
 
 logger = get_logger("voice_manager")
@@ -101,6 +102,7 @@ class VoiceManager(commands.Cog):
             stacking = getattr(self.bot, "stacking_detector", None)
             if stacking:
                 stacking.on_user_leave(member.id)
+            clear_session_timeout(member.id)
             logger.info(
                 "voice_leave",
                 user_id=member.id,

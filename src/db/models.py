@@ -143,6 +143,7 @@ class KickTarget(Base):
     discord_id: Mapped[int] = mapped_column(BigInteger, unique=True, nullable=False)
     username: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
     timeout_sec: Mapped[int] = mapped_column(Integer, nullable=False, default=3600)
+    max_timeout_sec: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)

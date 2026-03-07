@@ -159,11 +159,13 @@ class UserStatsResponse(BaseModel):
 class KickTargetCreate(BaseModel):
     discord_id: int
     username: Optional[str] = Field(None, max_length=100)
-    timeout_sec: int = Field(default=3600, ge=60, le=86400)
+    timeout_sec: int = Field(default=1800, ge=60, le=86400)
+    max_timeout_sec: Optional[int] = Field(None, ge=60, le=86400)
 
 
 class KickTargetUpdate(BaseModel):
     timeout_sec: Optional[int] = Field(None, ge=60, le=86400)
+    max_timeout_sec: Optional[int] = Field(None, ge=60, le=86400)
     is_active: Optional[bool] = None
     username: Optional[str] = Field(None, max_length=100)
 
@@ -173,6 +175,7 @@ class KickTargetResponse(BaseModel):
     discord_id: int
     username: Optional[str] = None
     timeout_sec: int
+    max_timeout_sec: Optional[int] = None
     is_active: bool
     created_at: datetime
     updated_at: datetime
