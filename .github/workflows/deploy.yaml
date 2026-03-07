@@ -43,8 +43,8 @@ jobs:
           docker compose build bot-api frontend
           docker compose up -d
           sleep 10
-          curl -f http://localhost/api/health || exit 1
-          curl -f http://localhost/ || exit 1
+          curl -f http://localhost:8080/api/health || exit 1
+          curl -f http://localhost:8080/ || exit 1
 
       - name: Health check — database
         run: docker compose exec -T postgres pg_isready -U ${POSTGRES_USER:-bot}

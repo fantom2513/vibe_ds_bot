@@ -37,7 +37,7 @@ services:
       dockerfile: Dockerfile.frontend
     container_name: discord-bot-frontend
     ports:
-      - "80:80"
+      - "8080:80"
     depends_on:
       - bot-api
     networks:
