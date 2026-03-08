@@ -7,12 +7,13 @@ import {
 } from '@mui/material'
 import { AddOutlined, EditOutlined, DeleteOutlined } from '@mui/icons-material'
 import { getKickTargets, createKickTarget, updateKickTarget, deleteKickTarget } from '../api/kickTargets'
-import { DiscordId, PageHeader, LoadingState, ErrorState, EmptyState } from '../components/ui'
+import { MemberCell, MemberAutocomplete, PageHeader, LoadingState, ErrorState, EmptyState } from '../components/ui'
+import { useMemberResolver } from '../hooks/useMemberResolver'
 import { PageWrapper } from '../styles/motion'
 
 const MONO = { fontFamily: "'IBM Plex Mono', monospace", fontSize: '0.72rem' }
 
-const defaultForm = () => ({ discord_id: '', username: '', timeout_sec: '1800', max_timeout_sec: '' })
+const defaultForm = () => ({ discord_id: null, timeout_sec: '1800', max_timeout_sec: '' })
 
 export default function KickTargets() {
   const [targets, setTargets] = useState([])
@@ -24,10 +25,13 @@ export default function KickTargets() {
   const [form, setForm] = useState(defaultForm())
   const [deleteTarget, setDeleteTarget] = useState(null)
   const [snack, setSnack] = useState(null)
+  const { get, resolveMany } = useMemberResolver()
 
   const load = async () => {
     try {
-      setTargets(await getKickTargets())
+      const data = await getKickTargets()
+      setTargets(data)
+      resolveMany(data.map(t => String(t.discord_id)))
     } catch (e) {
       setError(e.message)
     } finally {
@@ -49,7 +53,6 @@ export default function KickTargets() {
     setEditing(t)
     setForm({
       discord_id: String(t.discord_id),
-      username: t.username || '',
       timeout_sec: String(t.timeout_sec),
       max_timeout_sec: t.max_timeout_sec != null ? String(t.max_timeout_sec) : '',
     })
@@ -57,9 +60,14 @@ export default function KickTargets() {
   }
 
   const handleSave = async () => {
+    if (!form.discord_id) {
+      showSnack('Выберите пользователя', 'error')
+      return
+    }
+    const memberData = get(form.discord_id)
     const payload = {
       discord_id: Number(form.discord_id),
-      username: form.username || null,
+      username: memberData?.username || null,
       timeout_sec: Number(form.timeout_sec) || 1800,
       max_timeout_sec: form.max_timeout_sec ? Number(form.max_timeout_sec) : null,
     }
@@ -123,8 +131,7 @@ export default function KickTargets() {
           <Table size="small">
             <TableHead>
               <TableRow>
-                <TableCell>Discord ID</TableCell>
-                <TableCell>Username</TableCell>
+                <TableCell>Участник</TableCell>
                 <TableCell>Timeout</TableCell>
                 <TableCell>Max Timeout</TableCell>
                 <TableCell>Активно</TableCell>
@@ -134,9 +141,8 @@ export default function KickTargets() {
             <TableBody>
               {targets.map(t => (
                 <TableRow key={t.discord_id}>
-                  <TableCell><DiscordId id={t.discord_id} /></TableCell>
-                  <TableCell sx={{ color: t.username ? 'text.primary' : 'text.disabled', fontSize: '0.82rem' }}>
-                    {t.username || '—'}
+                  <TableCell sx={{ minWidth: 200 }}>
+                    <MemberCell id={String(t.discord_id)} memberData={get(String(t.discord_id))} />
                   </TableCell>
                   <TableCell sx={MONO}>{Math.round(t.timeout_sec / 60)} мин</TableCell>
                   <TableCell sx={{ ...MONO, color: t.max_timeout_sec ? 'text.primary' : 'text.disabled' }}>
@@ -182,23 +188,11 @@ export default function KickTargets() {
         </Box>
 
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-          <TextField
-            label="Discord ID"
-            size="small"
-            fullWidth
+          <MemberAutocomplete
+            label="Пользователь"
             value={form.discord_id}
-            onChange={e => setForm(f => ({ ...f, discord_id: e.target.value }))}
+            onChange={id => setForm(f => ({ ...f, discord_id: id }))}
             disabled={!!editing}
-            inputProps={{ style: { fontFamily: "'IBM Plex Mono', monospace" } }}
-            placeholder="123456789012345678"
-          />
-          <TextField
-            label="Username (необязательно)"
-            size="small"
-            fullWidth
-            value={form.username}
-            onChange={e => setForm(f => ({ ...f, username: e.target.value }))}
-            placeholder="user#0000"
           />
           <TextField
             label="Timeout (секунды)"

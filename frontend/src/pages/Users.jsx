@@ -3,11 +3,12 @@ import {
   Box, Button, Tabs, Tab,
   Table, TableBody, TableCell, TableHead, TableRow, TableContainer,
   Paper, IconButton, Dialog, DialogTitle, DialogContent, DialogActions,
-  TextField, Typography, Tooltip, Snackbar, Alert,
+  Typography, Tooltip, Snackbar, Alert,
 } from '@mui/material'
 import { AddOutlined, DeleteOutlined } from '@mui/icons-material'
 import { getUsers, addUser, deleteUser } from '../api/users'
-import { DiscordId, PageHeader, LoadingState, EmptyState } from '../components/ui'
+import { MemberCell, MemberAutocomplete, PageHeader, LoadingState, EmptyState } from '../components/ui'
+import { useMemberResolver } from '../hooks/useMemberResolver'
 import { PageWrapper } from '../styles/motion'
 import Timestamp from '../components/Timestamp'
 
@@ -17,15 +18,16 @@ function UserTable({ listType }) {
   const [modalOpen, setModalOpen] = useState(false)
   const [saving, setSaving] = useState(false)
   const [deleteTarget, setDeleteTarget] = useState(null)
-  const [discordId, setDiscordId] = useState('')
-  const [username, setUsername] = useState('')
-  const [idError, setIdError] = useState('')
+  const [selectedId, setSelectedId] = useState(null)
   const [snack, setSnack] = useState(null)
+  const { get, resolveMany } = useMemberResolver()
 
   const load = async () => {
     setLoading(true)
     try {
-      setUsers(await getUsers(listType))
+      const data = await getUsers(listType)
+      setUsers(data)
+      resolveMany(data.map(u => String(u.discord_id)))
     } catch (e) {
       setSnack({ msg: e.message, severity: 'error' })
     } finally {
@@ -38,18 +40,21 @@ function UserTable({ listType }) {
   const showSnack = (msg, severity = 'success') => setSnack({ msg, severity })
 
   const handleAdd = async () => {
-    if (!discordId || !/^\d+$/.test(discordId)) {
-      setIdError('Введите корректный Discord ID (только цифры)')
+    if (!selectedId) {
+      showSnack('Выберите пользователя', 'error')
       return
     }
+    const memberData = get(selectedId)
     setSaving(true)
     try {
-      await addUser({ discord_id: Number(discordId), list_type: listType, username: username || null })
+      await addUser({
+        discord_id: Number(selectedId),
+        list_type: listType,
+        username: memberData?.username || null,
+      })
       showSnack('Пользователь добавлен')
       setModalOpen(false)
-      setDiscordId('')
-      setUsername('')
-      setIdError('')
+      setSelectedId(null)
       load()
     } catch (e) {
       showSnack(e.response?.data?.detail || 'Ошибка', 'error')
@@ -73,7 +78,7 @@ function UserTable({ listType }) {
     <>
       <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 1.5 }}>
         <Button variant="contained" startIcon={<AddOutlined />} onClick={() => {
-          setDiscordId(''); setUsername(''); setIdError(''); setModalOpen(true)
+          setSelectedId(null); setModalOpen(true)
         }}>
           Добавить
         </Button>
@@ -88,8 +93,7 @@ function UserTable({ listType }) {
           <Table size="small">
             <TableHead>
               <TableRow>
-                <TableCell>Discord ID</TableCell>
-                <TableCell>Username</TableCell>
+                <TableCell>Участник</TableCell>
                 <TableCell>Добавлен</TableCell>
                 <TableCell />
               </TableRow>
@@ -97,9 +101,8 @@ function UserTable({ listType }) {
             <TableBody>
               {users.map(u => (
                 <TableRow key={`${u.discord_id}-${u.list_type}`}>
-                  <TableCell><DiscordId id={u.discord_id} /></TableCell>
-                  <TableCell sx={{ color: u.username ? 'text.primary' : 'text.disabled', fontSize: '0.82rem' }}>
-                    {u.username || '—'}
+                  <TableCell sx={{ minWidth: 200 }}>
+                    <MemberCell id={String(u.discord_id)} memberData={get(String(u.discord_id))} showId />
                   </TableCell>
                   <TableCell><Timestamp iso={u.created_at} /></TableCell>
                   <TableCell>
@@ -119,25 +122,11 @@ function UserTable({ listType }) {
       {/* Add Modal */}
       <Dialog open={modalOpen} onClose={() => setModalOpen(false)} maxWidth="xs" fullWidth>
         <DialogTitle>Добавить в {listType}</DialogTitle>
-        <DialogContent sx={{ pt: '16px !important', display: 'flex', flexDirection: 'column', gap: 2 }}>
-          <TextField
-            label="Discord ID"
-            size="small"
-            fullWidth
-            value={discordId}
-            onChange={e => { setDiscordId(e.target.value); setIdError('') }}
-            error={!!idError}
-            helperText={idError || 'Пример: 123456789012345678'}
-            placeholder="123456789012345678"
-            inputProps={{ style: { fontFamily: "'IBM Plex Mono', monospace" } }}
-          />
-          <TextField
-            label="Username (необязательно)"
-            size="small"
-            fullWidth
-            value={username}
-            onChange={e => setUsername(e.target.value)}
-            placeholder="user#0000"
+        <DialogContent sx={{ pt: '16px !important' }}>
+          <MemberAutocomplete
+            label="Пользователь"
+            value={selectedId}
+            onChange={id => setSelectedId(id)}
           />
         </DialogContent>
         <DialogActions>

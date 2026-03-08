@@ -7,13 +7,14 @@ import {
 } from '@mui/material'
 import { AddOutlined, DeleteOutlined } from '@mui/icons-material'
 import { getStackingPairs, createStackingPair, toggleStackingPair, deleteStackingPair } from '../api/stackingPairs'
-import { DiscordId, PageHeader, LoadingState, ErrorState, EmptyState } from '../components/ui'
+import { MemberCell, MemberAutocomplete, PageHeader, LoadingState, ErrorState, EmptyState } from '../components/ui'
+import { useMemberResolver } from '../hooks/useMemberResolver'
 import { PageWrapper } from '../styles/motion'
 import Timestamp from '../components/Timestamp'
 
 const MONO = { fontFamily: "'IBM Plex Mono', monospace", fontSize: '0.72rem' }
 
-const defaultForm = () => ({ user_id_1: '', user_id_2: '', target_channel_id: '' })
+const defaultForm = () => ({ user_id_1: null, user_id_2: null, target_channel_id: '' })
 
 export default function StackingPairs() {
   const [pairs, setPairs] = useState([])
@@ -24,10 +25,14 @@ export default function StackingPairs() {
   const [form, setForm] = useState(defaultForm())
   const [deleteTarget, setDeleteTarget] = useState(null)
   const [snack, setSnack] = useState(null)
+  const { get, resolveMany } = useMemberResolver()
 
   const load = async () => {
     try {
-      setPairs(await getStackingPairs())
+      const data = await getStackingPairs()
+      setPairs(data)
+      const ids = data.flatMap(p => [String(p.user_id_1), String(p.user_id_2)])
+      resolveMany(ids)
     } catch (e) {
       setError(e.message)
     } finally {
@@ -39,15 +44,21 @@ export default function StackingPairs() {
 
   const showSnack = (msg, severity = 'success') => setSnack({ msg, severity })
 
+  const sameUserError = form.user_id_1 && form.user_id_2 && form.user_id_1 === form.user_id_2
+
   const handleSave = async () => {
+    if (!form.user_id_1 || !form.user_id_2 || !form.target_channel_id) {
+      showSnack('Заполните все поля', 'error')
+      return
+    }
+    if (sameUserError) {
+      showSnack('Нельзя создать пару с собой', 'error')
+      return
+    }
     const payload = {
       user_id_1: Number(form.user_id_1),
       user_id_2: Number(form.user_id_2),
       target_channel_id: Number(form.target_channel_id),
-    }
-    if (!payload.user_id_1 || !payload.user_id_2 || !payload.target_channel_id) {
-      showSnack('Заполните все поля', 'error')
-      return
     }
     setSaving(true)
     try {
@@ -120,8 +131,12 @@ export default function StackingPairs() {
               {pairs.map(p => (
                 <TableRow key={p.id}>
                   <TableCell sx={MONO}>{p.id}</TableCell>
-                  <TableCell><DiscordId id={p.user_id_1} /></TableCell>
-                  <TableCell><DiscordId id={p.user_id_2} /></TableCell>
+                  <TableCell sx={{ minWidth: 180 }}>
+                    <MemberCell id={String(p.user_id_1)} memberData={get(String(p.user_id_1))} />
+                  </TableCell>
+                  <TableCell sx={{ minWidth: 180 }}>
+                    <MemberCell id={String(p.user_id_2)} memberData={get(String(p.user_id_2))} />
+                  </TableCell>
                   <TableCell sx={MONO}>{p.target_channel_id}</TableCell>
                   <TableCell><Timestamp iso={p.created_at} /></TableCell>
                   <TableCell>
@@ -155,23 +170,18 @@ export default function StackingPairs() {
         </Box>
 
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-          <TextField
-            label="User ID 1"
-            size="small"
-            fullWidth
+          <MemberAutocomplete
+            label="User 1"
             value={form.user_id_1}
-            onChange={e => setForm(f => ({ ...f, user_id_1: e.target.value }))}
-            inputProps={{ style: { fontFamily: "'IBM Plex Mono', monospace" } }}
-            placeholder="123456789012345678"
+            onChange={id => setForm(f => ({ ...f, user_id_1: id }))}
+            error={!!sameUserError}
           />
-          <TextField
-            label="User ID 2"
-            size="small"
-            fullWidth
+          <MemberAutocomplete
+            label="User 2"
             value={form.user_id_2}
-            onChange={e => setForm(f => ({ ...f, user_id_2: e.target.value }))}
-            inputProps={{ style: { fontFamily: "'IBM Plex Mono', monospace" } }}
-            placeholder="987654321098765432"
+            onChange={id => setForm(f => ({ ...f, user_id_2: id }))}
+            error={!!sameUserError}
+            helperText={sameUserError ? 'Нельзя создать пару с собой' : undefined}
           />
           <TextField
             label="Target Channel ID"
