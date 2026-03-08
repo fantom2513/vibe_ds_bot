@@ -48,7 +48,7 @@ function UserTable({ listType }) {
     setSaving(true)
     try {
       await addUser({
-        discord_id: Number(selectedId),
+        discord_id: selectedId,
         list_type: listType,
         username: memberData?.username || null,
       })

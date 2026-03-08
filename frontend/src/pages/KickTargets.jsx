@@ -66,7 +66,7 @@ export default function KickTargets() {
     }
     const memberData = get(form.discord_id)
     const payload = {
-      discord_id: Number(form.discord_id),
+      discord_id: form.discord_id,
       username: memberData?.username || null,
       timeout_sec: Number(form.timeout_sec) || 1800,
       max_timeout_sec: form.max_timeout_sec ? Number(form.max_timeout_sec) : null,

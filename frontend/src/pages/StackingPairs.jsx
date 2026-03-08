@@ -56,9 +56,9 @@ export default function StackingPairs() {
       return
     }
     const payload = {
-      user_id_1: Number(form.user_id_1),
-      user_id_2: Number(form.user_id_2),
-      target_channel_id: Number(form.target_channel_id),
+      user_id_1: form.user_id_1,
+      user_id_2: form.user_id_2,
+      target_channel_id: form.target_channel_id,
     }
     setSaving(true)
     try {

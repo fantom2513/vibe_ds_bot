@@ -2,9 +2,17 @@
 Pydantic-схемы для FastAPI (rules, users, schedules, logs, dashboard).
 """
 from datetime import datetime
-from typing import Any, Literal, Optional
+from typing import Annotated, Any, Literal, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, BeforeValidator, Field, PlainSerializer
+
+# Discord snowflake IDs exceed JS Number.MAX_SAFE_INTEGER (2^53).
+# Serialise as strings in JSON responses; accept int or str on input.
+DiscordId = Annotated[
+    int,
+    BeforeValidator(lambda v: int(v) if isinstance(v, str) else v),
+    PlainSerializer(lambda v: str(v), return_type=str),
+]
 
 
 # --- Rules ---
@@ -62,7 +70,7 @@ class RuleResponse(BaseModel):
 # --- Users (whitelist/blacklist) ---
 
 class UserListCreate(BaseModel):
-    discord_id: int
+    discord_id: DiscordId
     list_type: Literal["whitelist", "blacklist"]
     username: Optional[str] = Field(None, max_length=100)
     reason: Optional[str] = None
@@ -70,7 +78,7 @@ class UserListCreate(BaseModel):
 
 class UserListResponse(BaseModel):
     id: int
-    discord_id: int
+    discord_id: DiscordId
     username: Optional[str] = None
     list_type: str
     reason: Optional[str] = None
@@ -81,7 +89,7 @@ class UserListResponse(BaseModel):
 
 
 class UserListBulkEntry(BaseModel):
-    discord_id: int
+    discord_id: DiscordId
     list_type: Literal["whitelist", "blacklist"]
     username: Optional[str] = None
     reason: Optional[str] = None
@@ -124,9 +132,9 @@ class ScheduleResponse(BaseModel):
 class ActionLogResponse(BaseModel):
     id: int
     rule_id: Optional[int] = None
-    discord_id: int
+    discord_id: DiscordId
     action_type: Optional[str] = None
-    channel_id: Optional[int] = None
+    channel_id: Optional[DiscordId] = None
     details: dict[str, Any]
     executed_at: datetime
 
@@ -134,7 +142,7 @@ class ActionLogResponse(BaseModel):
 
 
 class LogsFilter(BaseModel):
-    discord_id: Optional[int] = None
+    discord_id: Optional[DiscordId] = None
     rule_id: Optional[int] = None
     action_type: Optional[str] = None
     date_from: Optional[datetime] = None
@@ -159,7 +167,7 @@ class StatsOverviewResponse(BaseModel):
 
 
 class UserStatsResponse(BaseModel):
-    discord_id: int
+    discord_id: DiscordId
     total_actions: int
     actions_by_type: dict[str, int]
 
@@ -167,7 +175,7 @@ class UserStatsResponse(BaseModel):
 # --- Kick targets ---
 
 class KickTargetCreate(BaseModel):
-    discord_id: int
+    discord_id: DiscordId
     username: Optional[str] = Field(None, max_length=100)
     timeout_sec: int = Field(default=1800, ge=60, le=86400)
     max_timeout_sec: Optional[int] = Field(None, ge=60, le=86400)
@@ -182,7 +190,7 @@ class KickTargetUpdate(BaseModel):
 
 class KickTargetResponse(BaseModel):
     id: int
-    discord_id: int
+    discord_id: DiscordId
     username: Optional[str] = None
     timeout_sec: int
     max_timeout_sec: Optional[int] = None
@@ -196,16 +204,16 @@ class KickTargetResponse(BaseModel):
 # --- Stacking pairs ---
 
 class StackingPairCreate(BaseModel):
-    user_id_1: int
-    user_id_2: int
-    target_channel_id: int
+    user_id_1: DiscordId
+    user_id_2: DiscordId
+    target_channel_id: DiscordId
 
 
 class StackingPairResponse(BaseModel):
     id: int
-    user_id_1: int
-    user_id_2: int
-    target_channel_id: int
+    user_id_1: DiscordId
+    user_id_2: DiscordId
+    target_channel_id: DiscordId
     is_active: bool
     created_at: datetime
 
