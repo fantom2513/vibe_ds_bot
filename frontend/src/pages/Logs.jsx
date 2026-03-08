@@ -1,198 +1,219 @@
 import { useState, useEffect, useCallback } from 'react'
 import {
-  Table, Form, Input, Select, Button, DatePicker, Space, Alert, Spin, Empty, Typography,
-} from 'antd'
-import { DownloadOutlined, ReloadOutlined } from '@ant-design/icons'
-import dayjs from 'dayjs'
+  Box, Button, TextField, Typography,
+  FormControl, InputLabel, Select, MenuItem,
+} from '@mui/material'
+import { DownloadOutlined, RefreshOutlined } from '@mui/icons-material'
+import { DataGrid } from '@mui/x-data-grid'
 import { getLogs } from '../api/logs'
-import ActionTag from '../components/ActionTag'
-import DiscordId from '../components/DiscordId'
+import { ActionChip, PageHeader, ErrorState, DiscordId } from '../components/ui'
+import { PageWrapper } from '../styles/motion'
 import Timestamp from '../components/Timestamp'
-
-const PAGE_HEADER = {
-  display: 'flex',
-  justifyContent: 'space-between',
-  alignItems: 'center',
-  marginBottom: 20,
-  paddingBottom: 16,
-  borderBottom: '1px solid var(--border-subtle)',
-}
 
 const ACTION_TYPES = ['mute', 'unmute', 'move', 'kick', 'kick_timeout', 'pair_move']
 
+const MONO = { fontFamily: "'IBM Plex Mono', monospace", fontSize: '0.72rem' }
+
 export default function Logs() {
   const [logs, setLogs] = useState([])
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
-  const [pagination, setPagination] = useState({ current: 1, pageSize: 50, total: 0 })
-  const [filters, setFilters] = useState({})
-  const [form] = Form.useForm()
+  const [rowCount, setRowCount] = useState(0)
+  const [paginationModel, setPaginationModel] = useState({ page: 0, pageSize: 50 })
+  const [filters, setFilters] = useState({ action_type: '', discord_id: '', rule_id: '', date_from: '', date_to: '' })
+  const [appliedFilters, setAppliedFilters] = useState({})
 
-  const load = useCallback(async (page = 1, pageSize = 50, f = filters) => {
+  const load = useCallback(async (page, pageSize, f) => {
     setLoading(true)
     try {
       const params = {
         limit: pageSize,
-        offset: (page - 1) * pageSize,
+        offset: page * pageSize,
         ...(f.discord_id && { discord_id: f.discord_id }),
         ...(f.action_type && { action_type: f.action_type }),
         ...(f.rule_id && { rule_id: f.rule_id }),
-        ...(f.date_range?.[0] && { date_from: f.date_range[0].toISOString() }),
-        ...(f.date_range?.[1] && { date_to: f.date_range[1].toISOString() }),
+        ...(f.date_from && { date_from: new Date(f.date_from).toISOString() }),
+        ...(f.date_to && { date_to: new Date(f.date_to).toISOString() }),
       }
       const data = await getLogs(params)
       setLogs(data)
-      setPagination(prev => ({ ...prev, current: page, pageSize, total: data.length < pageSize ? (page - 1) * pageSize + data.length : page * pageSize + 1 }))
+      setRowCount(prev => {
+        const fetched = page * pageSize + data.length
+        return data.length < pageSize ? fetched : Math.max(prev, fetched + 1)
+      })
     } catch (e) {
       setError(e.message)
     } finally {
       setLoading(false)
     }
-  }, [filters])
+  }, [])
 
-  useEffect(() => { load(1, 50, {}) }, [])
+  useEffect(() => {
+    load(paginationModel.page, paginationModel.pageSize, appliedFilters)
+  }, [paginationModel, appliedFilters, load])
 
-  const handleSearch = async () => {
-    const values = form.getFieldsValue()
-    setFilters(values)
-    await load(1, pagination.pageSize, values)
+  const handleSearch = () => {
+    setAppliedFilters({ ...filters })
+    setPaginationModel(m => ({ ...m, page: 0 }))
   }
 
   const handleReset = () => {
-    form.resetFields()
-    setFilters({})
-    load(1, 50, {})
-  }
-
-  const handleTableChange = (pag) => {
-    load(pag.current, pag.pageSize, filters)
+    const empty = { action_type: '', discord_id: '', rule_id: '', date_from: '', date_to: '' }
+    setFilters(empty)
+    setAppliedFilters({})
+    setPaginationModel(m => ({ ...m, page: 0 }))
   }
 
   const exportCsv = () => {
-    const f = filters
+    const f = appliedFilters
     const params = new URLSearchParams()
     if (f.discord_id) params.set('discord_id', f.discord_id)
     if (f.action_type) params.set('action_type', f.action_type)
     if (f.rule_id) params.set('rule_id', f.rule_id)
-    if (f.date_range?.[0]) params.set('date_from', f.date_range[0].toISOString())
-    if (f.date_range?.[1]) params.set('date_to', f.date_range[1].toISOString())
+    if (f.date_from) params.set('date_from', new Date(f.date_from).toISOString())
+    if (f.date_to) params.set('date_to', new Date(f.date_to).toISOString())
     window.open(`/api/logs/export?${params}`)
   }
 
   const columns = [
     {
-      title: 'Время',
-      dataIndex: 'executed_at',
+      field: 'executed_at',
+      headerName: 'Время',
       width: 130,
-      render: v => <Timestamp iso={v} />,
+      renderCell: ({ value }) => <Timestamp iso={value} />,
     },
     {
-      title: 'Discord ID',
-      dataIndex: 'discord_id',
-      render: v => <DiscordId id={v} />,
+      field: 'discord_id',
+      headerName: 'Discord ID',
+      width: 170,
+      renderCell: ({ value }) => <DiscordId id={value} />,
     },
     {
-      title: 'Действие',
-      dataIndex: 'action_type',
+      field: 'action_type',
+      headerName: 'Действие',
       width: 150,
-      render: (v, r) => <ActionTag type={v} isDryRun={r.is_dry_run} />,
+      renderCell: ({ row }) => <ActionChip type={row.action_type} isDryRun={row.is_dry_run} />,
     },
     {
-      title: 'Rule ID',
-      dataIndex: 'rule_id',
-      width: 80,
-      render: v => v != null
-        ? <span style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 11 }}>{v}</span>
-        : <span style={{ color: 'var(--text-muted)' }}>—</span>,
+      field: 'rule_id',
+      headerName: 'Rule',
+      width: 70,
+      renderCell: ({ value }) => (
+        <Typography sx={{ ...MONO, color: value != null ? 'text.primary' : 'text.disabled' }}>
+          {value ?? '—'}
+        </Typography>
+      ),
     },
     {
-      title: 'Channel',
-      dataIndex: 'channel_id',
-      width: 150,
-      render: v => v
-        ? <span style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 11 }}>{v}</span>
-        : <span style={{ color: 'var(--text-muted)' }}>—</span>,
+      field: 'channel_id',
+      headerName: 'Channel',
+      width: 170,
+      renderCell: ({ value }) => (
+        <Typography sx={{ ...MONO, color: value ? 'text.primary' : 'text.disabled' }}>
+          {value || '—'}
+        </Typography>
+      ),
     },
   ]
 
-  if (error) return <Alert type="error" message={error} />
+  if (error) return <ErrorState message={error} />
 
   return (
-    <>
-      <div style={PAGE_HEADER}>
-        <div>
-          <Typography.Title
-            level={4}
-            style={{ margin: 0, fontFamily: 'Syne, sans-serif', color: 'var(--text-primary)', fontWeight: 600 }}
-          >
-            Logs
-          </Typography.Title>
-          <Typography.Text style={{ color: 'var(--text-secondary)', fontSize: 12 }}>
-            История действий бота
-          </Typography.Text>
-        </div>
-        <Button icon={<DownloadOutlined />} onClick={exportCsv}>
-          Экспорт CSV
-        </Button>
-      </div>
+    <PageWrapper>
+      <PageHeader
+        title="Logs"
+        subtitle="История действий бота"
+        actions={
+          <Button variant="outlined" startIcon={<DownloadOutlined />} onClick={exportCsv} size="small">
+            Экспорт CSV
+          </Button>
+        }
+      />
 
-      <Form form={form} layout="inline" style={{ marginBottom: 16, flexWrap: 'wrap', gap: 8 }}>
-        <Form.Item name="date_range">
-          <DatePicker.RangePicker showTime size="small" />
-        </Form.Item>
-        <Form.Item name="action_type">
-          <Select
-            size="small"
-            placeholder="Action type"
-            style={{ width: 140 }}
-            allowClear
-          >
-            {ACTION_TYPES.map(t => <Select.Option key={t} value={t}>{t}</Select.Option>)}
-          </Select>
-        </Form.Item>
-        <Form.Item name="discord_id">
-          <Input size="small" placeholder="Discord ID" style={{ width: 160, fontFamily: "'IBM Plex Mono', monospace" }} />
-        </Form.Item>
-        <Form.Item name="rule_id">
-          <Input size="small" placeholder="Rule ID" style={{ width: 90 }} />
-        </Form.Item>
-        <Form.Item>
-          <Space>
-            <Button size="small" type="primary" icon={<ReloadOutlined />} onClick={handleSearch}>
-              Применить
-            </Button>
-            <Button size="small" onClick={handleReset}>Сбросить</Button>
-          </Space>
-        </Form.Item>
-      </Form>
-
-      {loading ? (
-        <div style={{ textAlign: 'center', paddingTop: 60 }}><Spin size="large" /></div>
-      ) : logs.length === 0 ? (
-        <Empty description="Нет записей" />
-      ) : (
-        <Table
-          dataSource={logs}
-          columns={columns}
-          rowKey="id"
+      {/* Filter bar */}
+      <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap', mb: 2, alignItems: 'flex-end' }}>
+        <TextField
+          label="Date from"
           size="small"
-          pagination={{
-            ...pagination,
-            size: 'small',
-            showTotal: t => `Всего: ${t}`,
-          }}
-          onChange={handleTableChange}
-          rowClassName={() => 'table-row'}
-          expandable={{
-            expandedRowRender: r => (
-              <pre className="json-preview">
-                {JSON.stringify(r.details || {}, null, 2)}
-              </pre>
-            ),
-            rowExpandable: r => r.details && Object.keys(r.details).length > 0,
-          }}
+          type="datetime-local"
+          value={filters.date_from}
+          onChange={e => setFilters(f => ({ ...f, date_from: e.target.value }))}
+          InputLabelProps={{ shrink: true }}
+          sx={{ width: 200 }}
         />
-      )}
-    </>
+        <TextField
+          label="Date to"
+          size="small"
+          type="datetime-local"
+          value={filters.date_to}
+          onChange={e => setFilters(f => ({ ...f, date_to: e.target.value }))}
+          InputLabelProps={{ shrink: true }}
+          sx={{ width: 200 }}
+        />
+        <FormControl size="small" sx={{ width: 150 }}>
+          <InputLabel>Action type</InputLabel>
+          <Select
+            value={filters.action_type}
+            label="Action type"
+            onChange={e => setFilters(f => ({ ...f, action_type: e.target.value }))}
+          >
+            <MenuItem value="">Все</MenuItem>
+            {ACTION_TYPES.map(t => <MenuItem key={t} value={t}>{t}</MenuItem>)}
+          </Select>
+        </FormControl>
+        <TextField
+          label="Discord ID"
+          size="small"
+          value={filters.discord_id}
+          onChange={e => setFilters(f => ({ ...f, discord_id: e.target.value }))}
+          sx={{ width: 160 }}
+          inputProps={{ style: { fontFamily: "'IBM Plex Mono', monospace" } }}
+        />
+        <TextField
+          label="Rule ID"
+          size="small"
+          value={filters.rule_id}
+          onChange={e => setFilters(f => ({ ...f, rule_id: e.target.value }))}
+          sx={{ width: 90 }}
+        />
+        <Button variant="contained" startIcon={<RefreshOutlined />} size="small" onClick={handleSearch}>
+          Применить
+        </Button>
+        <Button variant="text" size="small" onClick={handleReset}>
+          Сбросить
+        </Button>
+      </Box>
+
+      <DataGrid
+        rows={logs}
+        columns={columns}
+        paginationMode="server"
+        rowCount={rowCount}
+        paginationModel={paginationModel}
+        onPaginationModelChange={setPaginationModel}
+        pageSizeOptions={[25, 50, 100]}
+        loading={loading}
+        autoHeight
+        disableRowSelectionOnClick
+        sx={{
+          border: '1px solid rgba(255,255,255,0.07)',
+          borderRadius: 2,
+          '& .MuiDataGrid-columnHeaders': {
+            backgroundColor: '#060810',
+            borderBottom: '1px solid rgba(255,255,255,0.07)',
+          },
+          '& .MuiDataGrid-row:hover': {
+            backgroundColor: 'rgba(255,255,255,0.025)',
+          },
+          '& .MuiDataGrid-cell': {
+            borderBottom: '1px solid rgba(255,255,255,0.04)',
+            fontSize: '0.82rem',
+          },
+          '& .MuiDataGrid-footerContainer': {
+            borderTop: '1px solid rgba(255,255,255,0.07)',
+          },
+        }}
+      />
+    </PageWrapper>
   )
 }

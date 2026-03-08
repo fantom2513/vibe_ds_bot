@@ -1,7 +1,8 @@
 import { useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Button, Card, Typography } from 'antd'
+import { Box, Button, Typography } from '@mui/material'
 import { useAuth } from '../contexts/AuthContext'
+import { GlowCard } from '../components/ui'
 
 export default function Login() {
   const { user } = useAuth()
@@ -12,41 +13,38 @@ export default function Login() {
   }, [user, navigate])
 
   return (
-    <div
-      style={{
-        display: 'flex',
-        justifyContent: 'center',
-        alignItems: 'center',
-        height: '100vh',
-        background: 'var(--bg-base)',
-      }}
-    >
-      <Card
-        style={{
-          width: 360,
-          textAlign: 'center',
-          background: 'var(--bg-surface)',
-          border: '1px solid var(--border-base)',
-        }}
-      >
-        <Typography.Title
-          level={3}
-          style={{ color: 'var(--text-primary)', fontFamily: 'Syne, sans-serif' }}
-        >
+    <Box sx={{
+      display: 'flex',
+      justifyContent: 'center',
+      alignItems: 'center',
+      height: '100vh',
+    }}>
+      <GlowCard glowColor="accent" sx={{ width: 360, p: 4, textAlign: 'center' }}>
+        <Box sx={{
+          width: 56, height: 56, borderRadius: '14px', mx: 'auto', mb: 3,
+          background: 'linear-gradient(135deg, #5865F2, #8b5cf6)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          fontSize: '24px',
+          boxShadow: '0 0 32px rgba(88,101,242,0.40)',
+        }}>
+          🤖
+        </Box>
+        <Typography variant="h5" sx={{ mb: 1, fontFamily: "'Syne', sans-serif" }}>
           Bot Dashboard
-        </Typography.Title>
-        <Typography.Paragraph style={{ color: 'var(--text-secondary)' }}>
+        </Typography>
+        <Typography variant="body2" sx={{ color: 'text.secondary', mb: 3 }}>
           Войдите через Discord чтобы получить доступ
-        </Typography.Paragraph>
+        </Typography>
         <Button
-          type="primary"
+          variant="contained"
+          fullWidth
           size="large"
-          block
-          onClick={() => (window.location.href = '/auth/discord/login')}
+          onClick={() => { window.location.href = '/auth/discord/login' }}
+          sx={{ py: 1.2 }}
         >
           Войти через Discord
         </Button>
-      </Card>
-    </div>
+      </GlowCard>
+    </Box>
   )
 }

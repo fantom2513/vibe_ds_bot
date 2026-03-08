@@ -9,11 +9,15 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@ant-design/icons": "^6.1.0",
-    "antd": "^6.3.1",
+    "@emotion/react": "^11.14.0",
+    "@emotion/styled": "^11.14.1",
+    "@mui/icons-material": "^7.3.9",
+    "@mui/material": "^7.3.9",
+    "@mui/x-data-grid": "^8.27.4",
     "axios": "^1.13.6",
     "cronstrue": "^3.13.0",
     "dayjs": "^1.11.19",
+    "framer-motion": "^12.35.1",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-router-dom": "^6.20.0"

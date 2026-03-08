@@ -1,26 +1,20 @@
 import { useState, useEffect, useCallback } from 'react'
-import { Row, Col, Table, Avatar, Alert, Spin, Empty, Typography, Space } from 'antd'
 import {
-  OrderedListOutlined,
-  TeamOutlined,
-  ThunderboltOutlined,
+  Grid, Typography,
+  Table, TableBody, TableCell, TableHead, TableRow, TableContainer,
+  Avatar, Paper,
+} from '@mui/material'
+import {
+  ListAltOutlined,
+  GroupOutlined,
+  BoltOutlined,
   HistoryOutlined,
-} from '@ant-design/icons'
+} from '@mui/icons-material'
 import { getDashboard } from '../api/dashboard'
 import { getStatsOverview } from '../api/stats'
-import StatCard from '../components/StatCard'
-import ActionTag from '../components/ActionTag'
+import { StatCard, ActionChip, PageHeader, LoadingState, ErrorState, EmptyState, DiscordId } from '../components/ui'
+import { PageWrapper } from '../styles/motion'
 import Timestamp from '../components/Timestamp'
-import DiscordId from '../components/DiscordId'
-
-const PAGE_HEADER = {
-  display: 'flex',
-  justifyContent: 'space-between',
-  alignItems: 'center',
-  marginBottom: 20,
-  paddingBottom: 16,
-  borderBottom: '1px solid var(--border-subtle)',
-}
 
 export default function Dashboard() {
   const [dashboard, setDashboard] = useState(null)
@@ -42,20 +36,14 @@ export default function Dashboard() {
     }
   }, [])
 
-  useEffect(() => {
-    fetchData()
-  }, [fetchData])
+  useEffect(() => { fetchData() }, [fetchData])
 
-  // SSE real-time updates (Part 2.4 — wired up here)
   useEffect(() => {
     const es = new EventSource('/api/dashboard/stream')
-
     es.onmessage = (e) => {
       const event = JSON.parse(e.data)
       if (event.type === 'ping') return
-      if (event.type === 'voice_update') {
-        fetchData()
-      }
+      if (event.type === 'voice_update') fetchData()
       if (event.type === 'action_log') {
         setRecentLogs(prev => [
           {
@@ -71,158 +59,109 @@ export default function Dashboard() {
         ].slice(0, 20))
       }
     }
-
-    es.onerror = () => {
-      console.warn('SSE disconnected, reconnecting...')
-    }
-
+    es.onerror = () => { console.warn('SSE disconnected') }
     return () => es.close()
   }, [fetchData])
 
-  if (loading) {
-    return (
-      <div style={{ display: 'flex', justifyContent: 'center', paddingTop: 60 }}>
-        <Spin size="large" />
-      </div>
-    )
-  }
-
-  if (error) return <Alert type="error" message={error} />
-
-  const onlineColumns = [
-    {
-      title: '',
-      dataIndex: 'avatar',
-      width: 40,
-      render: (url) => <Avatar src={url} size="small" />,
-    },
-    { title: 'Пользователь', dataIndex: 'username' },
-    { title: 'Канал', dataIndex: 'channel_name' },
-    {
-      title: 'Время в канале',
-      dataIndex: 'joined_at',
-      render: (v) => <Timestamp iso={v} />,
-    },
-  ]
-
-  const logColumns = [
-    {
-      title: 'Время',
-      dataIndex: 'executed_at',
-      render: (v) => <Timestamp iso={v} />,
-      width: 130,
-    },
-    {
-      title: 'Discord ID',
-      dataIndex: 'discord_id',
-      render: (v) => <DiscordId id={v} />,
-    },
-    {
-      title: 'Действие',
-      dataIndex: 'action_type',
-      render: (v, r) => <ActionTag type={v} isDryRun={r.is_dry_run} />,
-      width: 140,
-    },
-    { title: 'Rule ID', dataIndex: 'rule_id', width: 80, render: v => v ?? '—' },
-  ]
+  if (loading) return <LoadingState />
+  if (error) return <ErrorState message={error} />
 
   const onlineUsers = dashboard?.online_users || []
   const todayActions = stats?.total_actions || 0
 
   return (
-    <>
-      <div style={PAGE_HEADER}>
-        <div>
-          <Typography.Title
-            level={4}
-            style={{ margin: 0, fontFamily: 'Syne, sans-serif', color: 'var(--text-primary)', fontWeight: 600 }}
-          >
-            Dashboard
-          </Typography.Title>
-          <Typography.Text style={{ color: 'var(--text-secondary)', fontSize: 12 }}>
-            Обзор активности бота в реальном времени
-          </Typography.Text>
-        </div>
-      </div>
+    <PageWrapper>
+      <PageHeader
+        title="Dashboard"
+        subtitle="Обзор активности бота в реальном времени"
+      />
 
-      <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
-        <Col xs={24} sm={12} lg={6}>
-          <StatCard
-            title="Активных правил"
-            value={dashboard?.active_rules?.length ?? 0}
-            icon={<OrderedListOutlined />}
-            color="#5865F2"
-          />
-        </Col>
-        <Col xs={24} sm={12} lg={6}>
-          <StatCard
-            title="В голосе сейчас"
-            value={dashboard?.voice_online_count ?? 0}
-            icon={<TeamOutlined />}
-            color="#23c55e"
-          />
-        </Col>
-        <Col xs={24} sm={12} lg={6}>
-          <StatCard
-            title="Действий всего"
-            value={todayActions}
-            icon={<ThunderboltOutlined />}
-            color="#f59e0b"
-          />
-        </Col>
-        <Col xs={24} sm={12} lg={6}>
-          <StatCard
-            title="Последних событий"
-            value={recentLogs.length}
-            icon={<HistoryOutlined />}
-            color="#3b82f6"
-          />
-        </Col>
-      </Row>
+      <Grid container spacing={2} sx={{ mb: 3 }}>
+        <Grid item xs={12} sm={6} lg={3}>
+          <StatCard title="Активных правил" value={dashboard?.active_rules?.length ?? 0}
+            icon={ListAltOutlined} color="#5865F2" glowColor="accent" index={0} />
+        </Grid>
+        <Grid item xs={12} sm={6} lg={3}>
+          <StatCard title="В голосе сейчас" value={dashboard?.voice_online_count ?? 0}
+            icon={GroupOutlined} color="#22d3a5" glowColor="green" index={1} />
+        </Grid>
+        <Grid item xs={12} sm={6} lg={3}>
+          <StatCard title="Действий всего" value={todayActions}
+            icon={BoltOutlined} color="#fbbf24" glowColor="accent" index={2} />
+        </Grid>
+        <Grid item xs={12} sm={6} lg={3}>
+          <StatCard title="Последних событий" value={recentLogs.length}
+            icon={HistoryOutlined} color="#38bdf8" glowColor="accent" index={3} />
+        </Grid>
+      </Grid>
 
-      <Row gutter={[16, 16]}>
-        <Col xs={24} lg={12}>
-          <Typography.Title
-            level={5}
-            style={{ fontFamily: 'Syne, sans-serif', color: 'var(--text-primary)', marginBottom: 12 }}
-          >
+      <Grid container spacing={2}>
+        <Grid item xs={12} lg={6}>
+          <Typography variant="h6" sx={{ mb: 1.5, fontSize: '0.9rem' }}>
             Сейчас в голосе
-          </Typography.Title>
+          </Typography>
           {onlineUsers.length === 0 ? (
-            <Empty description="Никого нет в голосовых каналах" />
+            <EmptyState text="Никого нет в голосовых каналах" icon="🔇" />
           ) : (
-            <Table
-              dataSource={onlineUsers}
-              columns={onlineColumns}
-              rowKey="user_id"
-              size="small"
-              pagination={false}
-              rowClassName={() => 'table-row'}
-            />
+            <TableContainer component={Paper}>
+              <Table size="small">
+                <TableHead>
+                  <TableRow>
+                    <TableCell sx={{ width: 40 }} />
+                    <TableCell>Пользователь</TableCell>
+                    <TableCell>Канал</TableCell>
+                    <TableCell>Время в канале</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {onlineUsers.map(u => (
+                    <TableRow key={u.user_id}>
+                      <TableCell><Avatar src={u.avatar} sx={{ width: 24, height: 24 }} /></TableCell>
+                      <TableCell>{u.username}</TableCell>
+                      <TableCell>{u.channel_name}</TableCell>
+                      <TableCell><Timestamp iso={u.joined_at} /></TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </TableContainer>
           )}
-        </Col>
+        </Grid>
 
-        <Col xs={24} lg={12}>
-          <Typography.Title
-            level={5}
-            style={{ fontFamily: 'Syne, sans-serif', color: 'var(--text-primary)', marginBottom: 12 }}
-          >
+        <Grid item xs={12} lg={6}>
+          <Typography variant="h6" sx={{ mb: 1.5, fontSize: '0.9rem' }}>
             Последние события
-          </Typography.Title>
+          </Typography>
           {recentLogs.length === 0 ? (
-            <Empty description="Нет событий" />
+            <EmptyState text="Нет событий" icon="📋" />
           ) : (
-            <Table
-              dataSource={recentLogs}
-              columns={logColumns}
-              rowKey="id"
-              size="small"
-              pagination={false}
-              rowClassName={() => 'table-row'}
-            />
+            <TableContainer component={Paper}>
+              <Table size="small">
+                <TableHead>
+                  <TableRow>
+                    <TableCell>Время</TableCell>
+                    <TableCell>Discord ID</TableCell>
+                    <TableCell>Действие</TableCell>
+                    <TableCell>Rule</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {recentLogs.map(log => (
+                    <TableRow key={log.id}>
+                      <TableCell><Timestamp iso={log.executed_at} /></TableCell>
+                      <TableCell><DiscordId id={log.discord_id} /></TableCell>
+                      <TableCell><ActionChip type={log.action_type} isDryRun={log.is_dry_run} /></TableCell>
+                      <TableCell sx={{ color: 'text.disabled', fontFamily: "'IBM Plex Mono'", fontSize: '0.72rem' }}>
+                        {log.rule_id ?? '—'}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </TableContainer>
           )}
-        </Col>
-      </Row>
-    </>
+        </Grid>
+      </Grid>
+    </PageWrapper>
   )
 }

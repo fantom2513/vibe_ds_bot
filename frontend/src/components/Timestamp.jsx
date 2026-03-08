@@ -1,4 +1,4 @@
-import { Tooltip } from 'antd'
+import { Tooltip } from '@mui/material'
 import dayjs from 'dayjs'
 import relativeTime from 'dayjs/plugin/relativeTime'
 import 'dayjs/locale/ru'

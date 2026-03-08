@@ -1,20 +1,28 @@
 import { useState, useEffect } from 'react'
 import {
-  Table, Button, Drawer, Form, Select, Input, InputNumber, Switch, Tag,
-  Popconfirm, message, Alert, Spin, Empty, Space, Typography,
-} from 'antd'
-import { PlusOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons'
+  Box,
+  Button, Drawer, Select, MenuItem, TextField, Switch, FormControlLabel,
+  Table, TableBody, TableCell, TableHead, TableRow, TableContainer,
+  Paper, IconButton, Dialog, DialogTitle, DialogContent, DialogActions,
+  Snackbar, Alert, Tooltip, Typography, FormControl, InputLabel,
+} from '@mui/material'
+import { AddOutlined, EditOutlined, DeleteOutlined } from '@mui/icons-material'
 import { getRules, createRule, updateRule, deleteRule, toggleRule } from '../api/rules'
-import ActionTag from '../components/ActionTag'
+import { ActionChip, PageHeader, LoadingState, ErrorState, EmptyState } from '../components/ui'
+import { PageWrapper } from '../styles/motion'
 
-const PAGE_HEADER = {
-  display: 'flex',
-  justifyContent: 'space-between',
-  alignItems: 'center',
-  marginBottom: 20,
-  paddingBottom: 16,
-  borderBottom: '1px solid var(--border-subtle)',
-}
+const MONO = { fontFamily: "'IBM Plex Mono', monospace", fontSize: '0.72rem' }
+
+const defaultForm = () => ({
+  target_list: '',
+  channel_ids: '',
+  max_time_sec: '',
+  action_type: '',
+  action_params: '{}',
+  priority: 0,
+  is_active: true,
+  is_dry_run: false,
+})
 
 export default function Rules() {
   const [rules, setRules] = useState([])
@@ -23,12 +31,14 @@ export default function Rules() {
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [editing, setEditing] = useState(null)
   const [saving, setSaving] = useState(false)
-  const [form] = Form.useForm()
+  const [form, setForm] = useState(defaultForm())
+  const [formError, setFormError] = useState(null)
+  const [deleteTarget, setDeleteTarget] = useState(null)
+  const [snack, setSnack] = useState(null)
 
   const load = async () => {
     try {
-      const data = await getRules()
-      setRules(data)
+      setRules(await getRules())
     } catch (e) {
       setError(e.message)
     } finally {
@@ -38,20 +48,22 @@ export default function Rules() {
 
   useEffect(() => { load() }, [])
 
+  const showSnack = (msg, severity = 'success') => setSnack({ msg, severity })
+
   const openCreate = () => {
     setEditing(null)
-    form.resetFields()
-    form.setFieldsValue({ is_active: true, is_dry_run: false, priority: 0, action_params: '{}' })
+    setForm(defaultForm())
+    setFormError(null)
     setDrawerOpen(true)
   }
 
   const openEdit = (rule) => {
     setEditing(rule)
-    form.setFieldsValue({
-      target_list: rule.target_list,
-      channel_ids: rule.channel_ids,
-      max_time_sec: rule.max_time_sec,
-      action_type: rule.action_type,
+    setForm({
+      target_list: rule.target_list || '',
+      channel_ids: (rule.channel_ids || []).join(', '),
+      max_time_sec: rule.max_time_sec ?? '',
+      action_type: rule.action_type || '',
       action_params: typeof rule.action_params === 'object'
         ? JSON.stringify(rule.action_params, null, 2)
         : (rule.action_params || '{}'),
@@ -59,48 +71,57 @@ export default function Rules() {
       is_active: rule.is_active,
       is_dry_run: rule.is_dry_run,
     })
+    setFormError(null)
     setDrawerOpen(true)
   }
 
   const handleSave = async () => {
-    let values
+    if (!form.action_type) { setFormError('action_type обязателен'); return }
+    let action_params
     try {
-      values = await form.validateFields()
-    } catch { return }
-
-    // Validate action_params JSON
-    try {
-      values.action_params = JSON.parse(values.action_params || '{}')
+      action_params = JSON.parse(form.action_params || '{}')
     } catch {
-      message.error('action_params — невалидный JSON')
+      setFormError('action_params — невалидный JSON')
       return
     }
-
+    const payload = {
+      target_list: form.target_list || null,
+      channel_ids: form.channel_ids
+        ? form.channel_ids.split(',').map(s => s.trim()).filter(Boolean)
+        : [],
+      max_time_sec: form.max_time_sec ? Number(form.max_time_sec) : null,
+      action_type: form.action_type,
+      action_params,
+      priority: Number(form.priority) || 0,
+      is_active: form.is_active,
+      is_dry_run: form.is_dry_run,
+    }
     setSaving(true)
     try {
       if (editing) {
-        await updateRule(editing.id, values)
-        message.success('Правило обновлено')
+        await updateRule(editing.id, payload)
+        showSnack('Правило обновлено')
       } else {
-        await createRule(values)
-        message.success('Правило создано')
+        await createRule(payload)
+        showSnack('Правило создано')
       }
       setDrawerOpen(false)
       load()
     } catch (e) {
-      message.error(e.response?.data?.detail || 'Ошибка сохранения')
+      showSnack(e.response?.data?.detail || 'Ошибка сохранения', 'error')
     } finally {
       setSaving(false)
     }
   }
 
-  const handleDelete = async (id) => {
+  const handleDelete = async () => {
     try {
-      await deleteRule(id)
-      message.success('Правило удалено')
+      await deleteRule(deleteTarget.id)
+      showSnack('Правило удалено')
+      setDeleteTarget(null)
       load()
     } catch (e) {
-      message.error(e.response?.data?.detail || 'Ошибка удаления')
+      showSnack(e.response?.data?.detail || 'Ошибка удаления', 'error')
     }
   }
 
@@ -109,179 +130,225 @@ export default function Rules() {
       await toggleRule(rule.id)
       load()
     } catch (e) {
-      message.error(e.response?.data?.detail || 'Ошибка')
+      showSnack(e.response?.data?.detail || 'Ошибка', 'error')
     }
   }
 
-  const columns = [
-    {
-      title: 'ID',
-      dataIndex: 'id',
-      width: 60,
-      render: v => (
-        <span style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 11, color: 'var(--text-mono)' }}>
-          {v}
-        </span>
-      ),
-    },
-    {
-      title: 'Target List',
-      dataIndex: 'target_list',
-      width: 110,
-      render: v => v
-        ? <Tag color={v === 'whitelist' ? 'green' : 'red'}>{v}</Tag>
-        : <span style={{ color: 'var(--text-muted)' }}>—</span>,
-    },
-    {
-      title: 'Каналы',
-      dataIndex: 'channel_ids',
-      render: v => Array.isArray(v) && v.length
-        ? <span style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 11 }}>{v.join(', ')}</span>
-        : <span style={{ color: 'var(--text-muted)' }}>Все</span>,
-    },
-    {
-      title: 'Max Time',
-      dataIndex: 'max_time_sec',
-      width: 100,
-      render: v => v
-        ? <span style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 11 }}>{Math.round(v / 60)} мин</span>
-        : <span style={{ color: 'var(--text-muted)' }}>—</span>,
-    },
-    {
-      title: 'Действие',
-      dataIndex: 'action_type',
-      width: 130,
-      render: (v, r) => <ActionTag type={v} isDryRun={r.is_dry_run} />,
-    },
-    {
-      title: 'Приоритет',
-      dataIndex: 'priority',
-      width: 90,
-      render: v => (
-        <span style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 11 }}>{v}</span>
-      ),
-    },
-    {
-      title: 'Активно',
-      dataIndex: 'is_active',
-      width: 90,
-      render: (v, r) => (
-        <Switch checked={v} size="small" onChange={() => handleToggle(r)} />
-      ),
-    },
-    {
-      title: '',
-      key: 'actions',
-      width: 90,
-      render: (_, r) => (
-        <Space size={4}>
-          <Button
-            size="small"
-            icon={<EditOutlined />}
-            onClick={() => openEdit(r)}
-          />
-          <Popconfirm
-            title="Удалить правило?"
-            onConfirm={() => handleDelete(r.id)}
-            okText="Да"
-            cancelText="Нет"
-          >
-            <Button size="small" danger icon={<DeleteOutlined />} />
-          </Popconfirm>
-        </Space>
-      ),
-    },
-  ]
-
-  if (loading) return <div style={{ textAlign: 'center', paddingTop: 60 }}><Spin size="large" /></div>
-  if (error) return <Alert type="error" message={error} />
+  if (loading) return <LoadingState />
+  if (error) return <ErrorState message={error} />
 
   return (
-    <>
-      <div style={PAGE_HEADER}>
-        <div>
-          <Typography.Title
-            level={4}
-            style={{ margin: 0, fontFamily: 'Syne, sans-serif', color: 'var(--text-primary)', fontWeight: 600 }}
-          >
-            Rules
-          </Typography.Title>
-          <Typography.Text style={{ color: 'var(--text-secondary)', fontSize: 12 }}>
-            Управление правилами обработки голосовых событий
-          </Typography.Text>
-        </div>
-        <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>
-          Новое правило
-        </Button>
-      </div>
-
-      {rules.length === 0 ? (
-        <Empty description="Нет правил" />
-      ) : (
-        <Table
-          dataSource={rules}
-          columns={columns}
-          rowKey="id"
-          size="small"
-          pagination={{ pageSize: 20, size: 'small', showTotal: t => `Всего: ${t}` }}
-          rowClassName={() => 'table-row'}
-        />
-      )}
-
-      <Drawer
-        title={editing ? 'Редактировать правило' : 'Новое правило'}
-        open={drawerOpen}
-        onClose={() => setDrawerOpen(false)}
-        width={520}
-        extra={
-          <Button type="primary" loading={saving} onClick={handleSave}>
-            Сохранить
+    <PageWrapper>
+      <PageHeader
+        title="Rules"
+        subtitle="Управление правилами обработки голосовых событий"
+        actions={
+          <Button variant="contained" startIcon={<AddOutlined />} onClick={openCreate}>
+            Новое правило
           </Button>
         }
+      />
+
+      {rules.length === 0 ? (
+        <EmptyState text="Нет правил" icon="📋" />
+      ) : (
+        <TableContainer component={Paper}>
+          <Table size="small">
+            <TableHead>
+              <TableRow>
+                <TableCell>ID</TableCell>
+                <TableCell>Target List</TableCell>
+                <TableCell>Каналы</TableCell>
+                <TableCell>Max Time</TableCell>
+                <TableCell>Действие</TableCell>
+                <TableCell>Приоритет</TableCell>
+                <TableCell>Активно</TableCell>
+                <TableCell />
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {rules.map(r => (
+                <TableRow key={r.id}>
+                  <TableCell sx={MONO}>{r.id}</TableCell>
+                  <TableCell>
+                    {r.target_list ? (
+                      <Box component="span" sx={{
+                        px: 0.75, py: '2px', borderRadius: '4px', fontSize: '0.7rem',
+                        ...MONO,
+                        backgroundColor: r.target_list === 'whitelist'
+                          ? 'rgba(34,211,165,0.10)' : 'rgba(244,63,94,0.10)',
+                        color: r.target_list === 'whitelist' ? '#22d3a5' : '#f43f5e',
+                        border: `1px solid ${r.target_list === 'whitelist' ? 'rgba(34,211,165,0.30)' : 'rgba(244,63,94,0.30)'}`,
+                      }}>
+                        {r.target_list}
+                      </Box>
+                    ) : (
+                      <Typography sx={{ color: 'text.disabled', fontSize: '0.72rem' }}>—</Typography>
+                    )}
+                  </TableCell>
+                  <TableCell sx={{ color: Array.isArray(r.channel_ids) && r.channel_ids.length ? 'text.primary' : 'text.disabled', ...MONO }}>
+                    {Array.isArray(r.channel_ids) && r.channel_ids.length ? r.channel_ids.join(', ') : 'Все'}
+                  </TableCell>
+                  <TableCell sx={MONO}>
+                    {r.max_time_sec ? `${Math.round(r.max_time_sec / 60)} мин` : <Typography sx={{ color: 'text.disabled', fontSize: '0.72rem' }}>—</Typography>}
+                  </TableCell>
+                  <TableCell><ActionChip type={r.action_type} isDryRun={r.is_dry_run} /></TableCell>
+                  <TableCell sx={MONO}>{r.priority}</TableCell>
+                  <TableCell>
+                    <Switch checked={r.is_active} size="small" onChange={() => handleToggle(r)} />
+                  </TableCell>
+                  <TableCell>
+                    <Box sx={{ display: 'flex', gap: 0.5 }}>
+                      <Tooltip title="Редактировать">
+                        <IconButton size="small" onClick={() => openEdit(r)}>
+                          <EditOutlined sx={{ fontSize: 15 }} />
+                        </IconButton>
+                      </Tooltip>
+                      <Tooltip title="Удалить">
+                        <IconButton size="small" color="error" onClick={() => setDeleteTarget(r)}>
+                          <DeleteOutlined sx={{ fontSize: 15 }} />
+                        </IconButton>
+                      </Tooltip>
+                    </Box>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </TableContainer>
+      )}
+
+      {/* Edit/Create Drawer */}
+      <Drawer
+        anchor="right"
+        open={drawerOpen}
+        onClose={() => setDrawerOpen(false)}
+        PaperProps={{ sx: { width: 480, p: 3 } }}
       >
-        <Form form={form} layout="vertical">
-          <Form.Item name="target_list" label="Target List">
-            <Select placeholder="Все пользователи" allowClear>
-              <Select.Option value="whitelist">whitelist</Select.Option>
-              <Select.Option value="blacklist">blacklist</Select.Option>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+          <Typography variant="h6" sx={{ fontSize: '1rem' }}>
+            {editing ? 'Редактировать правило' : 'Новое правило'}
+          </Typography>
+          <Button variant="contained" size="small" onClick={handleSave} disabled={saving}>
+            {saving ? 'Сохранение...' : 'Сохранить'}
+          </Button>
+        </Box>
+
+        {formError && <Alert severity="error" sx={{ mb: 2 }}>{formError}</Alert>}
+
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+          <FormControl size="small" fullWidth>
+            <InputLabel>Target List</InputLabel>
+            <Select
+              value={form.target_list}
+              label="Target List"
+              onChange={e => setForm(f => ({ ...f, target_list: e.target.value }))}
+            >
+              <MenuItem value="">Все пользователи</MenuItem>
+              <MenuItem value="whitelist">whitelist</MenuItem>
+              <MenuItem value="blacklist">blacklist</MenuItem>
             </Select>
-          </Form.Item>
-          <Form.Item name="channel_ids" label="Channel IDs (пустой = все каналы)">
-            <Select mode="tags" placeholder="Введите ID канала и нажмите Enter" tokenSeparators={[',']} />
-          </Form.Item>
-          <Form.Item name="max_time_sec" label="Max Time (секунды)">
-            <InputNumber style={{ width: '100%' }} min={1} placeholder="например 3600" />
-          </Form.Item>
-          <Form.Item name="action_type" label="Action Type" rules={[{ required: true }]}>
-            <Select>
+          </FormControl>
+
+          <TextField
+            label="Channel IDs (через запятую, пусто = все)"
+            size="small"
+            fullWidth
+            value={form.channel_ids}
+            onChange={e => setForm(f => ({ ...f, channel_ids: e.target.value }))}
+            placeholder="123456789, 987654321"
+            inputProps={{ style: { fontFamily: "'IBM Plex Mono', monospace" } }}
+          />
+
+          <TextField
+            label="Max Time (секунды)"
+            size="small"
+            fullWidth
+            type="number"
+            value={form.max_time_sec}
+            onChange={e => setForm(f => ({ ...f, max_time_sec: e.target.value }))}
+            placeholder="например 3600"
+          />
+
+          <FormControl size="small" fullWidth required>
+            <InputLabel>Action Type *</InputLabel>
+            <Select
+              value={form.action_type}
+              label="Action Type *"
+              onChange={e => setForm(f => ({ ...f, action_type: e.target.value }))}
+            >
               {['mute', 'unmute', 'move', 'kick'].map(t => (
-                <Select.Option key={t} value={t}>{t}</Select.Option>
+                <MenuItem key={t} value={t}>{t}</MenuItem>
               ))}
             </Select>
-          </Form.Item>
-          <Form.Item
-            name="action_params"
+          </FormControl>
+
+          <TextField
             label="Action Params (JSON)"
-            rules={[{
-              validator: (_, v) => {
-                try { JSON.parse(v || '{}'); return Promise.resolve() }
-                catch { return Promise.reject('Невалидный JSON') }
-              }
-            }]}
-          >
-            <Input.TextArea rows={3} style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 11 }} />
-          </Form.Item>
-          <Form.Item name="priority" label="Приоритет">
-            <InputNumber style={{ width: '100%' }} defaultValue={0} />
-          </Form.Item>
-          <Form.Item name="is_active" label="Активно" valuePropName="checked">
-            <Switch />
-          </Form.Item>
-          <Form.Item name="is_dry_run" label="Dry Run" valuePropName="checked">
-            <Switch />
-          </Form.Item>
-        </Form>
+            size="small"
+            fullWidth
+            multiline
+            rows={3}
+            value={form.action_params}
+            onChange={e => setForm(f => ({ ...f, action_params: e.target.value }))}
+            inputProps={{ style: { fontFamily: "'IBM Plex Mono', monospace", fontSize: '0.75rem' } }}
+          />
+
+          <TextField
+            label="Приоритет"
+            size="small"
+            fullWidth
+            type="number"
+            value={form.priority}
+            onChange={e => setForm(f => ({ ...f, priority: e.target.value }))}
+          />
+
+          <FormControlLabel
+            control={
+              <Switch
+                checked={form.is_active}
+                onChange={e => setForm(f => ({ ...f, is_active: e.target.checked }))}
+              />
+            }
+            label="Активно"
+          />
+
+          <FormControlLabel
+            control={
+              <Switch
+                checked={form.is_dry_run}
+                onChange={e => setForm(f => ({ ...f, is_dry_run: e.target.checked }))}
+              />
+            }
+            label="Dry Run"
+          />
+        </Box>
       </Drawer>
-    </>
+
+      {/* Delete Confirm Dialog */}
+      <Dialog open={!!deleteTarget} onClose={() => setDeleteTarget(null)}>
+        <DialogTitle>Удалить правило?</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+            Правило #{deleteTarget?.id} ({deleteTarget?.action_type}) будет удалено.
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setDeleteTarget(null)}>Отмена</Button>
+          <Button color="error" variant="contained" onClick={handleDelete}>Удалить</Button>
+        </DialogActions>
+      </Dialog>
+
+      <Snackbar
+        open={!!snack}
+        autoHideDuration={3000}
+        onClose={() => setSnack(null)}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+      >
+        <Alert severity={snack?.severity || 'success'} onClose={() => setSnack(null)}>
+          {snack?.msg}
+        </Alert>
+      </Snackbar>
+    </PageWrapper>
   )
 }

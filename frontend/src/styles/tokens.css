@@ -1,36 +1,53 @@
 :root {
-  /* Backgrounds */
-  --bg-base:        #0d0e11;
-  --bg-surface:     #13151a;
-  --bg-elevated:    #1a1d24;
-  --bg-input:       #1e2128;
+  /* === BACKGROUNDS === */
+  --bg-canvas:     #030507;   /* самый глубокий — body за всем */
+  --bg-base:       #060810;   /* основной фон страниц */
+  --bg-surface:    #0a0d16;   /* карточки первого уровня */
+  --bg-elevated:   #0f1220;   /* карточки второго уровня, дроверы */
+  --bg-overlay:    #141828;   /* модалы, тултипы */
+  --bg-input:      #0d1018;   /* поля ввода */
+  --bg-hover:      #111525;   /* hover state строк */
 
-  /* Borders */
-  --border-subtle:  #1f2229;
-  --border-base:    #2a2d36;
-  --border-focus:   #5865F2;
+  /* === GRADIENT MESH === */
+  --mesh-primary:  rgba(88, 101, 242, 0.12);   /* Discord blurple */
+  --mesh-secondary:rgba(139, 92, 246, 0.08);   /* purple */
+  --mesh-accent:   rgba(59, 130, 246, 0.06);   /* blue */
 
-  /* Text */
-  --text-primary:   #e8eaf0;
-  --text-secondary: #8b8fa8;
-  --text-muted:     #4a4d5e;
-  --text-mono:      #a8b4c8;
+  /* === BORDERS === */
+  --border-dim:    rgba(255,255,255,0.04);
+  --border-subtle: rgba(255,255,255,0.07);
+  --border-base:   rgba(255,255,255,0.10);
+  --border-bright: rgba(255,255,255,0.16);
+  --border-accent: rgba(88, 101, 242, 0.40);
 
-  /* Brand */
-  --accent:         #5865F2;
-  --accent-hover:   #4752c4;
+  /* === TEXT === */
+  --text-primary:  #f0f2ff;
+  --text-secondary:#8892b0;
+  --text-muted:    #4a5270;
+  --text-mono:     #7ec8e3;
 
-  /* Status */
-  --status-success: #23c55e;
-  --status-warning: #f59e0b;
-  --status-error:   #ef4444;
-  --status-info:    #3b82f6;
+  /* === BRAND & GLOW === */
+  --accent:        #5865F2;
+  --accent-light:  #7c85f5;
+  --accent-glow:   rgba(88, 101, 242, 0.35);
+  --purple:        #8b5cf6;
+  --purple-glow:   rgba(139, 92, 246, 0.30);
 
-  /* Action type colors */
-  --action-mute:    #f59e0b;
-  --action-unmute:  #23c55e;
-  --action-move:    #3b82f6;
-  --action-kick:    #ef4444;
-  --action-dry:     #6b7280;
-  --action-pair:    #8b5cf6;
+  /* === STATUS === */
+  --green:         #22d3a5;
+  --green-glow:    rgba(34, 211, 165, 0.25);
+  --yellow:        #fbbf24;
+  --yellow-glow:   rgba(251, 191, 36, 0.25);
+  --red:           #f43f5e;
+  --red-glow:      rgba(244, 63, 94, 0.25);
+  --blue:          #38bdf8;
+  --blue-glow:     rgba(56, 189, 248, 0.25);
+
+  /* === ACTION TYPE COLORS === */
+  --action-mute:   #fbbf24;
+  --action-unmute: #22d3a5;
+  --action-move:   #38bdf8;
+  --action-kick:   #f43f5e;
+  --action-pair:   #8b5cf6;
+  --action-dry:    #475569;
 }

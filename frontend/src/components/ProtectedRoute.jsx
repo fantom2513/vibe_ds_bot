@@ -1,16 +1,15 @@
 import { Navigate, Outlet } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
-import { Spin } from 'antd'
+import { Box, LinearProgress } from '@mui/material'
 
 export default function ProtectedRoute() {
   const { user } = useAuth()
 
   if (user === undefined) {
     return (
-      <div style={{ display: 'flex', justifyContent: 'center',
-                    alignItems: 'center', height: '100vh' }}>
-        <Spin size="large" />
-      </div>
+      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
+        <LinearProgress sx={{ width: 200, borderRadius: 2 }} />
+      </Box>
     )
   }
 

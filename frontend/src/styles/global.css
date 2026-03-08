@@ -25,12 +25,6 @@ body {
   background: var(--bg-elevated) !important;
 }
 
-/* Ant Design drawer/modal titles */
-.ant-drawer-title,
-.ant-modal-title {
-  font-family: 'Syne', sans-serif !important;
-  font-weight: 600 !important;
-}
 
 /* JSON in expandable rows */
 .json-preview {
