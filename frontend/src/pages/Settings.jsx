@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react'
 import {
-  Box, Typography,
+  Box, Typography, Switch, FormControlLabel,
   Table, TableBody, TableCell, TableHead, TableRow, TableContainer,
-  Paper,
+  Paper, Snackbar, Alert,
 } from '@mui/material'
 import { CheckCircleOutlined } from '@mui/icons-material'
 import { getBotInfo, getAllowedUsers } from '../api/stats'
+import { getDebugMode, setDebugMode } from '../api/muteLevels'
 import { DiscordId, PageHeader, LoadingState, ErrorState } from '../components/ui'
 import { GlowCard } from '../components/ui'
 import { PageWrapper } from '../styles/motion'
@@ -38,15 +39,34 @@ function InfoRow({ label, value }) {
 export default function Settings() {
   const [botInfo, setBotInfo] = useState(null)
   const [allowedUsers, setAllowedUsers] = useState(null)
+  const [debugMode, setDebugModeState] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const [snack, setSnack] = useState(null)
+
+  const showSnack = (msg, severity = 'success') => setSnack({ msg, severity })
 
   useEffect(() => {
-    Promise.all([getBotInfo(), getAllowedUsers()])
-      .then(([info, users]) => { setBotInfo(info); setAllowedUsers(users) })
+    Promise.all([getBotInfo(), getAllowedUsers(), getDebugMode().catch(() => ({ debug_mode: false }))])
+      .then(([info, users, dbg]) => {
+        setBotInfo(info)
+        setAllowedUsers(users)
+        setDebugModeState(dbg.debug_mode)
+      })
       .catch(e => setError(e.message))
       .finally(() => setLoading(false))
   }, [])
+
+  const handleDebugToggle = async (e) => {
+    const enabled = e.target.checked
+    try {
+      const res = await setDebugMode(enabled)
+      setDebugModeState(res.debug_mode)
+      showSnack(enabled ? 'Debug mode включён' : 'Debug mode выключен')
+    } catch {
+      showSnack('Ошибка переключения debug mode', 'error')
+    }
+  }
 
   if (loading) return <LoadingState />
   if (error) return <ErrorState message={error} />
@@ -83,6 +103,49 @@ export default function Settings() {
           </GlowCard>
         </Box>
 
+        {/* ── Debug Mode ── */}
+        <Box>
+          <Typography variant="h6" sx={{ mb: 1.5, fontSize: '0.9rem' }}>Debug Mode</Typography>
+          <GlowCard glowColor="accent" sx={{ p: 2 }}>
+            <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
+              <Box>
+                <Typography sx={{ fontSize: '0.85rem', mb: 0.5 }}>
+                  Логировать все события в debug-канал
+                </Typography>
+                <Typography sx={{ fontSize: '0.75rem', color: 'text.secondary' }}>
+                  Включайте только при отладке — создаёт много сообщений
+                </Typography>
+              </Box>
+              <FormControlLabel
+                control={
+                  <Switch
+                    checked={debugMode}
+                    onChange={handleDebugToggle}
+                    size="small"
+                    color={debugMode ? 'warning' : 'default'}
+                  />
+                }
+                label=""
+                sx={{ ml: 2, mr: 0 }}
+              />
+            </Box>
+            {debugMode && (
+              <Box sx={{
+                mt: 1.5,
+                px: 1.5, py: 0.75,
+                borderRadius: 1,
+                bgcolor: 'rgba(251,191,36,0.08)',
+                border: '1px solid rgba(251,191,36,0.2)',
+              }}>
+                <Typography sx={{ fontSize: '0.73rem', color: '#fbbf24' }}>
+                  ⚠ Debug mode активен — все действия бота отправляются в debug-канал
+                </Typography>
+              </Box>
+            )}
+          </GlowCard>
+        </Box>
+
+        {/* ── Dashboard Access ── */}
         <Box>
           <Typography variant="h6" sx={{ mb: 0.5, fontSize: '0.9rem' }}>Dashboard Access</Typography>
           {allowedUsers?.note && (
@@ -120,6 +183,17 @@ export default function Settings() {
           </TableContainer>
         </Box>
       </Box>
+
+      <Snackbar
+        open={!!snack}
+        autoHideDuration={3000}
+        onClose={() => setSnack(null)}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+      >
+        <Alert severity={snack?.severity || 'success'} onClose={() => setSnack(null)}>
+          {snack?.msg}
+        </Alert>
+      </Snackbar>
     </PageWrapper>
   )
 }

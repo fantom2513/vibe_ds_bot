@@ -71,15 +71,15 @@ async def _check_overtime(
                 rule_id=rule_id,
                 pool=pool,
             )
-            await logs_repo.log_action(
-                pool,
-                rule_id=rule_id,
-                discord_id=discord_id,
-                action_type=action_type,
-                channel_id=channel_id,
-                details={"source": "overtime", "overtime_seconds": entry.get("overtime_seconds")},
-            )
             if ok:
+                await logs_repo.log_action(
+                    pool,
+                    rule_id=rule_id,
+                    discord_id=discord_id,
+                    action_type=action_type,
+                    channel_id=channel_id,
+                    details={"source": "overtime", "overtime_seconds": entry.get("overtime_seconds")},
+                )
                 logger.info(
                     "overtime_action_executed",
                     discord_id=discord_id,
@@ -217,6 +217,122 @@ def setup_scheduler(
     # Cron-задачи из schedules (регистрируем асинхронно при старте через start_scheduler)
     # Тут только добавляем задачу, регистрация schedule jobs — в start_scheduler
     return scheduler
+
+
+async def tick_mute_xp(pool: asyncpg.Pool, mute_tracker, mute_xp_service, bot) -> None:
+    """Каждую минуту начислять XP пользователям, которые прямо сейчас в полном муте."""
+    from src.engine.mute_xp_service import MUTE_XP_PER_MINUTE
+    active = mute_tracker.get_active()
+    if not active:
+        return
+
+    guild_id = getattr(bot, "guild_id", None)
+    guild = bot.get_guild(guild_id) if guild_id else None
+    if not guild:
+        return
+
+    for member_id in list(active.keys()):
+        member = guild.get_member(member_id)
+        if not member:
+            continue
+        try:
+            await mute_xp_service._add_xp(pool, member, MUTE_XP_PER_MINUTE)
+        except Exception as e:
+            logger.warning("mute_xp.tick_failed", discord_id=str(member_id), error=str(e))
+
+    logger.info("mute_xp.tick", active_sessions=len(active))
+
+
+async def send_daily_stats(pool: asyncpg.Pool, notifier, bot) -> None:
+    """Отправить статистику за прошедшие 24 часа в daily-канал."""
+    from datetime import datetime, timezone
+
+    try:
+        stats = await pool.fetchrow("""
+            SELECT
+                COUNT(DISTINCT vs.discord_id) AS unique_users,
+                COUNT(*) AS total_sessions,
+                COALESCE(SUM(
+                    EXTRACT(EPOCH FROM (
+                        COALESCE(vs.left_at, NOW()) - vs.joined_at
+                    ))
+                ), 0)::INT AS total_voice_seconds,
+                (SELECT COUNT(*) FROM action_logs
+                 WHERE created_at >= NOW() - INTERVAL '24 hours') AS total_actions
+            FROM voice_sessions vs
+            WHERE vs.joined_at >= NOW() - INTERVAL '24 hours'
+        """)
+
+        top_mute = await pool.fetchrow("""
+            SELECT discord_id, SUM(duration_sec) AS total_sec
+            FROM mute_sessions
+            WHERE started_at >= NOW() - INTERVAL '24 hours'
+              AND ended_at IS NOT NULL
+            GROUP BY discord_id
+            ORDER BY total_sec DESC
+            LIMIT 1
+        """)
+
+        action_breakdown = await pool.fetch("""
+            SELECT action_type, COUNT(*) AS cnt
+            FROM action_logs
+            WHERE created_at >= NOW() - INTERVAL '24 hours'
+            GROUP BY action_type
+            ORDER BY cnt DESC
+        """)
+    except Exception as e:
+        logger.exception("daily_stats.query_failed", error=str(e))
+        return
+
+    def fmt_time(sec) -> str:
+        if not sec:
+            return "0m"
+        h = sec // 3600
+        m = (sec % 3600) // 60
+        return f"{h}h {m}m" if h else f"{m}m"
+
+    embed = discord.Embed(
+        title="📊 Ежедневный отчёт",
+        color=0x5865F2,
+        timestamp=datetime.now(timezone.utc),
+    )
+    embed.add_field(
+        name="Голосовая активность",
+        value=(
+            f"👥 Участников: **{stats['unique_users']}**\n"
+            f"🔊 Сессий: **{stats['total_sessions']}**\n"
+            f"⏱️ Суммарно: **{fmt_time(stats['total_voice_seconds'])}**"
+        ),
+        inline=True,
+    )
+
+    if action_breakdown:
+        breakdown_lines = "\n".join(
+            f"`{r['action_type']}`: {r['cnt']}" for r in action_breakdown
+        )
+        actions_value = f"⚡ Всего: **{stats['total_actions']}**\n{breakdown_lines}"
+    else:
+        actions_value = "Нет действий"
+
+    embed.add_field(name="Действия бота", value=actions_value, inline=True)
+
+    if top_mute:
+        guild_id = getattr(bot, "guild_id", None)
+        guild = bot.get_guild(guild_id) if guild_id else None
+        member = guild.get_member(top_mute["discord_id"]) if guild else None
+        name = member.display_name if member else str(top_mute["discord_id"])
+        embed.add_field(
+            name="🔇 Чемпион тишины",
+            value=f"**{name}** — {fmt_time(top_mute['total_sec'])} в муте",
+            inline=False,
+        )
+
+    embed.set_footer(text="За последние 24 часа")
+    try:
+        await notifier.send_daily(embed)
+        logger.info("daily_stats.sent")
+    except Exception as e:
+        logger.exception("daily_stats.send_failed", error=str(e))
 
 
 async def _send_weekly_report(pool: asyncpg.Pool) -> None:

@@ -201,6 +201,45 @@ class KickTargetResponse(BaseModel):
     model_config = {"from_attributes": True}
 
 
+# --- Mute Levels ---
+
+class MuteLevelCreate(BaseModel):
+    level: int
+    xp_required: int
+    role_id: Optional[int] = None
+    label: str
+
+
+class MuteLevelUpdate(BaseModel):
+    xp_required: Optional[int] = None
+    role_id: Optional[int] = None
+    label: Optional[str] = None
+
+
+class MuteLevelResponse(BaseModel):
+    level: int
+    xp_required: int
+    role_id: Optional[int] = None
+    label: str
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class MuteXPResponse(BaseModel):
+    discord_id: DiscordId
+    xp: int
+    level: int
+    total_mute_seconds: int
+    updated_at: Optional[datetime] = None
+
+    model_config = {"from_attributes": True}
+
+
+class MuteXPAdjust(BaseModel):
+    xp: int
+
+
 # --- Stacking pairs ---
 
 class StackingPairCreate(BaseModel):

@@ -9,6 +9,8 @@ from apscheduler.triggers.interval import IntervalTrigger
 
 from src.bot.notifier import BotNotifier, set_notifier
 from src.config.settings import get_notifications_config, get_settings, get_stacking_pairs, load_config_yaml
+from src.engine.mute_tracker import mute_tracker
+from src.engine.mute_xp_service import MuteXPService
 from src.engine.stacking import PairRule, StackingDetector
 from src.scheduler import kick_timeout_job
 from src.utils.logging import get_logger
@@ -117,6 +119,9 @@ def setup_notifier(bot) -> BotNotifier:
     notifier = BotNotifier(
         bot=bot,
         log_channel_id=notif_cfg["log_channel_id"],
+        debug_channel_id=notif_cfg["debug_channel_id"],
+        daily_stats_channel_id=notif_cfg["daily_stats_channel_id"],
+        debug_mode=notif_cfg["debug_mode"],
         log_dry_run_events=notif_cfg["log_dry_run_events"],
         log_pair_moves=notif_cfg["log_pair_moves"],
         log_kick_timeouts=notif_cfg["log_kick_timeouts"],
@@ -127,8 +132,53 @@ def setup_notifier(bot) -> BotNotifier:
     logger.info(
         "notifier_created",
         log_channel_id=notif_cfg["log_channel_id"],
+        debug_channel_id=notif_cfg["debug_channel_id"],
     )
     return notifier
+
+
+def setup_mute_xp(
+    bot,
+    pool: asyncpg.Pool,
+    scheduler: Optional[AsyncIOScheduler] = None,
+) -> MuteXPService:
+    """
+    Создать MuteXPService и зарегистрировать tick_mute_xp (каждую минуту)
+    и send_daily_stats (ежедневно в 23:00 по daily_stats_timezone).
+    """
+    from src.scheduler.jobs import send_daily_stats, tick_mute_xp
+    from apscheduler.triggers.cron import CronTrigger
+    from apscheduler.triggers.interval import IntervalTrigger
+
+    notifier = getattr(bot, "notifier", None)
+    service = MuteXPService(bot=bot, pool=pool, notifier=notifier)
+    bot.mute_xp_service = service
+
+    if scheduler is not None:
+        scheduler.add_job(
+            tick_mute_xp,
+            trigger=IntervalTrigger(minutes=1),
+            args=[pool, mute_tracker, service, bot],
+            id="mute_xp_tick",
+            name="Mute XP Tick",
+            replace_existing=True,
+        )
+        logger.info("mute_xp_tick_registered")
+
+        config = load_config_yaml()
+        notif_cfg = get_notifications_config(config)
+        tz = notif_cfg.get("daily_stats_timezone", "Europe/Moscow")
+        scheduler.add_job(
+            send_daily_stats,
+            trigger=CronTrigger(hour=23, minute=0, timezone=tz),
+            args=[pool, notifier, bot],
+            id="daily_stats",
+            name="Daily Stats Report",
+            replace_existing=True,
+        )
+        logger.info("daily_stats_job_registered", timezone=tz)
+
+    return service
 
 
 async def setup_all_features(
@@ -137,7 +187,7 @@ async def setup_all_features(
     scheduler: Optional[AsyncIOScheduler] = None,
 ) -> Optional[AsyncIOScheduler]:
     """
-    Вызвать setup_stacking + setup_kick_timeout_scheduler + setup_notifier.
+    Вызвать setup_stacking + setup_kick_timeout_scheduler + setup_notifier + setup_mute_xp.
     Установить bot.guild_id = settings.DISCORD_GUILD_ID.
     """
     settings = get_settings()
@@ -145,4 +195,5 @@ async def setup_all_features(
     await setup_stacking(bot, pool)
     setup_kick_timeout_scheduler(bot, scheduler)
     setup_notifier(bot)
+    setup_mute_xp(bot, pool, scheduler)
     return scheduler

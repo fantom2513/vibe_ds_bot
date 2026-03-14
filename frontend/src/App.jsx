@@ -6,6 +6,7 @@ import Users from './pages/Users'
 import Schedules from './pages/Schedules'
 import Logs from './pages/Logs'
 import Settings from './pages/Settings'
+import MuteLevels from './pages/MuteLevels'
 
 export default function App() {
   return (
@@ -19,6 +20,7 @@ export default function App() {
           <Route path="schedules" element={<Schedules />} />
           <Route path="logs" element={<Logs />} />
           <Route path="settings" element={<Settings />} />
+          <Route path="mute-levels" element={<MuteLevels />} />
         </Route>
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>

@@ -128,14 +128,21 @@ async def check_kick_timeouts(bot: "commands.Bot") -> None:
                 continue
 
             clear_session_timeout(discord_id)
-            await logs_repo.log_action(
-                pool,
-                rule_id=None,
-                discord_id=discord_id,
-                action_type="kick_timeout",
-                channel_id=channel_id,
-                details={"timeout_sec": effective_timeout},
-            )
+            try:
+                await logs_repo.log_action(
+                    pool,
+                    rule_id=None,
+                    discord_id=discord_id,
+                    action_type="kick_timeout",
+                    channel_id=channel_id,
+                    details={"timeout_sec": effective_timeout},
+                )
+            except Exception as log_err:
+                logger.exception(
+                    "kick_timeout_log_failed",
+                    discord_id=discord_id,
+                    error=str(log_err),
+                )
             logger.info(
                 "kick_timeout_executed",
                 discord_id=discord_id,

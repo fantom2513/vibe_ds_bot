@@ -5,11 +5,16 @@ from datetime import datetime
 from typing import Annotated
 
 from fastapi import APIRouter, Depends
+from pydantic import BaseModel
 
 from src.api.deps import get_bot, get_current_user
 from src.config.settings import get_settings
 
 router = APIRouter()
+
+
+class DebugModeUpdate(BaseModel):
+    enabled: bool
 
 
 @router.get("/settings/bot-info")
@@ -29,6 +34,30 @@ async def bot_info(
         "uptime_seconds": uptime_seconds,
         "latency_ms": round(bot.latency * 1000),
     }
+
+
+@router.get("/settings/debug-mode")
+async def get_debug_mode(
+    _: Annotated[dict, Depends(get_current_user)],
+) -> dict:
+    """Текущее состояние debug mode."""
+    from src.bot.notifier import get_notifier
+    notifier = get_notifier()
+    return {"debug_mode": notifier.debug_mode if notifier else False}
+
+
+@router.patch("/settings/debug-mode")
+async def toggle_debug_mode(
+    body: DebugModeUpdate,
+    _: Annotated[dict, Depends(get_current_user)],
+) -> dict:
+    """Включить/выключить debug mode без перезапуска бота."""
+    from src.bot.notifier import get_notifier
+    notifier = get_notifier()
+    if notifier is None:
+        return {"debug_mode": False}
+    notifier.debug_mode = body.enabled
+    return {"debug_mode": notifier.debug_mode}
 
 
 @router.get("/settings/allowed-users")

@@ -34,6 +34,10 @@ _DEFAULT_YAML = {
     },
     "notifications": {
         "log_channel_id": None,
+        "debug_channel_id": None,
+        "daily_stats_channel_id": None,
+        "debug_mode": False,
+        "daily_stats_timezone": "Europe/Moscow",
         "log_dry_run_events": True,
         "log_pair_moves": True,
         "log_kick_timeouts": True,
@@ -199,6 +203,10 @@ def get_notifications_config(config: dict) -> dict:
     defaults = _DEFAULT_YAML["notifications"]
     return {
         "log_channel_id": section.get("log_channel_id", defaults["log_channel_id"]),
+        "debug_channel_id": section.get("debug_channel_id", defaults["debug_channel_id"]),
+        "daily_stats_channel_id": section.get("daily_stats_channel_id", defaults["daily_stats_channel_id"]),
+        "debug_mode": section.get("debug_mode", defaults["debug_mode"]),
+        "daily_stats_timezone": section.get("daily_stats_timezone", defaults["daily_stats_timezone"]),
         "log_dry_run_events": section.get("log_dry_run_events", defaults["log_dry_run_events"]),
         "log_pair_moves": section.get("log_pair_moves", defaults["log_pair_moves"]),
         "log_kick_timeouts": section.get("log_kick_timeouts", defaults["log_kick_timeouts"]),

@@ -20,6 +20,9 @@ export default function Layout() {
         <NavLink to="/logs" className={({ isActive }) => (isActive ? 'active' : '')}>
           Логи
         </NavLink>
+        <NavLink to="/mute-levels" className={({ isActive }) => (isActive ? 'active' : '')}>
+          Мут XP
+        </NavLink>
         <LiveIndicator />
         <NavLink to="/settings" className="settings-link">
           Настройки

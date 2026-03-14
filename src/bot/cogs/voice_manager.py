@@ -121,14 +121,22 @@ class VoiceManager(commands.Cog):
                         pool=pool,
                     )
                     if ok:
-                        await logs_repo.log_action(
-                            pool,
-                            action.rule_id,
-                            member.id,
-                            action.action_type,
-                            after.channel.id,
-                            details={"channel_id": after.channel.id},
-                        )
+                        try:
+                            await logs_repo.log_action(
+                                pool,
+                                action.rule_id,
+                                member.id,
+                                action.action_type,
+                                after.channel.id,
+                                details={"channel_id": after.channel.id},
+                            )
+                        except Exception as log_err:
+                            logger.exception(
+                                "voice_action_log_failed",
+                                action_type=action.action_type,
+                                member_id=member.id,
+                                error=str(log_err),
+                            )
                         from datetime import datetime
                         asyncio.create_task(broadcaster.broadcast({
                             "type": "action_log",
@@ -139,6 +147,28 @@ class VoiceManager(commands.Cog):
                             "is_dry_run": action.is_dry_run,
                             "timestamp": datetime.utcnow().isoformat(),
                         }))
+
+            # Обработка мут-состояния (self_mute AND self_deaf)
+            mute_xp_service = getattr(self.bot, "mute_xp_service", None)
+            if mute_xp_service:
+                from src.engine.mute_tracker import mute_tracker
+                mute_state_changed = (
+                    before.self_mute != after.self_mute
+                    or before.self_deaf != after.self_deaf
+                )
+                if mute_state_changed:
+                    if mute_tracker.is_fully_muted(member):
+                        mute_tracker.start_mute(member)
+                    else:
+                        session = mute_tracker.end_mute(member.id)
+                        if session:
+                            duration = mute_tracker.get_duration(session)
+                            asyncio.create_task(
+                                mute_xp_service.record_mute_session(pool, member, session, duration)
+                            )
+                elif before.channel is None and mute_tracker.is_fully_muted(member):
+                    # Пользователь зашёл в канал уже замьюченным
+                    mute_tracker.start_mute(member)
             return
 
         # Выход из канала
@@ -148,6 +178,16 @@ class VoiceManager(commands.Cog):
             if stacking:
                 stacking.on_user_leave(member.id)
             clear_session_timeout(member.id)
+            # Завершить мут-сессию при выходе
+            mute_xp_service = getattr(self.bot, "mute_xp_service", None)
+            if mute_xp_service:
+                from src.engine.mute_tracker import mute_tracker
+                session = mute_tracker.end_mute(member.id)
+                if session:
+                    duration = mute_tracker.get_duration(session)
+                    asyncio.create_task(
+                        mute_xp_service.record_mute_session(pool, member, session, duration)
+                    )
             logger.info(
                 "voice_leave",
                 user_id=member.id,
