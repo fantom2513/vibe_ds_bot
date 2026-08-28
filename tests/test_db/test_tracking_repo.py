@@ -19,8 +19,8 @@ async def test_create_tracked_member_applies_default_msk_schedule(pool) -> None:
 
     assert row["discord_id"] == 42
     assert row["work_days"] == [0, 1, 2, 3, 4]
-    assert row["work_start"] == "09:00:00"
-    assert row["work_end"] == "18:00:00"
+    assert row["work_start"] == "09:00"
+    assert row["work_end"] == "18:00"
     assert row["timezone"] == "Europe/Moscow"
 
 

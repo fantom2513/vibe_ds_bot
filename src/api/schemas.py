@@ -2,6 +2,7 @@
 Pydantic-схемы для FastAPI (rules, users, schedules, logs, dashboard).
 """
 from datetime import datetime, time
+import re
 from typing import Annotated, Any, Literal, Optional
 from zoneinfo import ZoneInfo
 
@@ -14,6 +15,15 @@ DiscordId = Annotated[
     BeforeValidator(lambda v: int(v) if isinstance(v, str) else v),
     PlainSerializer(lambda v: str(v), return_type=str),
 ]
+
+
+def _parse_hh_mm(value: str) -> None:
+    if not re.fullmatch(r"\d{2}:\d{2}", value):
+        raise ValueError("work times must use HH:MM format")
+    try:
+        time.fromisoformat(value)
+    except ValueError as exc:
+        raise ValueError("work times must use HH:MM format") from exc
 
 
 # --- Rules ---
@@ -180,8 +190,8 @@ class TrackedMemberCreate(BaseModel):
     username: Optional[str] = Field(None, max_length=100)
     is_active: bool = True
     work_days: list[int] = Field(default_factory=lambda: [0, 1, 2, 3, 4])
-    work_start: str = "09:00:00"
-    work_end: str = "18:00:00"
+    work_start: str = "09:00"
+    work_end: str = "18:00"
     timezone: str = "Europe/Moscow"
 
     @model_validator(mode="after")
@@ -189,10 +199,7 @@ class TrackedMemberCreate(BaseModel):
         if not self.work_days or len(set(self.work_days)) != len(self.work_days) or any(day < 0 or day > 6 for day in self.work_days):
             raise ValueError("work_days must contain unique values from 0 through 6")
         for value in (self.work_start, self.work_end):
-            try:
-                time.fromisoformat(value)
-            except ValueError as exc:
-                raise ValueError("work times must use HH:MM format") from exc
+            _parse_hh_mm(value)
         try:
             ZoneInfo(self.timezone)
         except Exception as exc:
@@ -218,10 +225,7 @@ class TrackedMemberUpdate(BaseModel):
             raise ValueError("work_days must contain unique values from 0 through 6")
         for value in (self.work_start, self.work_end):
             if value is not None:
-                try:
-                    time.fromisoformat(value)
-                except ValueError as exc:
-                    raise ValueError("work times must use HH:MM format") from exc
+                _parse_hh_mm(value)
         if self.timezone is not None:
             try:
                 ZoneInfo(self.timezone)

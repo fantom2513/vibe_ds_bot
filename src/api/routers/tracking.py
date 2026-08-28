@@ -33,7 +33,9 @@ async def create_member(
     _: Annotated[dict, Depends(get_current_user)],
     pool: Annotated[asyncpg.Pool, Depends(get_db_pool)],
 ) -> TrackedMemberResponse:
-    return TrackedMemberResponse(**await tracking_repo.create_tracked_member(pool, body.model_dump()))
+    payload = body.model_dump()
+    payload["discord_id"] = body.discord_id
+    return TrackedMemberResponse(**await tracking_repo.create_tracked_member(pool, payload))
 
 
 @router.patch("/tracking/members/{discord_id}", response_model=TrackedMemberResponse)
@@ -118,6 +120,7 @@ def _as_time(value: str | time) -> time:
 
 @router.get("/tracking/preview")
 async def preview_report(
+    request: Request,
     period: str = Query("today", pattern="^(today|week|month)$"),
     _: Annotated[dict, Depends(get_current_user)] = None,
     pool: Annotated[asyncpg.Pool, Depends(get_db_pool)] = None,
@@ -132,10 +135,17 @@ async def preview_report(
     }
     sessions = await tracking_repo.load_report_sessions(pool, list(schedules), period_start, period_end, now)
     totals = calculate_member_totals(sessions, schedules, period_start, period_end)
+    bot = getattr(request.app.state, "bot", None)
+    guild = bot.get_guild(get_app_settings().DISCORD_GUILD_ID) if bot is not None else None
+
+    def current_username(row: dict) -> str | None:
+        member = guild.get_member(row["discord_id"]) if guild is not None else None
+        return member.display_name if member is not None else row["username"]
+
     return {
         "period_start": period_start.isoformat(), "period_end": period_end.isoformat(),
         "members": [
-            {"discord_id": str(row["discord_id"]), "username": row["username"], **totals[row["discord_id"]].__dict__}
+            {"discord_id": str(row["discord_id"]), "username": current_username(row), **totals[row["discord_id"]].__dict__}
             for row in active_members
         ],
         "overlaps": [

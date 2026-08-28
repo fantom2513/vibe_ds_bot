@@ -16,7 +16,7 @@ def _row_to_dict(row: Any) -> dict[str, Any]:
     result = dict(row)
     for key in ("work_start", "work_end"):
         if isinstance(result.get(key), time):
-            result[key] = result[key].isoformat()
+            result[key] = result[key].strftime("%H:%M")
     return result
 
 
