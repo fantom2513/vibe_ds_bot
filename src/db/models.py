@@ -1,7 +1,7 @@
 """
 SQLAlchemy 2.0 declarative models for Discord Voice Bot.
 """
-from datetime import datetime
+from datetime import datetime, time
 from typing import Optional
 
 from sqlalchemy import (
@@ -13,6 +13,7 @@ from sqlalchemy import (
     Integer,
     String,
     Text,
+    Time,
     text,
 )
 from sqlalchemy.dialects.postgresql import ARRAY, JSONB
@@ -112,6 +113,32 @@ class VoiceSession(Base):
             postgresql_where=text("left_at IS NULL"),
         ),
     )
+
+
+class TrackedMember(Base):
+    """Участник, для которого формируется персональная голосовая статистика."""
+
+    __tablename__ = "tracked_members"
+
+    discord_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    username: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    work_days: Mapped[list[int]] = mapped_column(ARRAY(Integer), nullable=False)
+    work_start: Mapped[time] = mapped_column(Time, nullable=False)
+    work_end: Mapped[time] = mapped_column(Time, nullable=False)
+    timezone: Mapped[str] = mapped_column(String(50), default="Europe/Moscow", nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
+class TrackingSettings(Base):
+    """Единая настройка канала публикации отчётов по отслеживанию."""
+
+    __tablename__ = "tracking_settings"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, default=1)
+    report_channel_id: Mapped[Optional[int]] = mapped_column(BigInteger, nullable=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 
 
 class Schedule(Base):

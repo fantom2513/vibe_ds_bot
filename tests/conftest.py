@@ -41,6 +41,7 @@ class MockPool:
         self._rules_id = 0
         self.user_lists: list[dict[str, Any]] = []
         self._user_lists_id = 0
+        self.tracked_members: dict[int, dict[str, Any]] = {}
 
     async def execute(self, query: str, *args: Any) -> str:
         q = query.strip().upper()
@@ -75,6 +76,15 @@ class MockPool:
 
     async def fetch(self, query: str, *args: Any) -> list[dict]:
         q = query.strip().upper()
+        if "FROM VOICE_SESSIONS" in q:
+            member_ids, period_start, period_end, now = args
+            return [
+                {**row, "left_at": row["left_at"] or now}
+                for row in self.voice_sessions
+                if row["discord_id"] in member_ids
+                and row["joined_at"] < period_end
+                and (row["left_at"] or now) > period_start
+            ]
         if "FROM RULES" in q and "SELECT" in q:
             return list(self.rules)
         if "FROM USER_LISTS" in q and "SELECT" in q:
@@ -86,6 +96,15 @@ class MockPool:
 
     async def fetchrow(self, query: str, *args: Any) -> dict | None:
         q = query.strip().upper()
+        if "INSERT INTO TRACKED_MEMBERS" in q and "RETURNING" in q:
+            now = args[7]
+            row = {
+                "discord_id": args[0], "username": args[1], "is_active": args[2],
+                "work_days": args[3], "work_start": args[4], "work_end": args[5],
+                "timezone": args[6], "created_at": now, "updated_at": now,
+            }
+            self.tracked_members[args[0]] = row
+            return row
         if "INSERT INTO RULES" in q and "RETURNING" in q:
             self._rules_id += 1
             now = datetime.now(timezone.utc)
