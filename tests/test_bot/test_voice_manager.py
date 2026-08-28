@@ -22,6 +22,8 @@ def mock_bot_with_tracker(pool):
     bot.logs_repo = None
     bot.evaluator = None
     bot.actions = None
+    bot.stacking_detector = None
+    bot.mute_xp_service = None
     return bot
 
 
