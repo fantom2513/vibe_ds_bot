@@ -5,10 +5,18 @@ Cog: slash-команды для администраторов.
 Доступ контролируется через default_member_permissions(administrator=True).
 """
 import discord
+from datetime import datetime, time, timedelta, timezone
 from discord import app_commands
 from discord.ext import commands
+from typing import Literal
+from zoneinfo import ZoneInfo
 
-from src.db.repositories import rules_repo, stats_repo, users_repo
+from src.db.repositories import rules_repo, stats_repo, tracking_repo, users_repo
+from src.engine.tracking_report import (
+    MemberSchedule,
+    calculate_member_totals,
+    calculate_pair_overlaps,
+)
 from src.utils.logging import get_logger
 
 logger = get_logger("admin_commands")
@@ -20,6 +28,22 @@ def _fmt_seconds(seconds: int) -> str:
     if h:
         return f"{h}h {m}m"
     return f"{m}m"
+
+
+def _tracking_period_bounds(period: str, now: datetime) -> tuple[datetime, datetime]:
+    msk = ZoneInfo("Europe/Moscow")
+    local_now = now.astimezone(msk)
+    if period == "today":
+        start = local_now.date()
+    elif period == "week":
+        start = local_now.date() - timedelta(days=local_now.weekday())
+    else:
+        start = local_now.date().replace(day=1)
+    return datetime.combine(start, time.min, msk).astimezone(timezone.utc), now
+
+
+def _as_time(value: str | time) -> time:
+    return value if isinstance(value, time) else time.fromisoformat(value)
 
 
 # ---------------------------------------------------------------------------
@@ -288,6 +312,101 @@ class StatsGroup(app_commands.Group):
 
 
 # ---------------------------------------------------------------------------
+# /tracking group
+# ---------------------------------------------------------------------------
+
+class TrackingGroup(app_commands.Group):
+    """Команды публикации отчётов по отслеживаемым участникам."""
+
+    def __init__(self, bot: commands.Bot) -> None:
+        super().__init__(name="tracking", description="Отчёты отслеживаемых участников")
+        self.bot = bot
+
+    @property
+    def pool(self):
+        return getattr(self.bot, "pool", None)
+
+    @app_commands.command(name="report", description="Опубликовать отчёт активности")
+    @app_commands.default_permissions(administrator=True)
+    async def report(
+        self,
+        interaction: discord.Interaction,
+        period: Literal["today", "week", "month"] = "today",
+    ) -> None:
+        await interaction.response.defer(ephemeral=True)
+        if not self.pool:
+            await interaction.followup.send("Pool недоступен.", ephemeral=True)
+            return
+
+        settings = await tracking_repo.get_tracking_settings(self.pool)
+        report_channel_id = settings.get("report_channel_id")
+        if report_channel_id is None:
+            await interaction.followup.send(
+                "Сначала выберите канал отчётов в админке.", ephemeral=True
+            )
+            return
+        channel = self.bot.get_channel(report_channel_id)
+        if channel is None:
+            await interaction.followup.send("Канал отчётов недоступен.", ephemeral=True)
+            return
+
+        active_members = [
+            row for row in await tracking_repo.list_tracked_members(self.pool) if row["is_active"]
+        ]
+        if not active_members:
+            await interaction.followup.send("Нет активных отслеживаемых участников.", ephemeral=True)
+            return
+
+        now = datetime.now(timezone.utc)
+        period_start, period_end = _tracking_period_bounds(period, now)
+        schedules = {
+            row["discord_id"]: MemberSchedule(
+                set(row["work_days"]),
+                _as_time(row["work_start"]),
+                _as_time(row["work_end"]),
+                row["timezone"],
+            )
+            for row in active_members
+        }
+        sessions = await tracking_repo.load_report_sessions(
+            self.pool, list(schedules), period_start, period_end, now
+        )
+        totals = calculate_member_totals(sessions, schedules, period_start, period_end)
+        names = {row["discord_id"]: row["username"] for row in active_members}
+        embed = discord.Embed(
+            title=f"Отчёт отслеживания · {period}", color=discord.Color.blurple()
+        )
+        for row in active_members:
+            total = totals[row["discord_id"]]
+            embed.add_field(
+                name=row["username"],
+                value=(
+                    f"Всего: {_fmt_seconds(total.total_seconds)}\n"
+                    f"Сессий: {total.session_count}\n"
+                    f"Рабочее: {_fmt_seconds(total.work_seconds)}"
+                ),
+                inline=False,
+            )
+
+        overlaps = calculate_pair_overlaps(sessions, set(schedules), period_start, period_end)
+        stack_lines = [
+            f"{names[first]} + {names[second]} · <#{overlap.channel_id}> · {_fmt_seconds(overlap.seconds)}"
+            for overlap in overlaps
+            for first, second in [overlap.member_ids]
+        ]
+        embed.add_field(
+            name="Стаки", value="\n".join(stack_lines) or "Нет пересечений", inline=False
+        )
+        try:
+            await channel.send(embed=embed)
+        except (discord.Forbidden, discord.HTTPException):
+            await interaction.followup.send("Не удалось отправить отчёт в настроенный канал.", ephemeral=True)
+            return
+        await interaction.followup.send(
+            f"Отчёт отправлен в <#{report_channel_id}>.", ephemeral=True
+        )
+
+# ---------------------------------------------------------------------------
 # Cog
 # ---------------------------------------------------------------------------
 
@@ -299,6 +418,7 @@ class AdminCommands(commands.Cog):
         bot.tree.add_command(RuleGroup(bot))
         bot.tree.add_command(UserGroup(bot))
         bot.tree.add_command(StatsGroup(bot))
+        bot.tree.add_command(TrackingGroup(bot))
 
     @app_commands.command(name="ping", description="Проверка отклика бота")
     async def ping(self, interaction: discord.Interaction) -> None:
