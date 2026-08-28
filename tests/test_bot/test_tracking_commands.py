@@ -1,5 +1,6 @@
 """Контракт slash-команды публикации отчёта отслеживания."""
 from datetime import datetime, timezone
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
 import discord
@@ -38,7 +39,7 @@ def sendable_channel() -> MagicMock:
     return channel
 
 
-def tracked_member(discord_id: int, username: str) -> dict:
+def tracked_member(discord_id: int, username: str | None) -> dict[str, Any]:
     return {
         "discord_id": discord_id,
         "username": username,
@@ -89,6 +90,38 @@ async def test_tracking_report_posts_member_totals_and_stacks_to_configured_chan
     assert fields["Bob"] == "Всего: 0m\nСессий: 0\nРабочее: 0m"
     assert fields["Стаки"] == "Нет пересечений"
     interaction.followup.send.assert_awaited_with("Отчёт отправлен в <#777>.", ephemeral=True)
+
+
+@pytest.mark.asyncio
+async def test_tracking_report_uses_discord_id_when_stored_username_is_missing(
+    mock_bot: MagicMock, interaction: MagicMock, sendable_channel: MagicMock,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    mock_bot.get_channel.return_value = sendable_channel
+    members = [tracked_member(42, None), tracked_member(43, "Bob")]
+    sessions = [
+        Session(42, 10, datetime(2026, 8, 28, 9, tzinfo=timezone.utc), datetime(2026, 8, 28, 10, tzinfo=timezone.utc)),
+        Session(43, 10, datetime(2026, 8, 28, 9, tzinfo=timezone.utc), datetime(2026, 8, 28, 10, tzinfo=timezone.utc)),
+    ]
+    monkeypatch.setattr(
+        admin_commands.tracking_repo,
+        "get_tracking_settings",
+        AsyncMock(return_value={"report_channel_id": 777}),
+    )
+    monkeypatch.setattr(
+        admin_commands.tracking_repo, "list_tracked_members", AsyncMock(return_value=members)
+    )
+    monkeypatch.setattr(
+        admin_commands.tracking_repo, "load_report_sessions", AsyncMock(return_value=sessions)
+    )
+
+    group = TrackingGroup(mock_bot)
+    await group.report.callback(group, interaction, "today")
+
+    embed = sendable_channel.send.await_args.kwargs["embed"]
+    fields = {field.name: field.value for field in embed.fields}
+    assert fields["42"] == "Всего: 1h 0m\nСессий: 1\nРабочее: 1h 0m"
+    assert fields["Стаки"] == "42 + Bob · <#10> · 1h 0m"
 
 
 @pytest.mark.asyncio
