@@ -172,6 +172,23 @@ class UserStatsResponse(BaseModel):
     actions_by_type: dict[str, int]
 
 
+# --- Tracking ---
+
+class TrackedMemberCreate(BaseModel):
+    discord_id: DiscordId
+    username: Optional[str] = Field(None, max_length=100)
+    is_active: bool = True
+    work_days: list[int] = Field(default_factory=lambda: [0, 1, 2, 3, 4])
+    work_start: str = "09:00:00"
+    work_end: str = "18:00:00"
+    timezone: str = "Europe/Moscow"
+
+
+class TrackedMemberResponse(TrackedMemberCreate):
+    created_at: datetime
+    updated_at: datetime
+
+
 # --- Kick targets ---
 
 class KickTargetCreate(BaseModel):

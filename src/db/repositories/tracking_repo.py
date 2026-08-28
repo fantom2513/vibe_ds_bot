@@ -45,6 +45,18 @@ async def create_tracked_member(pool: asyncpg.Pool, data: dict[str, Any]) -> dic
     return _row_to_dict(row)
 
 
+async def list_tracked_members(pool: asyncpg.Pool) -> list[dict[str, Any]]:
+    """Вернуть все настроенные профили отслеживания."""
+    rows = await pool.fetch(
+        """
+        SELECT discord_id, username, is_active, work_days, work_start, work_end, timezone, created_at, updated_at
+        FROM tracked_members
+        ORDER BY username NULLS LAST, discord_id
+        """
+    )
+    return [_row_to_dict(row) for row in rows]
+
+
 async def load_report_sessions(
     pool: asyncpg.Pool,
     member_ids: list[int],

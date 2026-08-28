@@ -76,6 +76,8 @@ class MockPool:
 
     async def fetch(self, query: str, *args: Any) -> list[dict]:
         q = query.strip().upper()
+        if "FROM TRACKED_MEMBERS" in q:
+            return list(self.tracked_members.values())
         if "FROM VOICE_SESSIONS" in q:
             member_ids, period_start, period_end, now = args
             return [
