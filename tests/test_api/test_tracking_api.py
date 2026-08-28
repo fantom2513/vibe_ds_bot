@@ -50,7 +50,7 @@ async def test_create_and_list_tracked_members(api_client, auth_cookies):
 @pytest.mark.asyncio
 async def test_update_and_delete_tracked_member(api_client, auth_cookies):
     async with api_client as client:
-        await client.post(
+        created = await client.post(
             "/api/tracking/members",
             cookies=auth_cookies,
             json={"discord_id": "42", "username": "Ada"},
@@ -63,6 +63,7 @@ async def test_update_and_delete_tracked_member(api_client, auth_cookies):
         deleted = await client.delete("/api/tracking/members/42", cookies=auth_cookies)
         listed = await client.get("/api/tracking/members", cookies=auth_cookies)
 
+    assert created.status_code == 200
     assert updated.status_code == 200
     assert updated.json()["is_active"] is False
     assert deleted.status_code == 204
@@ -137,6 +138,13 @@ async def test_preview_returns_active_member_totals_and_overlaps(api_client, aut
             "timezone": "Europe/Moscow", "created_at": now, "updated_at": now,
         },
     }
+    cached_member = MagicMock()
+    cached_member.display_name = "Ada Renamed"
+    guild = MagicMock()
+    guild.get_member.side_effect = lambda discord_id: cached_member if discord_id == 42 else None
+    bot = MagicMock()
+    bot.get_guild.return_value = guild
+    app.state.bot = bot
 
     async with api_client as client:
         response = await client.get("/api/tracking/preview?period=week", cookies=auth_cookies)
@@ -144,7 +152,7 @@ async def test_preview_returns_active_member_totals_and_overlaps(api_client, aut
     assert response.status_code == 200
     assert set(response.json()) == {"period_start", "period_end", "members", "overlaps"}
     assert response.json()["members"] == [{
-        "discord_id": "42", "username": "Ada", "total_seconds": 0,
+        "discord_id": "42", "username": "Ada Renamed", "total_seconds": 0,
         "session_count": 0, "work_seconds": 0,
     }]
 
@@ -153,5 +161,53 @@ async def test_preview_returns_active_member_totals_and_overlaps(api_client, aut
 async def test_preview_rejects_unknown_period(api_client, auth_cookies):
     async with api_client as client:
         response = await client.get("/api/tracking/preview?period=year", cookies=auth_cookies)
+
+    assert response.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_preview_falls_back_to_stored_name_when_member_is_not_cached(api_client, auth_cookies):
+    now = datetime.now(timezone.utc)
+    api_client._transport.app.state.pool.tracked_members = {
+        42: {
+            "discord_id": 42, "username": "Ada", "is_active": True,
+            "work_days": [0, 1, 2, 3, 4], "work_start": "09:00:00", "work_end": "18:00:00",
+            "timezone": "Europe/Moscow", "created_at": now, "updated_at": now,
+        },
+    }
+    guild = MagicMock()
+    guild.get_member.return_value = None
+    bot = MagicMock()
+    bot.get_guild.return_value = guild
+    app.state.bot = bot
+
+    async with api_client as client:
+        response = await client.get("/api/tracking/preview?period=week", cookies=auth_cookies)
+
+    assert response.status_code == 200
+    assert response.json()["members"][0]["username"] == "Ada"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("field,value", [("work_start", "09:00:30"), ("work_end", "18:00+03:00")])
+async def test_tracking_schedule_rejects_non_hh_mm_times(api_client, auth_cookies, field, value):
+    async with api_client as client:
+        response = await client.post(
+            "/api/tracking/members",
+            cookies=auth_cookies,
+            json={"discord_id": "42", "username": "Ada", field: value},
+        )
+
+    assert response.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_tracking_schedule_patch_rejects_seconds(api_client, auth_cookies):
+    async with api_client as client:
+        response = await client.patch(
+            "/api/tracking/members/42",
+            cookies=auth_cookies,
+            json={"work_start": "09:00:30"},
+        )
 
     assert response.status_code == 422
