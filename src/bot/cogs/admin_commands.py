@@ -421,7 +421,10 @@ class TrackingGroup(app_commands.Group):
                 self.pool, list(schedules), period_start, period_end, now
             )
             totals = calculate_member_totals(sessions, schedules, period_start, period_end)
-            names = {row["discord_id"]: row["username"] for row in active_members}
+            names = {
+                row["discord_id"]: str(row["username"] or row["discord_id"])
+                for row in active_members
+            }
             embed = discord.Embed(
                 title=f"Отчёт отслеживания · {period}", color=discord.Color.blurple()
             )
@@ -429,7 +432,7 @@ class TrackingGroup(app_commands.Group):
             for row in visible_members:
                 total = totals[row["discord_id"]]
                 embed.add_field(
-                    name=_truncate(row["username"], MAX_FIELD_NAME_LENGTH),
+                    name=_truncate(names[row["discord_id"]], MAX_FIELD_NAME_LENGTH),
                     value=(
                         f"Всего: {_fmt_seconds(total.total_seconds)}\n"
                         f"Сессий: {total.session_count}\n"
