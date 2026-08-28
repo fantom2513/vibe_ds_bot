@@ -42,9 +42,12 @@ class MockPool:
         self.user_lists: list[dict[str, Any]] = []
         self._user_lists_id = 0
         self.tracked_members: dict[int, dict[str, Any]] = {}
+        self.tracking_settings: dict[str, Any] = {"report_channel_id": None}
 
     async def execute(self, query: str, *args: Any) -> str:
         q = query.strip().upper()
+        if "DELETE FROM TRACKED_MEMBERS" in q:
+            return "DELETE 1" if self.tracked_members.pop(args[0], None) else "DELETE 0"
         if "INSERT INTO VOICE_SESSIONS" in q:
             # INSERT INTO voice_sessions (discord_id, channel_id, joined_at, left_at) VALUES ($1, $2, $3, NULL)
             self.voice_sessions.append({
@@ -98,6 +101,23 @@ class MockPool:
 
     async def fetchrow(self, query: str, *args: Any) -> dict | None:
         q = query.strip().upper()
+        if "UPDATE TRACKED_MEMBERS" in q and "RETURNING" in q:
+            discord_id = args[-1]
+            row = self.tracked_members.get(discord_id)
+            if row is None:
+                return None
+            fields = [part.split(" = ")[0].strip().lower() for part in query.split("SET", 1)[1].split(", updated_at", 1)[0].split(", ")]
+            for field, value in zip(fields, args[1:-1]):
+                row[field] = value
+            row["updated_at"] = args[0]
+            return row
+        if "FROM TRACKED_MEMBERS" in q and "WHERE DISCORD_ID" in q:
+            return self.tracked_members.get(args[0])
+        if "INSERT INTO TRACKING_SETTINGS" in q:
+            self.tracking_settings = {"report_channel_id": args[0]}
+            return self.tracking_settings
+        if "FROM TRACKING_SETTINGS" in q:
+            return self.tracking_settings
         if "INSERT INTO TRACKED_MEMBERS" in q and "RETURNING" in q:
             now = args[7]
             row = {

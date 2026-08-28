@@ -1,10 +1,11 @@
 """
 Pydantic-схемы для FastAPI (rules, users, schedules, logs, dashboard).
 """
-from datetime import datetime
+from datetime import datetime, time
 from typing import Annotated, Any, Literal, Optional
+from zoneinfo import ZoneInfo
 
-from pydantic import BaseModel, BeforeValidator, Field, PlainSerializer
+from pydantic import BaseModel, BeforeValidator, Field, PlainSerializer, model_validator
 
 # Discord snowflake IDs exceed JS Number.MAX_SAFE_INTEGER (2^53).
 # Serialise as strings in JSON responses; accept int or str on input.
@@ -183,10 +184,57 @@ class TrackedMemberCreate(BaseModel):
     work_end: str = "18:00:00"
     timezone: str = "Europe/Moscow"
 
+    @model_validator(mode="after")
+    def validate_schedule(self) -> "TrackedMemberCreate":
+        if not self.work_days or len(set(self.work_days)) != len(self.work_days) or any(day < 0 or day > 6 for day in self.work_days):
+            raise ValueError("work_days must contain unique values from 0 through 6")
+        for value in (self.work_start, self.work_end):
+            try:
+                time.fromisoformat(value)
+            except ValueError as exc:
+                raise ValueError("work times must use HH:MM format") from exc
+        try:
+            ZoneInfo(self.timezone)
+        except Exception as exc:
+            raise ValueError("timezone must be an IANA timezone name") from exc
+        return self
+
 
 class TrackedMemberResponse(TrackedMemberCreate):
     created_at: datetime
     updated_at: datetime
+
+
+class TrackedMemberUpdate(BaseModel):
+    username: Optional[str] = Field(None, max_length=100)
+    is_active: Optional[bool] = None
+    work_days: Optional[list[int]] = None
+    work_start: Optional[str] = None
+    work_end: Optional[str] = None
+    timezone: Optional[str] = Field(None, min_length=1, max_length=50)
+
+    def model_post_init(self, __context: Any) -> None:
+        if self.work_days is not None and (not self.work_days or len(set(self.work_days)) != len(self.work_days) or any(day < 0 or day > 6 for day in self.work_days)):
+            raise ValueError("work_days must contain unique values from 0 through 6")
+        for value in (self.work_start, self.work_end):
+            if value is not None:
+                try:
+                    time.fromisoformat(value)
+                except ValueError as exc:
+                    raise ValueError("work times must use HH:MM format") from exc
+        if self.timezone is not None:
+            try:
+                ZoneInfo(self.timezone)
+            except Exception as exc:
+                raise ValueError("timezone must be an IANA timezone name") from exc
+
+
+class TrackingSettingsResponse(BaseModel):
+    report_channel_id: Optional[DiscordId] = None
+
+
+class TrackingSettingsUpdate(BaseModel):
+    report_channel_id: Optional[DiscordId] = None
 
 
 # --- Kick targets ---
