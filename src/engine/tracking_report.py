@@ -132,3 +132,62 @@ def calculate_pair_overlaps(
         PairOverlap(member_ids=member_ids, channel_id=channel_id, seconds=seconds)
         for (member_ids, channel_id), seconds in sorted(totals.items())
     ]
+
+
+def calculate_all_together_seconds(
+    sessions: list[Session],
+    tracked_member_ids: set[int],
+    period_start: datetime,
+    period_end: datetime,
+) -> int:
+    """
+    Суммарное время, когда ВСЕ отслеживаемые участники были одновременно
+    в одном и том же голосовом канале. Не привязано к конкретному каналу —
+    если "все вместе" случалось в разных каналах в разное время, секунды
+    суммируются по всем таким интервалам.
+    """
+    if not tracked_member_ids:
+        return 0
+
+    sessions_by_channel: dict[int, list[Session]] = {}
+    for session in sessions:
+        if session.discord_id not in tracked_member_ids:
+            continue
+        clipped = _clip_session(session, period_start, period_end)
+        if clipped is not None:
+            sessions_by_channel.setdefault(clipped.channel_id, []).append(clipped)
+
+    required = len(tracked_member_ids)
+    total_seconds = 0
+
+    for channel_sessions in sessions_by_channel.values():
+        # (время, delta, discord_id); delta=-1 (leave) идёт перед +1 (join) в один момент
+        events = sorted(
+            (
+                (endpoint, delta, s.discord_id)
+                for s in channel_sessions
+                for endpoint, delta in ((s.joined_at, 1), (s.left_at, -1))
+            ),
+            key=lambda event: (event[0], event[1]),
+        )
+
+        active: dict[int, int] = {}
+        full_start: datetime | None = None
+        for time_point, delta, discord_id in events:
+            was_full = len(active) == required
+
+            if delta == 1:
+                active[discord_id] = active.get(discord_id, 0) + 1
+            else:
+                active[discord_id] -= 1
+                if active[discord_id] == 0:
+                    del active[discord_id]
+            is_full = len(active) == required
+
+            if was_full and not is_full:
+                total_seconds += _seconds_between(full_start, time_point)
+                full_start = None
+            elif is_full and not was_full:
+                full_start = time_point
+
+    return total_seconds
