@@ -252,6 +252,41 @@ test('keeps the newest period result and locale-formats report numbers', async (
   await expect(personalTable).toContainText(/12[\s\u00a0]345/)
 })
 
+test('refreshes a completed schedule save with the currently selected period', async ({ page }) => {
+  const scheduleGate = deferred()
+  await mockApp(page, {
+    initialMembers: [trackedFixture()],
+    gates: { 'PATCH /api/tracking/members/42': scheduleGate.promise },
+    handlers: {
+      'GET /api/tracking/preview': ({ route, url }) => {
+        const selectedPeriod = url.searchParams.get('period')
+        return route.fulfill({
+          json: reportFixture(selectedPeriod === 'month' ? 'Month current' : 'Today stale'),
+        })
+      },
+    },
+  })
+
+  await page.goto(`${BASE_URL}/tracking`)
+  await page.getByRole('button', { name: 'Редактировать график: Ada Lovelace' }).click()
+  await page.getByRole('button', { name: 'Сохранить', exact: true }).click()
+
+  await page.locator('input.MuiSelect-nativeInput[value="today"]').evaluate(input => {
+    const valueSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set
+    valueSetter.call(input, 'month')
+    input.dispatchEvent(new Event('change', { bubbles: true }))
+  })
+  await expect(page.locator('table[aria-label="Личная статистика"]')).toContainText('Month current')
+
+  scheduleGate.resolve()
+  await expect(page.getByText('Расписание сохранено')).toBeVisible()
+
+  const personalTable = page.getByRole('table', { name: 'Личная статистика' })
+  await expect(page.getByRole('combobox', { name: 'Период' })).toContainText('Месяц')
+  await expect(personalTable).toContainText('Month current')
+  await expect(personalTable).not.toContainText('Today stale')
+})
+
 test('mobile schedule drawer exposes cancel and protects a pending save', async ({ page }) => {
   const longName = 'Ada Lovelace — руководитель очень длинного исследовательского направления'
   const longMember = { ...memberFixture, display_name: longName, label: longName }
