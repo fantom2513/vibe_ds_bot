@@ -447,6 +447,10 @@ export default function Tracking() {
                         <TableCell>{durationLabel(overlap.seconds)}</TableCell>
                       </TableRow>
                     ))}
+                    <TableRow>
+                      <TableCell sx={{ fontWeight: 600 }} colSpan={2}>Все вместе</TableCell>
+                      <TableCell sx={{ fontWeight: 600 }}>{durationLabel(preview.all_together_seconds)}</TableCell>
+                    </TableRow>
                   </TableBody>
                 </Table>
               </TableContainer>
