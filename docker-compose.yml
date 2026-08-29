@@ -44,9 +44,20 @@ services:
       - internal
     restart: unless-stopped
 
+  uptime-kuma:
+    image: louislam/uptime-kuma:1
+    container_name: uptime-kuma
+    ports:
+      - "3001:3001"
+    volumes:
+      - uptime_kuma_data:/app/data
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    restart: unless-stopped
+
 networks:
   internal:
     driver: bridge
 
 volumes:
   postgres_data:
+  uptime_kuma_data:
