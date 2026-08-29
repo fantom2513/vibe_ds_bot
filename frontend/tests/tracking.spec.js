@@ -50,9 +50,11 @@ test('adds a Discord member, edits schedule, and saves report channel', async ({
   await page.route('**/auth/me', route => route.fulfill({
     json: { id: '1', username: 'Admin', avatar: null },
   }))
-  await page.route('**/api/members**', route => {
+  await page.route(/\/api\/members(?:\/(?:42|batch))?(?:\?.*)?$/, route => {
     const path = new URL(route.request().url()).pathname
-    route.fulfill({ json: path === '/api/members/42' ? memberFixture : [memberFixture] })
+    if (path === '/api/members/42') return route.fulfill({ json: memberFixture })
+    if (path === '/api/members/batch') return route.fulfill({ json: { 42: memberFixture } })
+    return route.fulfill({ json: [memberFixture] })
   })
   await page.route('**/api/tracking/**', async route => {
     const request = route.request()

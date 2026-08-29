@@ -18,6 +18,7 @@ import Logs from './pages/Logs'
 import Settings from './pages/Settings'
 import KickTargets from './pages/KickTargets'
 import StackingPairs from './pages/StackingPairs'
+import Tracking from './pages/Tracking'
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <ThemeProvider theme={theme}>
@@ -33,6 +34,7 @@ ReactDOM.createRoot(document.getElementById('root')).render(
               <Route path="/users" element={<Users />} />
               <Route path="/kick-targets" element={<KickTargets />} />
               <Route path="/stacking-pairs" element={<StackingPairs />} />
+              <Route path="/tracking" element={<Tracking />} />
               <Route path="/schedules" element={<Schedules />} />
               <Route path="/logs" element={<Logs />} />
               <Route path="/settings" element={<Settings />} />

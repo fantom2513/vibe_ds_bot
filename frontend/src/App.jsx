@@ -7,6 +7,7 @@ import Schedules from './pages/Schedules'
 import Logs from './pages/Logs'
 import Settings from './pages/Settings'
 import MuteLevels from './pages/MuteLevels'
+import Tracking from './pages/Tracking'
 
 export default function App() {
   return (
@@ -21,6 +22,7 @@ export default function App() {
           <Route path="logs" element={<Logs />} />
           <Route path="settings" element={<Settings />} />
           <Route path="mute-levels" element={<MuteLevels />} />
+          <Route path="tracking" element={<Tracking />} />
         </Route>
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>
