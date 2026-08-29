@@ -13,7 +13,12 @@ from src.api.schemas import (
     TrackingSettingsResponse, TrackingSettingsUpdate,
 )
 from src.db.repositories import tracking_repo
-from src.engine.tracking_report import MemberSchedule, calculate_member_totals, calculate_pair_overlaps
+from src.engine.tracking_report import (
+    MemberSchedule,
+    calculate_all_together_seconds,
+    calculate_member_totals,
+    calculate_pair_overlaps,
+)
 from src.config.settings import get_settings as get_app_settings
 
 router = APIRouter()
@@ -152,4 +157,5 @@ async def preview_report(
             {"member_ids": [str(member_id) for member_id in overlap.member_ids], "channel_id": str(overlap.channel_id), "seconds": overlap.seconds}
             for overlap in calculate_pair_overlaps(sessions, set(schedules), period_start, period_end)
         ],
+        "all_together_seconds": calculate_all_together_seconds(sessions, set(schedules), period_start, period_end),
     }

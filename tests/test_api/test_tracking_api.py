@@ -149,11 +149,12 @@ async def test_preview_returns_active_member_totals_and_overlaps(api_client, aut
         response = await client.get("/api/tracking/preview?period=week", cookies=auth_cookies)
 
     assert response.status_code == 200
-    assert set(response.json()) == {"period_start", "period_end", "members", "overlaps"}
+    assert set(response.json()) == {"period_start", "period_end", "members", "overlaps", "all_together_seconds"}
     assert response.json()["members"] == [{
         "discord_id": "42", "username": "Ada Renamed", "total_seconds": 0,
         "session_count": 0, "work_seconds": 0,
     }]
+    assert response.json()["all_together_seconds"] == 0
 
 
 @pytest.mark.asyncio
