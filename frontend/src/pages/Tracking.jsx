@@ -112,6 +112,7 @@ export default function Tracking() {
   const [deleteTarget, setDeleteTarget] = useState(null)
   const [snack, setSnack] = useState(null)
   const previewRequestId = useRef(0)
+  const periodRef = useRef('today')
   const { get, resolveMany } = useMemberResolver()
   const busy = pendingAction !== null
 
@@ -123,9 +124,11 @@ export default function Tracking() {
     setPreviewError(null)
     try {
       const data = await previewTrackingReport(selectedPeriod)
-      if (requestId === previewRequestId.current) setPreview(data)
+      if (requestId === previewRequestId.current && selectedPeriod === periodRef.current) setPreview(data)
     } catch (requestError) {
-      if (requestId === previewRequestId.current) setPreviewError(errorMessage(requestError))
+      if (requestId === previewRequestId.current && selectedPeriod === periodRef.current) {
+        setPreviewError(errorMessage(requestError))
+      }
     } finally {
       if (requestId === previewRequestId.current) setPreviewLoading(false)
     }
@@ -162,9 +165,12 @@ export default function Tracking() {
 
   const handlePeriodChange = event => {
     const nextPeriod = event.target.value
+    periodRef.current = nextPeriod
     setPeriod(nextPeriod)
     loadPreview(nextPeriod)
   }
+
+  const refreshCurrentPreview = () => loadPreview(periodRef.current)
 
   const handleAdd = async () => {
     if (!selectedId) {
@@ -207,7 +213,7 @@ export default function Tracking() {
     try {
       await updateTrackedMember(String(editing.discord_id), schedule)
       setDrawerOpen(false)
-      await Promise.all([loadMembers(), loadPreview(period)])
+      await Promise.all([loadMembers(), refreshCurrentPreview()])
       showSnack('Расписание сохранено')
     } catch (requestError) {
       showSnack(errorMessage(requestError), 'error')
@@ -234,7 +240,7 @@ export default function Tracking() {
     try {
       await deleteTrackedMember(String(deleteTarget.discord_id))
       setDeleteTarget(null)
-      await Promise.all([loadMembers(), loadPreview(period)])
+      await Promise.all([loadMembers(), refreshCurrentPreview()])
       showSnack('Участник удалён')
     } catch (requestError) {
       showSnack(errorMessage(requestError), 'error')
@@ -380,7 +386,7 @@ export default function Tracking() {
           </FormControl>
           <Tooltip title="Обновить предпросмотр">
             <span>
-              <IconButton aria-label="Обновить предпросмотр" onClick={() => loadPreview(period)} disabled={previewLoading}>
+              <IconButton aria-label="Обновить предпросмотр" onClick={refreshCurrentPreview} disabled={previewLoading}>
                 <RefreshOutlined />
               </IconButton>
             </span>
