@@ -270,8 +270,10 @@ test('mobile schedule drawer exposes cancel and protects a pending save', async 
   const save = page.getByRole('button', { name: 'Сохранить', exact: true })
   await expect(cancel).toBeVisible()
   await expect(save).toBeVisible()
-  const saveBox = await save.boundingBox()
-  expect(saveBox.x + saveBox.width).toBeLessThanOrEqual(360)
+  await expect.poll(async () => {
+    const saveBox = await save.boundingBox()
+    return saveBox.x + saveBox.width
+  }).toBeLessThanOrEqual(360)
   await expect(page.getByText(longName).last()).toBeVisible()
 
   await page.getByLabel('Начало рабочего дня').fill('10:00')

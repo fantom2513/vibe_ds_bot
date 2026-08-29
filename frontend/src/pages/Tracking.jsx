@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   Alert,
   Box,
@@ -71,6 +71,9 @@ const defaultSchedule = () => ({
 
 const normalizeTime = value => String(value || '').slice(0, 5)
 
+const NUMBER_FORMAT = new Intl.NumberFormat('ru-RU')
+const numberLabel = value => NUMBER_FORMAT.format(Number(value || 0))
+
 const scheduleFromMember = member => ({
   work_days: [...member.work_days],
   work_start: normalizeTime(member.work_start),
@@ -83,9 +86,9 @@ const durationLabel = seconds => {
   const totalMinutes = Math.floor(Number(seconds || 0) / 60)
   const hours = Math.floor(totalMinutes / 60)
   const minutes = totalMinutes % 60
-  if (hours && minutes) return `${hours} ч ${minutes} мин`
-  if (hours) return `${hours} ч`
-  return `${minutes} мин`
+  if (hours && minutes) return `${numberLabel(hours)} ч ${numberLabel(minutes)} мин`
+  if (hours) return `${numberLabel(hours)} ч`
+  return `${numberLabel(minutes)} мин`
 }
 
 const errorMessage = error => error.response?.data?.detail || error.message || 'Ошибка'
@@ -95,31 +98,36 @@ export default function Tracking() {
   const [channels, setChannels] = useState([])
   const [reportChannelId, setReportChannelId] = useState('')
   const [selectedId, setSelectedId] = useState(null)
+  const [selectedMember, setSelectedMember] = useState(null)
   const [period, setPeriod] = useState('today')
   const [preview, setPreview] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [previewLoading, setPreviewLoading] = useState(false)
   const [previewError, setPreviewError] = useState(null)
-  const [saving, setSaving] = useState(false)
+  const [pendingAction, setPendingAction] = useState(null)
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [editing, setEditing] = useState(null)
   const [schedule, setSchedule] = useState(defaultSchedule())
   const [deleteTarget, setDeleteTarget] = useState(null)
   const [snack, setSnack] = useState(null)
+  const previewRequestId = useRef(0)
   const { get, resolveMany } = useMemberResolver()
+  const busy = pendingAction !== null
 
   const showSnack = (message, severity = 'success') => setSnack({ message, severity })
 
   const loadPreview = useCallback(async selectedPeriod => {
+    const requestId = ++previewRequestId.current
     setPreviewLoading(true)
     setPreviewError(null)
     try {
-      setPreview(await previewTrackingReport(selectedPeriod))
+      const data = await previewTrackingReport(selectedPeriod)
+      if (requestId === previewRequestId.current) setPreview(data)
     } catch (requestError) {
-      setPreviewError(errorMessage(requestError))
+      if (requestId === previewRequestId.current) setPreviewError(errorMessage(requestError))
     } finally {
-      setPreviewLoading(false)
+      if (requestId === previewRequestId.current) setPreviewLoading(false)
     }
   }, [])
 
@@ -133,17 +141,15 @@ export default function Tracking() {
   useEffect(() => {
     const load = async () => {
       try {
-        const [memberData, settings, channelData, previewData] = await Promise.all([
+        const [memberData, settings, channelData] = await Promise.all([
           listTrackedMembers(),
           getTrackingSettings(),
           listTextChannels(),
-          previewTrackingReport('today'),
         ])
         setMembers(memberData)
         resolveMany(memberData.map(member => String(member.discord_id)))
         setReportChannelId(settings.report_channel_id || '')
         setChannels(channelData)
-        setPreview(previewData)
       } catch (requestError) {
         setError(errorMessage(requestError))
       } finally {
@@ -151,7 +157,8 @@ export default function Tracking() {
       }
     }
     load()
-  }, [resolveMany])
+    loadPreview('today')
+  }, [loadPreview, resolveMany])
 
   const handlePeriodChange = event => {
     const nextPeriod = event.target.value
@@ -164,10 +171,15 @@ export default function Tracking() {
       showSnack('Выберите пользователя', 'error')
       return
     }
-    setSaving(true)
+    setPendingAction('add')
     try {
-      const created = await createTrackedMember({ discord_id: selectedId, ...defaultSchedule() })
+      const created = await createTrackedMember({
+        discord_id: selectedId,
+        username: selectedMember?.display_name || selectedMember?.username || null,
+        ...defaultSchedule(),
+      })
       setSelectedId(null)
+      setSelectedMember(null)
       setEditing(created)
       setSchedule(scheduleFromMember(created))
       setDrawerOpen(true)
@@ -176,7 +188,7 @@ export default function Tracking() {
     } catch (requestError) {
       showSnack(errorMessage(requestError), 'error')
     } finally {
-      setSaving(false)
+      setPendingAction(null)
     }
   }
 
@@ -191,7 +203,7 @@ export default function Tracking() {
       showSnack('Выберите хотя бы один рабочий день', 'error')
       return
     }
-    setSaving(true)
+    setPendingAction('schedule')
     try {
       await updateTrackedMember(String(editing.discord_id), schedule)
       setDrawerOpen(false)
@@ -200,12 +212,12 @@ export default function Tracking() {
     } catch (requestError) {
       showSnack(errorMessage(requestError), 'error')
     } finally {
-      setSaving(false)
+      setPendingAction(null)
     }
   }
 
   const handleChannelSave = async () => {
-    setSaving(true)
+    setPendingAction('channel')
     try {
       const settings = await setTrackingSettings({ report_channel_id: reportChannelId || null })
       setReportChannelId(settings.report_channel_id || '')
@@ -213,12 +225,12 @@ export default function Tracking() {
     } catch (requestError) {
       showSnack(errorMessage(requestError), 'error')
     } finally {
-      setSaving(false)
+      setPendingAction(null)
     }
   }
 
   const handleDelete = async () => {
-    setSaving(true)
+    setPendingAction('delete')
     try {
       await deleteTrackedMember(String(deleteTarget.discord_id))
       setDeleteTarget(null)
@@ -227,7 +239,7 @@ export default function Tracking() {
     } catch (requestError) {
       showSnack(errorMessage(requestError), 'error')
     } finally {
-      setSaving(false)
+      setPendingAction(null)
     }
   }
 
@@ -251,7 +263,7 @@ export default function Tracking() {
     [channels],
   )
 
-  if (loading) return <LoadingState text="Загрузка настроек отслеживания..." />
+  if (loading) return <LoadingState text="Загрузка настроек отслеживания…" />
   if (error) return <ErrorState message={error} />
 
   return (
@@ -271,6 +283,7 @@ export default function Tracking() {
             labelId="tracking-channel-label"
             label="Канал отчётов"
             value={reportChannelId}
+            disabled={busy}
             onChange={event => setReportChannelId(event.target.value)}
           >
             <MenuItem value=""><em>Не выбран</em></MenuItem>
@@ -279,8 +292,8 @@ export default function Tracking() {
             ))}
           </Select>
         </FormControl>
-        <Button variant="contained" onClick={handleChannelSave} disabled={saving}>
-          Сохранить канал
+        <Button variant="contained" onClick={handleChannelSave} disabled={busy}>
+          {pendingAction === 'channel' ? 'Сохранение…' : 'Сохранить канал'}
         </Button>
       </Box>
 
@@ -291,11 +304,14 @@ export default function Tracking() {
         <MemberAutocomplete
           label="Пользователь"
           value={selectedId}
-          onChange={setSelectedId}
-          disabled={saving}
+          onChange={(id, member) => {
+            setSelectedId(id)
+            setSelectedMember(member)
+          }}
+          disabled={busy}
         />
-        <Button variant="contained" onClick={handleAdd} disabled={saving || !selectedId}>
-          Добавить
+        <Button variant="contained" onClick={handleAdd} disabled={busy || !selectedId}>
+          {pendingAction === 'add' ? 'Добавление…' : 'Добавить'}
         </Button>
       </Box>
 
@@ -333,12 +349,12 @@ export default function Tracking() {
                     <TableCell>{member.is_active ? 'Активен' : 'Отключён'}</TableCell>
                     <TableCell align="right" sx={{ whiteSpace: 'nowrap' }}>
                       <Tooltip title="Редактировать график">
-                        <IconButton size="small" aria-label={`Редактировать график: ${name}`} onClick={() => openSchedule(member)}>
+                        <IconButton size="small" aria-label={`Редактировать график: ${name}`} onClick={() => openSchedule(member)} disabled={busy}>
                           <EditOutlined sx={{ fontSize: 16 }} />
                         </IconButton>
                       </Tooltip>
                       <Tooltip title="Удалить">
-                        <IconButton size="small" color="error" aria-label={`Удалить: ${name}`} onClick={() => setDeleteTarget(member)}>
+                        <IconButton size="small" color="error" aria-label={`Удалить: ${name}`} onClick={() => setDeleteTarget(member)} disabled={busy}>
                           <DeleteOutlined sx={{ fontSize: 16 }} />
                         </IconButton>
                       </Tooltip>
@@ -374,7 +390,7 @@ export default function Tracking() {
 
       {previewError && <Alert severity="error" sx={{ mb: 2 }}>{previewError}</Alert>}
       {previewLoading ? (
-        <LoadingState text="Расчёт отчёта..." />
+        <LoadingState text="Расчёт отчёта…" />
       ) : (
         <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', lg: 'minmax(0, 3fr) minmax(320px, 2fr)' }, gap: 2 }}>
           <Box>
@@ -395,7 +411,7 @@ export default function Tracking() {
                       <TableRow key={member.discord_id}>
                         <TableCell>{member.username || member.discord_id}</TableCell>
                         <TableCell>{durationLabel(member.total_seconds)}</TableCell>
-                        <TableCell>{member.session_count}</TableCell>
+                        <TableCell>{numberLabel(member.session_count)}</TableCell>
                         <TableCell>{durationLabel(member.work_seconds)}</TableCell>
                       </TableRow>
                     ))}
@@ -436,17 +452,24 @@ export default function Tracking() {
       <Drawer
         anchor="right"
         open={drawerOpen}
-        onClose={() => setDrawerOpen(false)}
+        onClose={() => { if (!busy) setDrawerOpen(false) }}
         PaperProps={{ sx: { width: { xs: '100vw', sm: 480 }, p: 3 } }}
       >
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 2, mb: 3 }}>
-          <Box>
+          <Box sx={{ minWidth: 0, flex: 1 }}>
             <Typography variant="h6" sx={{ fontSize: '1rem' }}>Рабочий график</Typography>
-            <Typography variant="caption">{editing?.username || editing?.discord_id}</Typography>
+            <Typography variant="caption" sx={{ display: 'block', overflowWrap: 'anywhere' }}>
+              {editing?.username || editing?.discord_id}
+            </Typography>
           </Box>
-          <Button variant="contained" size="small" onClick={handleScheduleSave} disabled={saving}>
-            Сохранить
-          </Button>
+          <Box sx={{ display: 'flex', gap: 1, flexShrink: 0 }}>
+            <Button size="small" onClick={() => setDrawerOpen(false)} disabled={busy}>
+              Отмена
+            </Button>
+            <Button variant="contained" size="small" onClick={handleScheduleSave} disabled={busy}>
+              {pendingAction === 'schedule' ? 'Сохранение…' : 'Сохранить'}
+            </Button>
+          </Box>
         </Box>
 
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
@@ -462,6 +485,7 @@ export default function Tracking() {
                     size="small"
                     aria-pressed={selected}
                     onClick={() => toggleWeekday(day.value)}
+                    disabled={busy}
                     sx={{ minWidth: 0, px: 0.5 }}
                   >
                     {day.label}
@@ -476,6 +500,7 @@ export default function Tracking() {
               label="Начало рабочего дня"
               type="time"
               value={schedule.work_start}
+              disabled={busy}
               onChange={event => setSchedule(current => ({ ...current, work_start: event.target.value }))}
               inputProps={{ step: 60 }}
               InputLabelProps={{ shrink: true }}
@@ -484,6 +509,7 @@ export default function Tracking() {
               label="Конец рабочего дня"
               type="time"
               value={schedule.work_end}
+              disabled={busy}
               onChange={event => setSchedule(current => ({ ...current, work_end: event.target.value }))}
               inputProps={{ step: 60 }}
               InputLabelProps={{ shrink: true }}
@@ -496,6 +522,7 @@ export default function Tracking() {
               labelId="tracking-timezone-label"
               label="Часовой пояс"
               value={schedule.timezone}
+              disabled={busy}
               onChange={event => setSchedule(current => ({ ...current, timezone: event.target.value }))}
             >
               {(TIMEZONES.includes(schedule.timezone) ? TIMEZONES : [schedule.timezone, ...TIMEZONES]).map(timezone => (
@@ -508,6 +535,7 @@ export default function Tracking() {
             control={
               <Switch
                 checked={schedule.is_active}
+                disabled={busy}
                 onChange={event => setSchedule(current => ({ ...current, is_active: event.target.checked }))}
                 inputProps={{ 'aria-label': 'Активно' }}
               />
@@ -517,7 +545,7 @@ export default function Tracking() {
         </Box>
       </Drawer>
 
-      <Dialog open={!!deleteTarget} onClose={() => setDeleteTarget(null)}>
+      <Dialog open={!!deleteTarget} onClose={() => { if (!busy) setDeleteTarget(null) }}>
         <DialogTitle>Удалить участника?</DialogTitle>
         <DialogContent>
           <Typography variant="body2" sx={{ color: 'text.secondary' }}>
@@ -525,8 +553,10 @@ export default function Tracking() {
           </Typography>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setDeleteTarget(null)}>Отмена</Button>
-          <Button color="error" variant="contained" onClick={handleDelete} disabled={saving}>Удалить</Button>
+          <Button onClick={() => setDeleteTarget(null)} disabled={busy}>Отмена</Button>
+          <Button color="error" variant="contained" onClick={handleDelete} disabled={busy}>
+            {pendingAction === 'delete' ? 'Удаление…' : 'Удалить'}
+          </Button>
         </DialogActions>
       </Dialog>
 
