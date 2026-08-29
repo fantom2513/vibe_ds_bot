@@ -7,9 +7,10 @@ import {
 import { CheckCircleOutlined } from '@mui/icons-material'
 import { getBotInfo, getAllowedUsers } from '../api/stats'
 import { getDebugMode, setDebugMode } from '../api/muteLevels'
-import { DiscordId, PageHeader, LoadingState, ErrorState } from '../components/ui'
+import { MemberCell, PageHeader, LoadingState, ErrorState } from '../components/ui'
 import { GlowCard } from '../components/ui'
 import { PageWrapper } from '../styles/motion'
+import { useMemberResolver } from '../hooks/useMemberResolver'
 
 const MONO = { fontFamily: "'IBM Plex Mono', monospace", fontSize: '0.82rem' }
 
@@ -43,6 +44,7 @@ export default function Settings() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [snack, setSnack] = useState(null)
+  const { get: getMember, resolveMany } = useMemberResolver()
 
   const showSnack = (msg, severity = 'success') => setSnack({ msg, severity })
 
@@ -52,6 +54,7 @@ export default function Settings() {
         setBotInfo(info)
         setAllowedUsers(users)
         setDebugModeState(dbg.debug_mode)
+        resolveMany((users?.allowed_discord_ids || []).map(String))
       })
       .catch(e => setError(e.message))
       .finally(() => setLoading(false))
@@ -157,14 +160,14 @@ export default function Settings() {
             <Table size="small">
               <TableHead>
                 <TableRow>
-                  <TableCell>Discord ID</TableCell>
+                  <TableCell>Пользователь</TableCell>
                   <TableCell>Статус</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
                 {allowedIds.map((id, i) => (
                   <TableRow key={i}>
-                    <TableCell><DiscordId id={id} /></TableCell>
+                    <TableCell><MemberCell id={String(id)} memberData={getMember(String(id))} showId /></TableCell>
                     <TableCell>
                       <Box component="span" sx={{
                         px: 0.75, py: '2px', borderRadius: '4px',
