@@ -10,7 +10,7 @@ from src.api.app import app
 from src.bot.client import create_bot
 from src.config.settings import get_settings, load_config_yaml
 from src.db import database
-from src.db.repositories import logs_repo, rules_repo, schedules_repo, users_repo
+from src.db.repositories import logs_repo, rules_repo, users_repo
 from src.engine import actions, evaluator, tracker
 from src.scheduler import jobs as scheduler_jobs
 from src.api.deps import set_scheduler

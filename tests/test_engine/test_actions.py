@@ -2,7 +2,7 @@
 Тесты модуля действий: mute вызывает member.edit(mute=True);
 при member.id == guild.owner_id execute_action возвращает False и не вызывает edit.
 """
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock
 
 import pytest
 

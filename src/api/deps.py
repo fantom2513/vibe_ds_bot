@@ -1,11 +1,11 @@
 """
 Зависимости FastAPI: пул БД, аутентификация, scheduler, бот.
 """
-from typing import Annotated, Optional
+from typing import Optional
 
 import asyncpg
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
-from fastapi import Depends, HTTPException, Request
+from fastapi import HTTPException, Request
 from jose import JWTError, jwt
 
 from src.config.settings import get_settings

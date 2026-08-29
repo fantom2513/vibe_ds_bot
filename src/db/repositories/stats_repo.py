@@ -1,8 +1,7 @@
 """
 Репозиторий статистики. Агрегации по voice_sessions и action_logs.
 """
-from datetime import datetime, timezone
-from typing import Any, Optional
+from typing import Any
 
 import asyncpg
 

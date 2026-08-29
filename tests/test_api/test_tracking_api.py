@@ -108,7 +108,6 @@ async def test_text_channels_returns_only_cached_sendable_text_channels(api_clie
     blocked.id = 13
     blocked.name = "locked"
     blocked.permissions_for.return_value.send_messages = False
-    not_text = MagicMock(spec=discord.VoiceChannel)
     guild = MagicMock()
     guild.text_channels = [sendable, blocked]
     guild.me = MagicMock()

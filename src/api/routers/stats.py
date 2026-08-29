@@ -4,7 +4,7 @@
 from typing import Annotated
 
 import asyncpg
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
 
 from src.api.deps import get_current_user, get_db_pool
 from src.api.schemas import StatsOverviewResponse, UserStatsResponse

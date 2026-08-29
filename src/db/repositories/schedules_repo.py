@@ -1,7 +1,7 @@
 """
 Репозиторий расписаний (schedules). Асинхронные операции через asyncpg.
 """
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import Any, Literal, Optional
 
 import asyncpg
