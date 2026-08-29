@@ -11,6 +11,16 @@ from src.bot.cogs.admin_commands import TrackingGroup
 from src.engine.tracking_report import Session
 
 
+REPORT_NOW = datetime(2026, 8, 28, 12, tzinfo=timezone.utc)
+
+
+def freeze_report_clock(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Keep report-command fixtures anchored to their fixed session date."""
+    monkeypatch.setattr(
+        admin_commands, "datetime", MagicMock(now=MagicMock(return_value=REPORT_NOW))
+    )
+
+
 @pytest.fixture
 def mock_bot() -> MagicMock:
     bot = MagicMock()
@@ -57,6 +67,7 @@ async def test_tracking_report_posts_member_totals_and_stacks_to_configured_chan
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     mock_bot.get_channel.return_value = sendable_channel
+    freeze_report_clock(monkeypatch)
     members = [
         tracked_member(42, "Ada"),
         tracked_member(43, "Bob"),
@@ -98,6 +109,7 @@ async def test_tracking_report_uses_discord_id_when_stored_username_is_missing(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     mock_bot.get_channel.return_value = sendable_channel
+    freeze_report_clock(monkeypatch)
     members = [tracked_member(42, None), tracked_member(43, "Bob")]
     sessions = [
         Session(42, 10, datetime(2026, 8, 28, 9, tzinfo=timezone.utc), datetime(2026, 8, 28, 10, tzinfo=timezone.utc)),
