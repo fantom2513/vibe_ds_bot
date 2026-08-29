@@ -25,6 +25,7 @@ def rule_kick_blacklist():
         id=1,
         name="Kick blacklist",
         is_active=True,
+        is_dry_run=False,
         target_list="blacklist",
         channel_ids=None,
         max_time_sec=None,

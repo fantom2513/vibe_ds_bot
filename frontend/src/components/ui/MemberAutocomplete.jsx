@@ -11,7 +11,7 @@ const MONO = { fontFamily: "'IBM Plex Mono', monospace", fontSize: '0.70rem' }
  *
  * Props:
  *   value       — selected discord_id string | null
- *   onChange(id) — called with discord_id string when selection changes
+ *   onChange(id, member) — called with discord_id string and selected member metadata
  *   label       — TextField label
  *   error       — boolean
  *   helperText  — string
@@ -60,7 +60,7 @@ export function MemberAutocomplete({ value, onChange, label, error, helperText, 
         if (reason === 'input') fetchOptions(newInput)
       }}
       onChange={(_, newValue) => {
-        onChange(newValue?.id ?? null)
+        onChange(newValue?.id ?? null, newValue ?? null)
       }}
       renderOption={(props, opt) => (
         <Box component="li" {...props} key={opt.id} sx={{ display: 'flex', alignItems: 'center', gap: 1.5, py: '6px !important' }}>

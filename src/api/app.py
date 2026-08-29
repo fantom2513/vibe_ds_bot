@@ -6,7 +6,7 @@ FastAPI приложение Voice Bot API.
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from src.api.routers import auth, dashboard, guild, kick_targets, logs, members, mute_levels, rules, schedules, settings, stacking_pairs, stats, users
+from src.api.routers import auth, dashboard, guild, kick_targets, logs, members, mute_levels, rules, schedules, settings, stacking_pairs, stats, tracking, users
 
 app = FastAPI(
     title="Voice Bot API",
@@ -41,3 +41,4 @@ app.include_router(settings.router, prefix="/api", tags=["settings"])
 app.include_router(members.router, prefix="/api", tags=["members"])
 app.include_router(mute_levels.router, prefix="/api", tags=["mute-levels"])
 app.include_router(guild.router, prefix="/api", tags=["guild"])
+app.include_router(tracking.router, prefix="/api", tags=["tracking"])

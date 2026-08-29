@@ -18,6 +18,7 @@ import {
   ChevronLeftOutlined,
   MenuOutlined,
   LogoutOutlined,
+  QueryStatsOutlined,
 } from '@mui/icons-material'
 
 const SIDEBAR_WIDTH = 220
@@ -29,6 +30,7 @@ const navItems = [
   { path: '/users',          label: 'Users',           Icon: GroupOutlined },
   { path: '/kick-targets',   label: 'Kick Targets',    Icon: FlashOnOutlined },
   { path: '/stacking-pairs', label: 'Stacking Pairs',  Icon: PeopleOutlined },
+  { path: '/tracking',       label: 'Отслеживание',    Icon: QueryStatsOutlined },
   { path: '/schedules',      label: 'Schedules',       Icon: AccessTimeOutlined },
   { path: '/logs',           label: 'Logs',            Icon: ArticleOutlined },
   { path: '/settings',       label: 'Settings',        Icon: SettingsOutlined },

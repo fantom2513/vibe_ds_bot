@@ -61,8 +61,8 @@
 @pytest.mark.parametrize(
     ("joined_at", "left_at", "expected"),
     [
-        (dt("2026-08-03T08:30:00Z"), dt("2026-08-03T10:00:00Z"), 3600),
-        (dt("2026-08-03T14:00:00Z"), dt("2026-08-03T19:00:00Z"), 14400),
+        (dt("2026-08-03T08:30:00Z"), dt("2026-08-03T10:00:00Z"), 5400),
+        (dt("2026-08-03T14:00:00Z"), dt("2026-08-03T19:00:00Z"), 3600),
     ],
 )
 def test_work_seconds_are_clipped_to_member_msk_window(joined_at, left_at, expected):

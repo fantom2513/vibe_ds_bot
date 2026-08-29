@@ -41,9 +41,13 @@ class MockPool:
         self._rules_id = 0
         self.user_lists: list[dict[str, Any]] = []
         self._user_lists_id = 0
+        self.tracked_members: dict[int, dict[str, Any]] = {}
+        self.tracking_settings: dict[str, Any] = {"report_channel_id": None}
 
     async def execute(self, query: str, *args: Any) -> str:
         q = query.strip().upper()
+        if "DELETE FROM TRACKED_MEMBERS" in q:
+            return "DELETE 1" if self.tracked_members.pop(args[0], None) else "DELETE 0"
         if "INSERT INTO VOICE_SESSIONS" in q:
             # INSERT INTO voice_sessions (discord_id, channel_id, joined_at, left_at) VALUES ($1, $2, $3, NULL)
             self.voice_sessions.append({
@@ -75,6 +79,17 @@ class MockPool:
 
     async def fetch(self, query: str, *args: Any) -> list[dict]:
         q = query.strip().upper()
+        if "FROM TRACKED_MEMBERS" in q:
+            return list(self.tracked_members.values())
+        if "FROM VOICE_SESSIONS" in q:
+            member_ids, period_start, period_end, now = args
+            return [
+                {**row, "left_at": row["left_at"] or now}
+                for row in self.voice_sessions
+                if row["discord_id"] in member_ids
+                and row["joined_at"] < period_end
+                and (row["left_at"] or now) > period_start
+            ]
         if "FROM RULES" in q and "SELECT" in q:
             return list(self.rules)
         if "FROM USER_LISTS" in q and "SELECT" in q:
@@ -86,6 +101,32 @@ class MockPool:
 
     async def fetchrow(self, query: str, *args: Any) -> dict | None:
         q = query.strip().upper()
+        if "UPDATE TRACKED_MEMBERS" in q and "RETURNING" in q:
+            discord_id = args[-1]
+            row = self.tracked_members.get(discord_id)
+            if row is None:
+                return None
+            fields = [part.split(" = ")[0].strip().lower() for part in query.split("SET", 1)[1].split(", updated_at", 1)[0].split(", ")]
+            for field, value in zip(fields, args[1:-1]):
+                row[field] = value
+            row["updated_at"] = args[0]
+            return row
+        if "FROM TRACKED_MEMBERS" in q and "WHERE DISCORD_ID" in q:
+            return self.tracked_members.get(args[0])
+        if "INSERT INTO TRACKING_SETTINGS" in q:
+            self.tracking_settings = {"report_channel_id": args[0]}
+            return self.tracking_settings
+        if "FROM TRACKING_SETTINGS" in q:
+            return self.tracking_settings
+        if "INSERT INTO TRACKED_MEMBERS" in q and "RETURNING" in q:
+            now = args[7]
+            row = {
+                "discord_id": args[0], "username": args[1], "is_active": args[2],
+                "work_days": args[3], "work_start": args[4], "work_end": args[5],
+                "timezone": args[6], "created_at": now, "updated_at": now,
+            }
+            self.tracked_members[args[0]] = row
+            return row
         if "INSERT INTO RULES" in q and "RETURNING" in q:
             self._rules_id += 1
             now = datetime.now(timezone.utc)
