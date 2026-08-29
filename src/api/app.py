@@ -3,7 +3,7 @@ FastAPI приложение Voice Bot API.
 Роутеры: rules, users, schedules, logs, dashboard, stats, health.
 Пул БД устанавливается извне (main) в app.state.pool.
 """
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 
 from src.api.routers import auth, dashboard, guild, kick_targets, logs, members, mute_levels, rules, schedules, settings, stacking_pairs, stats, tracking, users
@@ -16,9 +16,29 @@ app = FastAPI(
 
 @app.get("/health")
 @app.get("/api/health")
-def health() -> dict[str, str]:
-    """Health check для контейнера и балансировщиков. Без аутентификации."""
-    return {"status": "ok"}
+async def health(request: Request) -> dict[str, bool | str]:
+    """
+    Health check для контейнера, балансировщиков и внешнего мониторинга (Uptime Kuma).
+    Без аутентификации. Всегда отвечает 200 — деградация видна по полям, не по коду ответа.
+    """
+    bot = getattr(request.app.state, "bot", None)
+    discord_connected = bool(bot and bot.is_ready())
+
+    pool = getattr(request.app.state, "pool", None)
+    db_connected = False
+    if pool is not None:
+        try:
+            async with pool.acquire() as conn:
+                await conn.execute("SELECT 1")
+            db_connected = True
+        except Exception:
+            db_connected = False
+
+    return {
+        "status": "ok",
+        "discord_connected": discord_connected,
+        "db_connected": db_connected,
+    }
 
 app.add_middleware(
     CORSMiddleware,
