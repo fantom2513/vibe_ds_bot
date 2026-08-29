@@ -115,6 +115,16 @@ class Settings(BaseSettings):
         description="Discord ID пользователей с доступом к дашборду",
     )
 
+    # Мониторинг
+    ALERT_WEBHOOK_URL: str = Field(
+        default="",
+        description=(
+            "Discord webhook для алертов мониторинга (потеря gateway-сессии, "
+            "ERROR-логи). Отдельный от gateway бота канал доставки — работает, "
+            "даже если сам бот отвалился от Discord. Пусто — алерты выключены."
+        ),
+    )
+
     @field_validator("ALLOWED_DISCORD_IDS", mode="before")
     @classmethod
     def parse_allowed_ids(cls, v: Any) -> list[int]:

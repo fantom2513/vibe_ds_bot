@@ -58,6 +58,7 @@ jobs:
           JWT_SECRET=${{ secrets.JWT_SECRET }}
           JWT_EXPIRE_HOURS=24
           ALLOWED_DISCORD_IDS=${{ secrets.ALLOWED_DISCORD_IDS }}
+          ALERT_WEBHOOK_URL=${{ secrets.ALERT_WEBHOOK_URL }}
           EOF
 
       - name: Stop old containers
