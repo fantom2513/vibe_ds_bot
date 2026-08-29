@@ -14,11 +14,19 @@ from src.engine.tracking_report import Session
 REPORT_NOW = datetime(2026, 8, 28, 12, tzinfo=timezone.utc)
 
 
+class ReportDateTime(datetime):
+    """Real datetime type with a deterministic report-command clock."""
+
+    @classmethod
+    def now(cls, tz=None) -> datetime:
+        if tz is None:
+            return REPORT_NOW.replace(tzinfo=None)
+        return REPORT_NOW.astimezone(tz)
+
+
 def freeze_report_clock(monkeypatch: pytest.MonkeyPatch) -> None:
     """Keep report-command fixtures anchored to their fixed session date."""
-    monkeypatch.setattr(
-        admin_commands, "datetime", MagicMock(now=MagicMock(return_value=REPORT_NOW))
-    )
+    monkeypatch.setattr(admin_commands, "datetime", ReportDateTime)
 
 
 @pytest.fixture
