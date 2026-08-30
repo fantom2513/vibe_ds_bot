@@ -16,8 +16,10 @@ from src.db.repositories import tracking_repo
 from src.engine.tracking_report import (
     MemberSchedule,
     calculate_all_together_seconds,
+    calculate_daily_work_seconds,
     calculate_member_totals,
     calculate_pair_overlaps,
+    daily_boundaries,
 )
 from src.config.settings import get_settings as get_app_settings
 
@@ -158,4 +160,47 @@ async def preview_report(
             for overlap in calculate_pair_overlaps(sessions, set(schedules), period_start, period_end)
         ],
         "all_together_seconds": calculate_all_together_seconds(sessions, set(schedules), period_start, period_end),
+    }
+
+
+@router.get("/tracking/daily-work-hours")
+async def daily_work_hours(
+    request: Request,
+    days: int = Query(14, ge=1, le=90),
+    _: Annotated[dict, Depends(get_current_user)] = None,
+    pool: Annotated[asyncpg.Pool, Depends(get_db_pool)] = None,
+) -> dict:
+    """Рабочие часы по дням за последние `days` дней — данные для столбчатой диаграммы."""
+    msk = ZoneInfo("Europe/Moscow")
+    now = datetime.now(timezone.utc)
+    day_starts = daily_boundaries(days, now, "Europe/Moscow")
+
+    active_members = [row for row in await tracking_repo.list_tracked_members(pool) if row["is_active"]]
+    schedules = {
+        row["discord_id"]: MemberSchedule(
+            set(row["work_days"]), _as_time(row["work_start"]), _as_time(row["work_end"]), row["timezone"],
+        ) for row in active_members
+    }
+    sessions = await tracking_repo.load_report_sessions(pool, list(schedules), day_starts[0], now, now)
+    daily = calculate_daily_work_seconds(sessions, schedules, day_starts)
+
+    bot = getattr(request.app.state, "bot", None)
+    guild = bot.get_guild(get_app_settings().DISCORD_GUILD_ID) if bot is not None else None
+
+    def current_username(row: dict) -> str | None:
+        member = guild.get_member(row["discord_id"]) if guild is not None else None
+        return member.display_name if member is not None else row["username"]
+
+    return {
+        "members": [
+            {"discord_id": str(row["discord_id"]), "username": current_username(row)}
+            for row in active_members
+        ],
+        "days": [
+            {
+                "date": day_start.astimezone(msk).date().isoformat(),
+                **{str(member_id): seconds for member_id, seconds in day_totals.items()},
+            }
+            for day_start, day_totals in zip(day_starts, daily)
+        ],
     }

@@ -158,6 +158,44 @@ async def test_preview_returns_active_member_totals_and_overlaps(api_client, aut
 
 
 @pytest.mark.asyncio
+async def test_daily_work_hours_requires_authentication(api_client):
+    async with api_client as client:
+        response = await client.get("/api/tracking/daily-work-hours")
+    assert response.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_daily_work_hours_returns_14_days_by_default(api_client, auth_cookies):
+    now = datetime.now(timezone.utc)
+    api_client._transport.app.state.pool.tracked_members = {
+        42: {
+            "discord_id": 42, "username": "Ada", "is_active": True,
+            "work_days": [0, 1, 2, 3, 4, 5, 6], "work_start": "00:00:00", "work_end": "23:59:59",
+            "timezone": "UTC", "created_at": now, "updated_at": now,
+        },
+    }
+    app.state.bot = None  # изолируем от MagicMock-бота, утёкшего из другого теста
+
+    async with api_client as client:
+        response = await client.get("/api/tracking/daily-work-hours", cookies=auth_cookies)
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["members"] == [{"discord_id": "42", "username": "Ada"}]
+    assert len(body["days"]) == 14
+    assert all("date" in day and "42" in day for day in body["days"])
+
+
+@pytest.mark.asyncio
+async def test_daily_work_hours_accepts_custom_days_param(api_client, auth_cookies):
+    async with api_client as client:
+        response = await client.get("/api/tracking/daily-work-hours?days=7", cookies=auth_cookies)
+
+    assert response.status_code == 200
+    assert len(response.json()["days"]) == 7
+
+
+@pytest.mark.asyncio
 async def test_preview_rejects_unknown_period(api_client, auth_cookies):
     async with api_client as client:
         response = await client.get("/api/tracking/preview?period=year", cookies=auth_cookies)

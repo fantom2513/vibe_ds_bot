@@ -10,3 +10,5 @@ export const setTrackingSettings = data => client.patch('/tracking/settings', da
 export const listTextChannels = () => client.get('/tracking/text-channels').then(r => r.data)
 export const previewTrackingReport = period =>
   client.get('/tracking/preview', { params: { period } }).then(r => r.data)
+export const getDailyWorkHours = (days = 14) =>
+  client.get('/tracking/daily-work-hours', { params: { days } }).then(r => r.data)

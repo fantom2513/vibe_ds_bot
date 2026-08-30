@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, time, timedelta
+from datetime import datetime, time, timedelta, timezone
 from itertools import combinations
 from zoneinfo import ZoneInfo
 
@@ -131,6 +131,42 @@ def calculate_pair_overlaps(
     return [
         PairOverlap(member_ids=member_ids, channel_id=channel_id, seconds=seconds)
         for (member_ids, channel_id), seconds in sorted(totals.items())
+    ]
+
+
+def daily_boundaries(days: int, now: datetime, tz_name: str = "Europe/Moscow") -> list[datetime]:
+    """
+    Границы последних `days` календарных дней (00:00 в tz_name, в UTC),
+    от самого старого к сегодняшнему включительно. Общий хелпер для API
+    и /report-команды бота — единая точка расчёта 14-дневного окна.
+    """
+    tz = ZoneInfo(tz_name)
+    today = now.astimezone(tz).date()
+    return [
+        datetime.combine(today - timedelta(days=offset), time.min, tz).astimezone(timezone.utc)
+        for offset in range(days - 1, -1, -1)
+    ]
+
+
+def calculate_daily_work_seconds(
+    sessions: list[Session],
+    schedules: dict[int, MemberSchedule],
+    day_starts: list[datetime],
+) -> list[dict[int, int]]:
+    """
+    Для 14-дневного графика: по одному {discord_id: work_seconds} на каждую
+    границу дня из day_starts (начало дня в UTC, конец = +24ч). Переиспользует
+    calculate_member_totals — один вызов на день, без дублирования логики
+    бакетинга по локальному дню участника.
+    """
+    return [
+        {
+            member_id: total.work_seconds
+            for member_id, total in calculate_member_totals(
+                sessions, schedules, day_start, day_start + timedelta(days=1),
+            ).items()
+        }
+        for day_start in day_starts
     ]
 
 

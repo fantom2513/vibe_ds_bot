@@ -112,6 +112,68 @@ async def test_tracking_report_posts_member_totals_and_stacks_to_configured_chan
 
 
 @pytest.mark.asyncio
+async def test_tracking_report_attaches_work_hours_chart_image(
+    mock_bot: MagicMock, interaction: MagicMock, sendable_channel: MagicMock,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    mock_bot.get_channel.return_value = sendable_channel
+    freeze_report_clock(monkeypatch)
+    members = [tracked_member(42, "Ada")]
+    monkeypatch.setattr(
+        admin_commands.tracking_repo,
+        "get_tracking_settings",
+        AsyncMock(return_value={"report_channel_id": 777}),
+    )
+    monkeypatch.setattr(
+        admin_commands.tracking_repo, "list_tracked_members", AsyncMock(return_value=members)
+    )
+    monkeypatch.setattr(
+        admin_commands.tracking_repo, "load_report_sessions", AsyncMock(return_value=[])
+    )
+
+    group = TrackingGroup(mock_bot)
+    await group.report.callback(group, interaction, "today")
+
+    kwargs = sendable_channel.send.await_args.kwargs
+    assert kwargs["file"].filename == "work_hours.png"
+    assert kwargs["embed"].image.url == "attachment://work_hours.png"
+
+
+@pytest.mark.asyncio
+async def test_tracking_report_still_sends_when_chart_render_fails(
+    mock_bot: MagicMock, interaction: MagicMock, sendable_channel: MagicMock,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Падение рендера графика — отчёт всё равно уходит, просто без картинки."""
+    mock_bot.get_channel.return_value = sendable_channel
+    freeze_report_clock(monkeypatch)
+    monkeypatch.setattr(
+        admin_commands.tracking_repo,
+        "get_tracking_settings",
+        AsyncMock(return_value={"report_channel_id": 777}),
+    )
+    monkeypatch.setattr(
+        admin_commands.tracking_repo,
+        "list_tracked_members",
+        AsyncMock(return_value=[tracked_member(42, "Ada")]),
+    )
+    monkeypatch.setattr(
+        admin_commands.tracking_repo, "load_report_sessions", AsyncMock(return_value=[])
+    )
+    monkeypatch.setattr(
+        admin_commands, "render_daily_work_hours_chart",
+        MagicMock(side_effect=RuntimeError("render exploded")),
+    )
+
+    group = TrackingGroup(mock_bot)
+    await group.report.callback(group, interaction, "today")
+
+    kwargs = sendable_channel.send.await_args.kwargs
+    assert "file" not in kwargs
+    interaction.followup.send.assert_awaited_with("Отчёт отправлен в <#777>.", ephemeral=True)
+
+
+@pytest.mark.asyncio
 async def test_tracking_report_uses_discord_id_when_stored_username_is_missing(
     mock_bot: MagicMock, interaction: MagicMock, sendable_channel: MagicMock,
     monkeypatch: pytest.MonkeyPatch,
