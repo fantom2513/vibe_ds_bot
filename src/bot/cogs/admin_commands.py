@@ -4,6 +4,8 @@ Cog: slash-команды для администраторов.
 Все ответы ephemeral=True — видны только вызвавшему администратору.
 Доступ контролируется через default_member_permissions(administrator=True).
 """
+import io
+
 import discord
 from datetime import datetime, time, timedelta, timezone
 from discord import app_commands
@@ -12,10 +14,13 @@ from typing import Literal
 from zoneinfo import ZoneInfo
 
 from src.db.repositories import rules_repo, stats_repo, tracking_repo, users_repo
+from src.engine.chart_render import render_daily_work_hours_chart
 from src.engine.tracking_report import (
     MemberSchedule,
+    calculate_daily_work_seconds,
     calculate_member_totals,
     calculate_pair_overlaps,
+    daily_boundaries,
 )
 from src.utils.logging import get_logger
 
@@ -460,8 +465,28 @@ class TrackingGroup(app_commands.Group):
             logger.exception("admin.tracking_report.build_failed", period=period)
             await interaction.followup.send("Не удалось подготовить отчёт. Попробуйте позже.", ephemeral=True)
             return
+
+        chart_file = None
         try:
-            await channel.send(embed=embed)
+            day_starts = daily_boundaries(14, now, "Europe/Moscow")
+            chart_sessions = await tracking_repo.load_report_sessions(
+                self.pool, list(schedules), day_starts[0], now, now
+            )
+            daily = calculate_daily_work_seconds(chart_sessions, schedules, day_starts)
+            msk = ZoneInfo("Europe/Moscow")
+            day_labels = [d.astimezone(msk).strftime("%d.%m") for d in day_starts]
+            chart_png = render_daily_work_hours_chart(day_labels, names, daily)
+            chart_file = discord.File(io.BytesIO(chart_png), filename="work_hours.png")
+            embed.set_image(url="attachment://work_hours.png")
+        except Exception:
+            # График — доп. информация, отчёт всё равно должен уйти без него
+            logger.exception("admin.tracking_report.chart_failed")
+
+        try:
+            if chart_file is not None:
+                await channel.send(embed=embed, file=chart_file)
+            else:
+                await channel.send(embed=embed)
         except (AttributeError, discord.HTTPException, OSError):
             await interaction.followup.send("Не удалось отправить отчёт в настроенный канал.", ephemeral=True)
             return
