@@ -31,6 +31,7 @@ import { DeleteOutlined, EditOutlined, RefreshOutlined } from '@mui/icons-materi
 import {
   createTrackedMember,
   deleteTrackedMember,
+  getDailyWorkHours,
   getTrackingSettings,
   listTextChannels,
   listTrackedMembers,
@@ -38,6 +39,7 @@ import {
   setTrackingSettings,
   updateTrackedMember,
 } from '../api/tracking'
+import DailyWorkHoursChart from '../components/DailyWorkHoursChart'
 import {
   EmptyState,
   ErrorState,
@@ -111,6 +113,7 @@ export default function Tracking() {
   const [schedule, setSchedule] = useState(defaultSchedule())
   const [deleteTarget, setDeleteTarget] = useState(null)
   const [snack, setSnack] = useState(null)
+  const [dailyWorkHours, setDailyWorkHours] = useState(null)
   const previewRequestId = useRef(0)
   const periodRef = useRef('today')
   const { get, resolveMany } = useMemberResolver()
@@ -161,6 +164,7 @@ export default function Tracking() {
     }
     load()
     loadPreview('today')
+    getDailyWorkHours(14).then(setDailyWorkHours).catch(() => setDailyWorkHours(null))
   }, [loadPreview, resolveMany])
 
   const handlePeriodChange = event => {
@@ -456,6 +460,17 @@ export default function Tracking() {
               </TableContainer>
             ) : <EmptyState text="Нет пересечений за период" icon="—" />}
           </Box>
+        </Box>
+      )}
+
+      {dailyWorkHours?.days?.length > 0 && (
+        <Box sx={{ mt: 4 }}>
+          <Typography variant="subtitle1" component="h2" sx={{ mb: 1 }}>
+            Рабочие часы — последние 14 дней
+          </Typography>
+          <Paper sx={{ p: 2 }}>
+            <DailyWorkHoursChart data={dailyWorkHours} />
+          </Paper>
         </Box>
       )}
 
