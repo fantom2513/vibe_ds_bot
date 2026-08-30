@@ -174,6 +174,7 @@ async def test_daily_work_hours_returns_14_days_by_default(api_client, auth_cook
             "timezone": "UTC", "created_at": now, "updated_at": now,
         },
     }
+    app.state.bot = None  # изолируем от MagicMock-бота, утёкшего из другого теста
 
     async with api_client as client:
         response = await client.get("/api/tracking/daily-work-hours", cookies=auth_cookies)
