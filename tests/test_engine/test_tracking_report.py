@@ -5,6 +5,7 @@ from src.engine.tracking_report import (
     MemberSchedule,
     Session,
     calculate_all_together_seconds,
+    calculate_daily_work_seconds,
     calculate_member_totals,
     calculate_pair_overlaps,
 )
@@ -128,6 +129,36 @@ def test_all_together_ignores_untracked_members_in_the_same_channel() -> None:
     )
 
     assert seconds == 3600
+
+
+def test_daily_work_seconds_buckets_one_entry_per_day_boundary() -> None:
+    """Один словарь {discord_id: work_seconds} на каждую переданную границу дня."""
+    schedule = MemberSchedule({0, 1, 2, 3, 4, 5, 6}, time(0), time(23, 59, 59), "UTC")
+    sessions = [
+        Session(1, 10, dt("2026-08-03T10:00:00Z"), dt("2026-08-03T11:00:00Z")),  # день 1: 1ч
+        Session(1, 10, dt("2026-08-04T10:00:00Z"), dt("2026-08-04T10:30:00Z")),  # день 2: 30мин
+    ]
+
+    daily = calculate_daily_work_seconds(
+        sessions=sessions,
+        schedules={1: schedule},
+        day_starts=[dt("2026-08-03T00:00:00Z"), dt("2026-08-04T00:00:00Z")],
+    )
+
+    assert daily == [{1: 3600}, {1: 1800}]
+
+
+def test_daily_work_seconds_empty_day_gives_zero_not_missing_key() -> None:
+    """День без сессий участника всё равно присутствует в результате, с нулём."""
+    schedule = MemberSchedule({0, 1, 2, 3, 4, 5, 6}, time(0), time(23, 59, 59), "UTC")
+
+    daily = calculate_daily_work_seconds(
+        sessions=[],
+        schedules={1: schedule},
+        day_starts=[dt("2026-08-03T00:00:00Z")],
+    )
+
+    assert daily == [{1: 0}]
 
 
 def test_all_together_returns_zero_for_empty_tracked_set() -> None:
