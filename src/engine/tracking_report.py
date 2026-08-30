@@ -134,6 +134,28 @@ def calculate_pair_overlaps(
     ]
 
 
+def calculate_daily_work_seconds(
+    sessions: list[Session],
+    schedules: dict[int, MemberSchedule],
+    day_starts: list[datetime],
+) -> list[dict[int, int]]:
+    """
+    Для 14-дневного графика: по одному {discord_id: work_seconds} на каждую
+    границу дня из day_starts (начало дня в UTC, конец = +24ч). Переиспользует
+    calculate_member_totals — один вызов на день, без дублирования логики
+    бакетинга по локальному дню участника.
+    """
+    return [
+        {
+            member_id: total.work_seconds
+            for member_id, total in calculate_member_totals(
+                sessions, schedules, day_start, day_start + timedelta(days=1),
+            ).items()
+        }
+        for day_start in day_starts
+    ]
+
+
 def calculate_all_together_seconds(
     sessions: list[Session],
     tracked_member_ids: set[int],
