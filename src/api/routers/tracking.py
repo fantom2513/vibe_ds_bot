@@ -19,6 +19,7 @@ from src.engine.tracking_report import (
     calculate_daily_work_seconds,
     calculate_member_totals,
     calculate_pair_overlaps,
+    daily_boundaries,
 )
 from src.config.settings import get_settings as get_app_settings
 
@@ -172,11 +173,7 @@ async def daily_work_hours(
     """Рабочие часы по дням за последние `days` дней — данные для столбчатой диаграммы."""
     msk = ZoneInfo("Europe/Moscow")
     now = datetime.now(timezone.utc)
-    today = now.astimezone(msk).date()
-    day_starts = [
-        datetime.combine(today - timedelta(days=offset), time.min, msk).astimezone(timezone.utc)
-        for offset in range(days - 1, -1, -1)
-    ]
+    day_starts = daily_boundaries(days, now, "Europe/Moscow")
 
     active_members = [row for row in await tracking_repo.list_tracked_members(pool) if row["is_active"]]
     schedules = {

@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, time, timedelta
+from datetime import datetime, time, timedelta, timezone
 from itertools import combinations
 from zoneinfo import ZoneInfo
 
@@ -131,6 +131,20 @@ def calculate_pair_overlaps(
     return [
         PairOverlap(member_ids=member_ids, channel_id=channel_id, seconds=seconds)
         for (member_ids, channel_id), seconds in sorted(totals.items())
+    ]
+
+
+def daily_boundaries(days: int, now: datetime, tz_name: str = "Europe/Moscow") -> list[datetime]:
+    """
+    Границы последних `days` календарных дней (00:00 в tz_name, в UTC),
+    от самого старого к сегодняшнему включительно. Общий хелпер для API
+    и /report-команды бота — единая точка расчёта 14-дневного окна.
+    """
+    tz = ZoneInfo(tz_name)
+    today = now.astimezone(tz).date()
+    return [
+        datetime.combine(today - timedelta(days=offset), time.min, tz).astimezone(timezone.utc)
+        for offset in range(days - 1, -1, -1)
     ]
 
 
