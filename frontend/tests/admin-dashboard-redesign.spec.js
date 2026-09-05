@@ -138,15 +138,12 @@ test('applies the approved graphite and mint foundation', async ({ page }) => {
     danger: '#e58a94',
   })
 
-  // The plan's reference test also asserts:
-  //   await expect(page.getByRole('heading', { name: 'Обзор сервера' }))
-  //     .toHaveCSS('font-family', /Unbounded/)
-  // That heading is introduced by the Dashboard.jsx redesign, which is Task 4
-  // of this plan — it does not exist yet. Rather than invent Dashboard
-  // content that isn't this task's job, the Unbounded/h1-h3 typography
-  // contract is locked below via the theme module directly (see "locks
-  // Unbounded for h1-h3 only"). Task 4 must re-add a browser-level
-  // assertion equivalent to the one above once the real heading exists.
+  // Task 4 re-adds the plan's original browser-level assertion now that the
+  // real Dashboard heading exists (the h1-h3/Unbounded contract is also
+  // locked at the theme-module level below, see "locks Unbounded for h1-h3
+  // only" — this is the live-route confirmation of that same contract).
+  await expect(page.getByRole('heading', { name: 'Обзор сервера' }))
+    .toHaveCSS('font-family', /Unbounded/)
 })
 
 test('locks Unbounded for h1-h3 only, IBM Plex Sans elsewhere', () => {
@@ -304,15 +301,14 @@ test('dashboard state: exposes role=status while loading', async ({ page }) => {
 })
 
 test('keeps primary hover distinct without changing secondary nav semantics', async ({ page }) => {
-  // The plan's reference test targets Dashboard's "Создать правило" primary
-  // action and "Все правила" secondary link — neither exists yet; both are
-  // introduced by Task 4's Dashboard rebuild. This exercises the exact same
-  // two component families (MuiButton containedPrimary vs. the AppLayout
-  // sidebar's NavLink) through routes that already exist today: Rules' real
-  // "Новое правило" primary action and the sidebar's "Обзор" secondary nav
-  // link. Task 4 should add the literal snippet from the plan once the
-  // Dashboard controls exist; this stays as a standing regression guard for
-  // the shared button/link theme so the two families can't drift together.
+  // Exercises the two shared component families (MuiButton containedPrimary
+  // vs. an anchor-backed nav/link control) through two independent routes:
+  // Rules' real "Новое правило" primary action + the sidebar's "Обзор"
+  // secondary nav link (a standing regression guard for the shared
+  // button/link theme so the families can't drift apart), and — per the
+  // plan's original reference test, now that Task 4 has built the real
+  // markup — Dashboard's own "Создать правило" primary action and "Все
+  // правила" secondary link.
   await page.route('**/auth/me', route => route.fulfill({ json: { id: '1', username: 'Admin', avatar: null } }))
   await page.route('**/api/rules', route => route.fulfill({ json: [] }))
   await page.setViewportSize({ width: 1440, height: 900 })
@@ -329,6 +325,24 @@ test('keeps primary hover distinct without changing secondary nav semantics', as
   await expect(secondary).not.toHaveCSS('background-color', 'rgb(101, 198, 156)')
   await secondary.hover()
   await expect(secondary).not.toHaveCSS('background-color', 'rgb(101, 198, 156)')
+
+  // The plan's literal reference assertion, now through the real Dashboard route.
+  await page.route('**/api/dashboard', route => route.fulfill({ json: dashboardFixture }))
+  await page.route('**/api/stats/overview', route => route.fulfill({ json: statsOverviewFixture }))
+  await neutralizeEventSource(page)
+  await page.goto(`${BASE_URL}/`)
+
+  const dashPrimary = page.getByRole('button', { name: 'Создать правило' })
+  const dashSecondary = page.getByRole('link', { name: 'Все правила' })
+
+  const dashBefore = await dashPrimary.evaluate(el => getComputedStyle(el).backgroundColor)
+  await dashPrimary.hover()
+  await expect.poll(() => dashPrimary.evaluate(el => getComputedStyle(el).backgroundColor))
+    .not.toBe(dashBefore)
+
+  await expect(dashSecondary).not.toHaveCSS('background-color', 'rgb(101, 198, 156)')
+  await dashSecondary.hover()
+  await expect(dashSecondary).not.toHaveCSS('background-color', 'rgb(101, 198, 156)')
 })
 
 test('Panel primitive state: neutral bordered surface with no hover shadow', async ({ page }) => {
@@ -360,4 +374,131 @@ test('StatusBadge primitive state: semantic tone maps to approved tokens, not ar
     page, '/src/components/ui/StatusBadge.jsx', 'StatusBadge', { tone: 'danger' }, 'bad',
   )
   expect(danger.color).toBe('rgb(229, 138, 148)') // --color-status-danger
+})
+
+// ---------------------------------------------------------------------------
+// Task 4 — the Dashboard command center: real content hierarchy built from
+// realistic fixtures (RuleResponse-shaped rules, voice presence, an action
+// event stream).
+// ---------------------------------------------------------------------------
+
+const commandCenterRules = [
+  {
+    id: 5,
+    name: 'Тихий час',
+    description: null,
+    is_active: true,
+    is_dry_run: false,
+    target_list: null,
+    channel_ids: null,
+    max_time_sec: 3600,
+    action_type: 'mute',
+    action_params: {},
+    schedule_cron: null,
+    schedule_tz: 'Europe/Moscow',
+    priority: 10,
+    created_at: '2026-08-01T09:00:00Z',
+    updated_at: '2026-08-01T09:00:00Z',
+  },
+  {
+    id: 8,
+    name: 'Ночной кик',
+    description: 'Тестовый прогон перед боевым запуском',
+    is_active: true,
+    is_dry_run: true,
+    target_list: 'blacklist',
+    channel_ids: [111, 222],
+    max_time_sec: null,
+    action_type: 'kick',
+    action_params: {},
+    schedule_cron: '0 3 * * *',
+    schedule_tz: 'Europe/Moscow',
+    priority: 3,
+    created_at: '2026-08-02T09:00:00Z',
+    updated_at: '2026-08-03T09:00:00Z',
+  },
+]
+
+const commandCenterVoiceMembers = [
+  { user_id: '111', username: 'Ada Lovelace', avatar: null, channel_name: 'General', joined_at: '2026-09-05T09:40:00Z' },
+  { user_id: '222', username: 'Grace Hopper', avatar: null, channel_name: 'Штаб', joined_at: '2026-09-05T09:55:00Z' },
+]
+
+const commandCenterEvents = [
+  { id: 301, executed_at: '2026-09-05T10:05:00Z', discord_id: '111', action_type: 'mute', rule_id: 5, is_dry_run: false, channel_id: null },
+  { id: 300, executed_at: '2026-09-05T10:00:00Z', discord_id: '222', action_type: 'kick', rule_id: 8, is_dry_run: true, channel_id: 333 },
+  { id: 299, executed_at: '2026-09-05T09:55:00Z', discord_id: '111', action_type: 'unmute', rule_id: null, is_dry_run: false, channel_id: null },
+]
+
+const commandCenterDashboardFixture = {
+  active_rules: commandCenterRules,
+  recent_logs: commandCenterEvents,
+  voice_online_count: 2,
+  online_users: commandCenterVoiceMembers,
+}
+
+test('command center: presents the server overview hierarchy with realistic fixtures', async ({ page }) => {
+  await page.route('**/auth/me', route => route.fulfill({ json: { id: '1', username: 'Admin', avatar: null } }))
+  await page.route('**/api/dashboard', route => route.fulfill({ json: commandCenterDashboardFixture }))
+  await page.route('**/api/stats/overview', route => route.fulfill({ json: { total_actions: 42 } }))
+  await neutralizeEventSource(page)
+  await page.goto(`${BASE_URL}/`)
+
+  // Header: Unbounded heading, a small live-status badge, primary CTA.
+  const heading = page.getByRole('heading', { name: 'Обзор сервера' })
+  await expect(heading).toBeVisible()
+  await expect(heading).toHaveCSS('font-family', /Unbounded/)
+  await expect(page.getByText('В сети', { exact: true })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Создать правило' })).toBeVisible()
+  await expect(page.getByRole('link', { name: 'Все правила' })).toBeVisible()
+
+  // Compact metric strip, led by people in voice and active rules.
+  const metrics = page.getByRole('list', { name: 'Ключевые показатели' }).getByRole('listitem')
+  await expect(metrics).toHaveCount(4)
+  const metricTexts = await metrics.allInnerTexts()
+  expect(metricTexts[0]).toMatch(/голос/i)
+  expect(metricTexts[0]).toContain('2')
+  expect(metricTexts[1]).toMatch(/правил/i)
+  expect(metricTexts[1]).toContain('2')
+  expect(metricTexts[2]).toContain('42')
+
+  // The three named panels.
+  await expect(page.getByRole('heading', { name: 'Сейчас в голосе' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Что происходит' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Активные правила' })).toBeVisible()
+
+  // Voice presence: member name, channel, duration.
+  const voiceTable = page.getByRole('table', { name: 'Сейчас в голосе' })
+  await expect(voiceTable.getByText('Ada Lovelace')).toBeVisible()
+  await expect(voiceTable.getByText('General')).toBeVisible()
+  await expect(voiceTable.getByText('Grace Hopper')).toBeVisible()
+  await expect(voiceTable.getByText('Штаб')).toBeVisible()
+  const firstVoiceRowCells = await voiceTable.getByRole('row').nth(1).getByRole('cell').allInnerTexts()
+  expect(firstVoiceRowCells[firstVoiceRowCells.length - 1].trim()).not.toBe('')
+  expect(firstVoiceRowCells[firstVoiceRowCells.length - 1].trim()).not.toBe('—')
+
+  // Event stream: action label, rule name, technical identifiers.
+  await expect(page.getByText('unmute', { exact: true })).toBeVisible()
+  await expect(page.getByText('kick', { exact: false }).first()).toBeVisible()
+  await expect(page.getByText('Без правила')).toBeVisible()
+  await expect(page.getByText('Тихий час')).toHaveCount(2) // active-rules row + event row (rule_id 5)
+  await expect(page.getByText('Ночной кик')).toHaveCount(2) // active-rules row + event row (rule_id 8)
+
+  const rawDiscordId = page.getByText('111', { exact: true }).first()
+  await expect(rawDiscordId).toBeVisible()
+  await expect(rawDiscordId).toHaveCSS('font-family', /IBM Plex Mono/)
+
+  // Active rules table: name, action, scope/schedule summary, priority,
+  // dry-run state, plus a mono technical identifier for the rule.
+  const rulesTable = page.getByRole('table', { name: 'Активные правила' })
+  await expect(rulesTable.getByText('Тихий час')).toBeVisible()
+  await expect(rulesTable.getByText('Ночной кик')).toBeVisible()
+  const ruleId = rulesTable.getByText('#5', { exact: true })
+  await expect(ruleId).toBeVisible()
+  await expect(ruleId).toHaveCSS('font-family', /IBM Plex Mono/)
+  await expect(rulesTable.getByText('10', { exact: true })).toBeVisible() // priority
+  await expect(rulesTable.getByText('DRY-RUN')).toBeVisible()
+  await expect(rulesTable.getByText('Боевой')).toBeVisible()
+  await expect(rulesTable.getByText('Постоянно')).toBeVisible() // no cron -> always-on schedule
+  await expect(rulesTable.getByText('Europe/Moscow').first()).toBeVisible()
 })
