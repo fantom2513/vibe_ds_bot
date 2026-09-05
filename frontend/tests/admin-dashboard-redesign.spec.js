@@ -505,3 +505,87 @@ test('command center: presents the server overview hierarchy with realistic fixt
   await expect(rulesTable.getByText('Постоянно')).toBeVisible() // no cron -> always-on schedule
   await expect(rulesTable.getByText('Europe/Moscow').first()).toBeVisible()
 })
+
+// ---------------------------------------------------------------------------
+// Task 5 — final responsive / accessibility / failure-behavior verification.
+// ---------------------------------------------------------------------------
+
+test('responsive: no horizontal overflow and all sections visible at 390x844', async ({ page }) => {
+  await page.route('**/auth/me', route => route.fulfill({ json: { id: '1', username: 'Admin', avatar: null } }))
+  await page.route('**/api/dashboard', route => route.fulfill({ json: commandCenterDashboardFixture }))
+  await page.route('**/api/stats/overview', route => route.fulfill({ json: { total_actions: 42 } }))
+  await neutralizeEventSource(page)
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.goto(`${BASE_URL}/`)
+
+  await expect(page.getByRole('heading', { name: 'Обзор сервера' })).toBeVisible()
+
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)
+  expect(overflow).toBeLessThanOrEqual(0)
+
+  // All three named panels stay reachable/visible on a narrow screen.
+  await expect(page.getByText('Сейчас в голосе', { exact: true })).toBeVisible()
+  await expect(page.getByText('Что происходит', { exact: true })).toBeVisible()
+  await expect(page.getByText('Активные правила', { exact: true }).last()).toBeVisible()
+
+  // Primary navigation/action targets keep a >=44px touch target on mobile.
+  const targets = [
+    page.getByRole('button', { name: 'Открыть меню' }),
+    page.getByRole('button', { name: 'Создать правило' }),
+  ]
+  for (const target of targets) {
+    const box = await target.boundingBox()
+    expect(box).not.toBeNull()
+    // Round: sub-pixel browser layout can report e.g. 43.9999992… for an
+    // element whose CSS minHeight is an exact 44px.
+    expect(Math.round(box.height)).toBeGreaterThanOrEqual(44)
+  }
+})
+
+// Repeatedly presses Tab (real keyboard navigation, not `.focus()` — Chromium
+// only flips :focus-visible on for programmatic .focus() in some cases, so
+// this is the faithful way to exercise the plan's "Tab to Создать правило"
+// wording) until the target control is focused, then reads its outline.
+async function tabToAndReadOutline(page, target, maxPresses = 30) {
+  for (let i = 0; i < maxPresses; i += 1) {
+    if (await target.evaluate(el => el === document.activeElement)) break
+    await page.keyboard.press('Tab')
+  }
+  await expect(target).toBeFocused()
+
+  return target.evaluate(el => {
+    const cs = getComputedStyle(el)
+    return { outlineStyle: cs.outlineStyle, outlineWidth: cs.outlineWidth }
+  })
+}
+
+test('keyboard: tabbing reaches Создать правило with a visible focus outline', async ({ page }) => {
+  await page.route('**/auth/me', route => route.fulfill({ json: { id: '1', username: 'Admin', avatar: null } }))
+  await page.route('**/api/dashboard', route => route.fulfill({ json: commandCenterDashboardFixture }))
+  await page.route('**/api/stats/overview', route => route.fulfill({ json: { total_actions: 42 } }))
+  await neutralizeEventSource(page)
+  await page.setViewportSize({ width: 1440, height: 900 })
+  await page.goto(`${BASE_URL}/`)
+
+  const createRule = page.getByRole('button', { name: 'Создать правило' })
+  const outline = await tabToAndReadOutline(page, createRule)
+
+  expect(outline.outlineStyle).not.toBe('none')
+  expect(parseFloat(outline.outlineWidth)).toBeGreaterThan(0)
+})
+
+test('keyboard: the focus outline survives emulated reduced motion', async ({ page }) => {
+  await page.route('**/auth/me', route => route.fulfill({ json: { id: '1', username: 'Admin', avatar: null } }))
+  await page.route('**/api/dashboard', route => route.fulfill({ json: commandCenterDashboardFixture }))
+  await page.route('**/api/stats/overview', route => route.fulfill({ json: { total_actions: 42 } }))
+  await neutralizeEventSource(page)
+  await page.emulateMedia({ reducedMotion: 'reduce' })
+  await page.setViewportSize({ width: 1440, height: 900 })
+  await page.goto(`${BASE_URL}/`)
+
+  const createRule = page.getByRole('button', { name: 'Создать правило' })
+  const outline = await tabToAndReadOutline(page, createRule)
+
+  expect(outline.outlineStyle).not.toBe('none')
+  expect(parseFloat(outline.outlineWidth)).toBeGreaterThan(0)
+})
