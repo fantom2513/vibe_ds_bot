@@ -111,3 +111,26 @@ test('locks Unbounded for h1-h3 only, IBM Plex Sans elsewhere', () => {
 test('carries IBM Plex Mono for technical captions', () => {
   expect(theme.typography.caption?.fontFamily).toMatch(/IBM Plex Mono/)
 })
+
+test('collapses the labelled desktop navigation into an accessible icon rail', async ({ page }) => {
+  await mockDashboard(page)
+  await page.setViewportSize({ width: 1440, height: 900 })
+  await page.goto(`${BASE_URL}/`)
+
+  await expect(page.getByRole('navigation', { name: 'Основная навигация' }))
+    .toContainText('Обзор')
+  await page.getByRole('button', { name: 'Свернуть меню' }).click()
+  await expect(page.getByRole('button', { name: 'Развернуть меню' })).toBeVisible()
+  await expect(page.getByRole('link', { name: 'Обзор' })).toHaveAttribute('aria-current', 'page')
+})
+
+test('uses a modal navigation drawer on mobile', async ({ page }) => {
+  await mockDashboard(page)
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.goto(`${BASE_URL}/`)
+
+  await page.getByRole('button', { name: 'Открыть меню' }).click()
+  await expect(page.getByRole('navigation', { name: 'Основная навигация' })).toBeVisible()
+  await page.keyboard.press('Escape')
+  await expect(page.getByRole('navigation', { name: 'Основная навигация' })).toBeHidden()
+})
