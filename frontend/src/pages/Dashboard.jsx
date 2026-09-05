@@ -247,7 +247,12 @@ export default function Dashboard() {
         <Grid item xs={12} lg={7}>
           <Panel title="Сейчас в голосе" description={`${onlineUsers.length} участник(ов) в голосовых каналах`}>
             {onlineUsers.length === 0 ? (
-              <EmptyState text="Никого нет в голосовых каналах" icon={VolumeOffOutlined} />
+              // `dashboard.online_users` isn't wired up on the backend yet
+              // (DashboardResponse only carries voice_online_count), so this
+              // panel is always empty in production today — the copy must
+              // not claim "nobody is in voice" when the truth is "this data
+              // isn't available yet". Tracked as backend tech debt.
+              <EmptyState text="Данные о присутствии в голосе временно недоступны" icon={VolumeOffOutlined} />
             ) : (
               <TableContainer>
                 <Table size="small" aria-label="Сейчас в голосе">

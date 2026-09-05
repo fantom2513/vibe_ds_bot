@@ -246,7 +246,9 @@ test('dashboard state: shows text-only empty messages without emoji', async ({ p
   await mockDashboard(page) // dashboardFixture has empty online_users / recent_logs
   await page.goto(`${BASE_URL}/`)
 
-  await expect(page.getByText('Никого нет в голосовых каналах')).toBeVisible()
+  // Honest copy: `online_users` isn't wired up on the backend yet, so this
+  // must not claim "nobody is in voice" — see Dashboard.jsx for detail.
+  await expect(page.getByText('Данные о присутствии в голосе временно недоступны')).toBeVisible()
   await expect(page.getByText('Нет событий')).toBeVisible()
 
   const bodyText = await page.locator('body').innerText()
