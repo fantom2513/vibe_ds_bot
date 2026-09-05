@@ -130,6 +130,25 @@ export const theme = createTheme({
       },
     },
 
+    // ButtonBase (the base for Button, IconButton, ListItemButton, Tab, …)
+    // unconditionally resets `outline: 0` on its own root class — see
+    // node_modules/@mui/material/ButtonBase/ButtonBase.js — which wins the
+    // cascade over the global `:focus-visible` rule in global.css (equal
+    // selector specificity, MUI's rule is emitted later). Re-declaring the
+    // same focus ring here, scoped to `.Mui-focusVisible`, restores visible
+    // keyboard focus on every MUI interactive control app-wide.
+    MuiButtonBase: {
+      styleOverrides: {
+        root: {
+          '&.Mui-focusVisible': {
+            outline: '2px solid var(--focus-ring-color)',
+            outlineOffset: '2px',
+            boxShadow: '0 0 0 4px var(--focus-ring-offset-color)',
+          },
+        },
+      },
+    },
+
     MuiButton: {
       styleOverrides: {
         root: {
@@ -138,6 +157,13 @@ export const theme = createTheme({
           fontSize: '0.82rem',
           transition: 'background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease, transform 0.2s ease',
         },
+        // Default/large buttons are primary calls to action (e.g. Dashboard's
+        // "Создать правило", Rules' "Новое правило") and must clear the 44px
+        // minimum touch target on mobile. Deliberately not applied to
+        // sizeSmall — those are secondary/dense-context controls (table row
+        // actions, inline text links) outside this task's demonstrated gap.
+        sizeMedium: { minHeight: 44 },
+        sizeLarge: { minHeight: 44 },
         contained: {
           boxShadow: 'none',
           '&:hover': { boxShadow: 'none' },
