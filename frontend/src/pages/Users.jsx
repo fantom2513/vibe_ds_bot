@@ -5,7 +5,7 @@ import {
   Paper, IconButton, Dialog, DialogTitle, DialogContent, DialogActions,
   Typography, Tooltip, Snackbar, Alert,
 } from '@mui/material'
-import { AddOutlined, DeleteOutlined } from '@mui/icons-material'
+import { AddOutlined, DeleteOutlined, PersonOutlineOutlined } from '@mui/icons-material'
 import { getUsers, addUser, deleteUser } from '../api/users'
 import { MemberCell, MemberAutocomplete, PageHeader, LoadingState, EmptyState } from '../components/ui'
 import { useMemberResolver } from '../hooks/useMemberResolver'
@@ -87,7 +87,7 @@ function UserTable({ listType }) {
       {loading ? (
         <LoadingState />
       ) : users.length === 0 ? (
-        <EmptyState text="Список пуст" icon="👤" />
+        <EmptyState text="Список пуст" icon={PersonOutlineOutlined} />
       ) : (
         <TableContainer component={Paper}>
           <Table size="small">

@@ -1,4 +1,6 @@
 export { GlowCard } from './GlowCard'
+export { Panel } from './Panel'
+export { StatusBadge } from './StatusBadge'
 export { StatCard } from './StatCard'
 export { ActionChip } from './ActionChip'
 export { DiscordId } from './DiscordId'

@@ -93,14 +93,13 @@ async function renderPrimitive(page, modulePath, exportName, props, childText) {
     const mod = await import(modulePath)
     const Comp = mod[exportName]
     const harness = await import('/tests/harness/renderStatic.js')
-    const html = harness.renderElementHTML(Comp, props, childText)
-    const div = document.createElement('div')
-    div.innerHTML = html
-    div.setAttribute('data-harness-root', '')
-    document.body.appendChild(div)
-    const el = div.firstElementChild
+    const container = document.createElement('div')
+    container.setAttribute('data-harness-root', '')
+    document.body.appendChild(container)
+    const unmount = await harness.mountElement(container, Comp, props, childText)
+    const el = container.firstElementChild
     const cs = getComputedStyle(el)
-    return {
+    const result = {
       text: el.textContent,
       borderWidth: cs.borderWidth,
       borderColor: cs.borderColor,
@@ -108,6 +107,9 @@ async function renderPrimitive(page, modulePath, exportName, props, childText) {
       backgroundColor: cs.backgroundColor,
       color: cs.color,
     }
+    unmount()
+    container.remove()
+    return result
   }, [modulePath, exportName, props, childText])
 }
 

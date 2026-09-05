@@ -5,7 +5,7 @@ import {
   Paper, IconButton, Drawer, Dialog, DialogTitle, DialogContent, DialogActions,
   TextField, Typography, Tooltip, Snackbar, Alert,
 } from '@mui/material'
-import { AddOutlined, DeleteOutlined } from '@mui/icons-material'
+import { AddOutlined, DeleteOutlined, PeopleOutlineOutlined } from '@mui/icons-material'
 import { getStackingPairs, createStackingPair, toggleStackingPair, deleteStackingPair } from '../api/stackingPairs'
 import { MemberCell, MemberAutocomplete, PageHeader, LoadingState, ErrorState, EmptyState } from '../components/ui'
 import { useMemberResolver } from '../hooks/useMemberResolver'
@@ -112,7 +112,7 @@ export default function StackingPairs() {
       />
 
       {pairs.length === 0 ? (
-        <EmptyState text="Нет пар стакинга" icon="👥" />
+        <EmptyState text="Нет пар стакинга" icon={PeopleOutlineOutlined} />
       ) : (
         <TableContainer component={Paper}>
           <Table size="small">

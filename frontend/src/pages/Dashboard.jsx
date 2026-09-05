@@ -9,6 +9,8 @@ import {
   GroupOutlined,
   BoltOutlined,
   HistoryOutlined,
+  ArticleOutlined,
+  VolumeOffOutlined,
 } from '@mui/icons-material'
 import { getDashboard } from '../api/dashboard'
 import { getStatsOverview } from '../api/stats'
@@ -29,6 +31,7 @@ export default function Dashboard() {
       setDashboard(dash)
       setStats(st)
       setRecentLogs(dash.recent_logs || [])
+      setError(null)
     } catch (e) {
       setError(e.message)
     } finally {
@@ -64,7 +67,7 @@ export default function Dashboard() {
   }, [fetchData])
 
   if (loading) return <LoadingState />
-  if (error) return <ErrorState message={error} />
+  if (error) return <ErrorState message={error} onRetry={fetchData} />
 
   const onlineUsers = dashboard?.online_users || []
   const todayActions = stats?.total_actions || 0
@@ -78,20 +81,20 @@ export default function Dashboard() {
 
       <Grid container spacing={2} sx={{ mb: 3 }}>
         <Grid item xs={12} sm={6} lg={3}>
-          <StatCard title="Активных правил" value={dashboard?.active_rules?.length ?? 0}
-            icon={ListAltOutlined} color="#5865F2" glowColor="accent" index={0} />
+          <StatCard label="Активных правил" value={dashboard?.active_rules?.length ?? 0}
+            icon={ListAltOutlined} tone="neutral" index={0} />
         </Grid>
         <Grid item xs={12} sm={6} lg={3}>
-          <StatCard title="В голосе сейчас" value={dashboard?.voice_online_count ?? 0}
-            icon={GroupOutlined} color="#22d3a5" glowColor="green" index={1} />
+          <StatCard label="В голосе сейчас" value={dashboard?.voice_online_count ?? 0}
+            icon={GroupOutlined} tone="success" index={1} />
         </Grid>
         <Grid item xs={12} sm={6} lg={3}>
-          <StatCard title="Действий всего" value={todayActions}
-            icon={BoltOutlined} color="#fbbf24" glowColor="accent" index={2} />
+          <StatCard label="Действий всего" value={todayActions}
+            icon={BoltOutlined} tone="neutral" index={2} />
         </Grid>
         <Grid item xs={12} sm={6} lg={3}>
-          <StatCard title="Последних событий" value={recentLogs.length}
-            icon={HistoryOutlined} color="#38bdf8" glowColor="accent" index={3} />
+          <StatCard label="Последних событий" value={recentLogs.length}
+            icon={HistoryOutlined} tone="neutral" index={3} />
         </Grid>
       </Grid>
 
@@ -101,7 +104,7 @@ export default function Dashboard() {
             Сейчас в голосе
           </Typography>
           {onlineUsers.length === 0 ? (
-            <EmptyState text="Никого нет в голосовых каналах" icon="🔇" />
+            <EmptyState text="Никого нет в голосовых каналах" icon={VolumeOffOutlined} />
           ) : (
             <TableContainer component={Paper}>
               <Table size="small">
@@ -133,7 +136,7 @@ export default function Dashboard() {
             Последние события
           </Typography>
           {recentLogs.length === 0 ? (
-            <EmptyState text="Нет событий" icon="📋" />
+            <EmptyState text="Нет событий" icon={ArticleOutlined} />
           ) : (
             <TableContainer component={Paper}>
               <Table size="small">

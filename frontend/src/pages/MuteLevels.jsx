@@ -6,7 +6,7 @@ import {
   TextField, Typography, Tooltip, Snackbar, Alert, Select, MenuItem,
   FormControl, InputLabel, Chip,
 } from '@mui/material'
-import { AddOutlined, EditOutlined, DeleteOutlined } from '@mui/icons-material'
+import { AddOutlined, EditOutlined, DeleteOutlined, VolumeOffOutlined, BarChartOutlined } from '@mui/icons-material'
 import {
   getMuteLevels, createMuteLevel, updateMuteLevel, deleteMuteLevel,
   getMuteLeaderboard, getGuildRoles,
@@ -156,7 +156,7 @@ export default function MuteLevels() {
           Уровни
         </Typography>
         {levels.length === 0 ? (
-          <EmptyState text="Уровни не настроены" icon="🔇" />
+          <EmptyState text="Уровни не настроены" icon={VolumeOffOutlined} />
         ) : (
           <TableContainer component={Paper}>
             <Table size="small">
@@ -218,7 +218,7 @@ export default function MuteLevels() {
           Лидерборд — топ 10
         </Typography>
         {leaderboard.length === 0 ? (
-          <EmptyState text="Нет данных" icon="📊" />
+          <EmptyState text="Нет данных" icon={BarChartOutlined} />
         ) : (
           <TableContainer component={Paper}>
             <Table size="small">
