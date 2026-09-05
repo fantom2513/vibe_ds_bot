@@ -29,7 +29,7 @@ export default function Login() {
         }}>
           🤖
         </Box>
-        <Typography variant="h5" sx={{ mb: 1, fontFamily: "'Syne', sans-serif" }}>
+        <Typography variant="h5" sx={{ mb: 1 }}>
           Bot Dashboard
         </Typography>
         <Typography variant="body2" sx={{ color: 'text.secondary', mb: 3 }}>
