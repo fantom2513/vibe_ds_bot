@@ -124,6 +124,23 @@ test('collapses the labelled desktop navigation into an accessible icon rail', a
   await expect(page.getByRole('link', { name: 'Обзор' })).toHaveAttribute('aria-current', 'page')
 })
 
+test('persists the collapsed sidebar rail across a reload', async ({ page }) => {
+  await mockDashboard(page)
+  await page.setViewportSize({ width: 1440, height: 900 })
+  await page.goto(`${BASE_URL}/`)
+
+  await page.getByRole('button', { name: 'Свернуть меню' }).click()
+  await expect(page.getByRole('button', { name: 'Развернуть меню' })).toBeVisible()
+
+  const stored = await page.evaluate(() => window.localStorage.getItem('vibe.admin.sidebarCollapsed'))
+  expect(stored).toBe('true')
+
+  await page.reload()
+
+  await expect(page.getByRole('button', { name: 'Развернуть меню' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Свернуть меню' })).toHaveCount(0)
+})
+
 test('uses a modal navigation drawer on mobile', async ({ page }) => {
   await mockDashboard(page)
   await page.setViewportSize({ width: 390, height: 844 })
@@ -133,4 +150,5 @@ test('uses a modal navigation drawer on mobile', async ({ page }) => {
   await expect(page.getByRole('navigation', { name: 'Основная навигация' })).toBeVisible()
   await page.keyboard.press('Escape')
   await expect(page.getByRole('navigation', { name: 'Основная навигация' })).toBeHidden()
+  await expect(page.getByRole('button', { name: 'Открыть меню' })).toBeFocused()
 })

@@ -98,28 +98,13 @@ export const theme = createTheme({
 
   components: {
 
-    MuiCssBaseline: {
-      styleOverrides: `
-        @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&family=Unbounded:wght@600;700&display=swap');
-
-        * { box-sizing: border-box; }
-
-        body {
-          background: ${graphite950};
-          min-height: 100vh;
-        }
-
-        ::-webkit-scrollbar { width: 5px; height: 5px; }
-        ::-webkit-scrollbar-track { background: transparent; }
-        ::-webkit-scrollbar-thumb {
-          background: rgba(242,246,244,0.10);
-          border-radius: 10px;
-        }
-        ::-webkit-scrollbar-thumb:hover {
-          background: rgba(242,246,244,0.18);
-        }
-      `,
-    },
+    // Cross-cutting base styles (box-sizing, body background/font, the
+    // Google Fonts import, scrollbar appearance) live exclusively in
+    // frontend/src/styles/global.css — see typography.css for the font
+    // @import. <CssBaseline /> applies its own MUI defaults on top; no
+    // MuiCssBaseline override is needed here. Do not re-add one without
+    // removing the equivalent rule from global.css first, or the cascade
+    // conflict this comment replaced will come back.
 
     MuiPaper: {
       styleOverrides: {
