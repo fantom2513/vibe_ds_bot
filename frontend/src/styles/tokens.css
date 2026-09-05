@@ -1,53 +1,82 @@
 :root {
-  /* === BACKGROUNDS === */
-  --bg-canvas:     #030507;   /* самый глубокий — body за всем */
-  --bg-base:       #060810;   /* основной фон страниц */
-  --bg-surface:    #0a0d16;   /* карточки первого уровня */
-  --bg-elevated:   #0f1220;   /* карточки второго уровня, дроверы */
-  --bg-overlay:    #141828;   /* модалы, тултипы */
-  --bg-input:      #0d1018;   /* поля ввода */
-  --bg-hover:      #111525;   /* hover state строк */
+  /* ========================================================= */
+  /* PRIMITIVE — raw palette values, never referenced directly  */
+  /* outside this file.                                         */
+  /* ========================================================= */
+  --graphite-950: #090d0f;
+  --graphite-900: #0c1114;
+  --graphite-850: #101619;
+  --graphite-800: #151d21;
+  --graphite-700: #253239;
 
-  /* === GRADIENT MESH === */
-  --mesh-primary:  rgba(88, 101, 242, 0.12);   /* Discord blurple */
-  --mesh-secondary:rgba(139, 92, 246, 0.08);   /* purple */
-  --mesh-accent:   rgba(59, 130, 246, 0.06);   /* blue */
+  --neutral-050: #f2f6f4;
+  --neutral-300: #a8b5b0;
 
-  /* === BORDERS === */
-  --border-dim:    rgba(255,255,255,0.04);
-  --border-subtle: rgba(255,255,255,0.07);
-  --border-base:   rgba(255,255,255,0.10);
-  --border-bright: rgba(255,255,255,0.16);
-  --border-accent: rgba(88, 101, 242, 0.40);
+  --mint-500: #65c69c;
+  --mint-400: #79d3ae;
+  --mint-600: #52ad86;
 
-  /* === TEXT === */
-  --text-primary:  #f0f2ff;
-  --text-secondary:#8892b0;
-  --text-muted:    #4a5270;
-  --text-mono:     #7ec8e3;
+  --sky-500: #67b9de;
+  --amber-500: #ddb868;
+  --rose-500: #e58a94;
 
-  /* === BRAND & GLOW === */
-  --accent:        #5865F2;
-  --accent-light:  #7c85f5;
-  --accent-glow:   rgba(88, 101, 242, 0.35);
-  --purple:        #8b5cf6;
-  --purple-glow:   rgba(139, 92, 246, 0.30);
+  /* ========================================================= */
+  /* SEMANTIC — meaning-based aliases consumed across the app.  */
+  /* ========================================================= */
+  --color-bg-canvas: var(--graphite-950);
+  --color-bg-sidebar: var(--graphite-900);
+  --color-bg-surface: var(--graphite-850);
+  --color-bg-elevated: var(--graphite-800);
+  --color-border: var(--graphite-700);
 
-  /* === STATUS === */
-  --green:         #22d3a5;
-  --green-glow:    rgba(34, 211, 165, 0.25);
-  --yellow:        #fbbf24;
-  --yellow-glow:   rgba(251, 191, 36, 0.25);
-  --red:           #f43f5e;
-  --red-glow:      rgba(244, 63, 94, 0.25);
-  --blue:          #38bdf8;
-  --blue-glow:     rgba(56, 189, 248, 0.25);
+  --color-text-primary: var(--neutral-050);
+  --color-text-secondary: var(--neutral-300);
 
-  /* === ACTION TYPE COLORS === */
-  --action-mute:   #fbbf24;
-  --action-unmute: #22d3a5;
-  --action-move:   #38bdf8;
-  --action-kick:   #f43f5e;
-  --action-pair:   #8b5cf6;
-  --action-dry:    #475569;
+  --color-action-primary: var(--mint-500);
+  --color-status-success: var(--mint-500);
+  --color-status-info: var(--sky-500);
+  --color-status-warning: var(--amber-500);
+  --color-status-danger: var(--rose-500);
+
+  /* ========================================================= */
+  /* COMPONENT — aliases scoped to one component family.        */
+  /* ========================================================= */
+  --button-primary-bg: var(--mint-500);
+  --button-primary-hover-bg: var(--mint-400);
+  --button-primary-pressed-bg: var(--mint-600);
+
+  --focus-ring-color: var(--mint-500);
+  --focus-ring-offset-color: var(--graphite-950);
+
+  /* ========================================================= */
+  /* COMPATIBILITY — temporary aliases for pages/components     */
+  /* that still read the pre-redesign variable names. Remove    */
+  /* each alias once its last consumer migrates to the semantic */
+  /* tokens above (tracked in the redesign plan, tasks 2-5).    */
+  /* ========================================================= */
+  --bg-canvas: var(--color-bg-canvas);
+  --bg-base: var(--color-bg-canvas);
+  --bg-surface: var(--color-bg-surface);
+  --bg-elevated: var(--color-bg-elevated);
+  --bg-overlay: var(--color-bg-elevated);
+  --bg-input: var(--color-bg-surface);
+  --bg-hover: var(--color-bg-elevated);
+
+  --border-dim: var(--color-border);
+  --border-subtle: var(--color-border);
+  --border-base: var(--color-border);
+  --border-bright: var(--neutral-300);
+  --border-accent: var(--mint-500);
+
+  --text-primary: var(--color-text-primary);
+  --text-secondary: var(--color-text-secondary);
+  --text-muted: var(--color-text-secondary);
+  --text-mono: var(--sky-500);
+
+  --accent: var(--mint-500);
+  --accent-light: var(--mint-400);
+  --green: var(--mint-500);
+  --yellow: var(--amber-500);
+  --red: var(--rose-500);
+  --blue: var(--sky-500);
 }

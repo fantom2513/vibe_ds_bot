@@ -1,55 +1,87 @@
 import { createTheme } from '@mui/material/styles'
 
+// Approved "graphite + Soft Mint" palette. Keep these primitives in sync
+// with frontend/src/styles/tokens.css — MUI's palette augmentation needs
+// real color values (not CSS var() strings) to compute contrast text and
+// tonal variants, so the hex values are duplicated here intentionally.
+const graphite950 = '#090d0f'
+const graphite900 = '#0c1114'
+const graphite850 = '#101619'
+const graphite800 = '#151d21'
+const graphite700 = '#253239'
+
+const neutral050 = '#f2f6f4'
+const neutral300 = '#a8b5b0'
+
+const mint500 = '#65c69c'
+const mint400 = '#79d3ae'
+const mint600 = '#52ad86'
+
+const sky500 = '#67b9de'
+const amber500 = '#ddb868'
+const rose500 = '#e58a94'
+
+const bodyFontFamily = "'IBM Plex Sans', -apple-system, 'Segoe UI', sans-serif"
+const headingFontFamily = "'Unbounded', sans-serif"
+const monoFontFamily = "'IBM Plex Mono', monospace"
+
 export const theme = createTheme({
   palette: {
     mode: 'dark',
     primary: {
-      main:  '#5865F2',
-      light: '#7c85f5',
-      dark:  '#4752c4',
+      main: mint500,
+      light: mint400,
+      dark: mint600,
+      contrastText: '#09110d',
     },
     secondary: {
-      main: '#8b5cf6',
+      main: neutral300,
+      contrastText: graphite950,
     },
     background: {
-      default: '#060810',
-      paper:   '#0a0d16',
+      default: graphite950,
+      paper: graphite850,
     },
     text: {
-      primary:   '#f0f2ff',
-      secondary: '#8892b0',
-      disabled:  '#4a5270',
+      primary: neutral050,
+      secondary: neutral300,
+      disabled: 'rgba(242,246,244,0.38)',
     },
-    divider: 'rgba(255,255,255,0.07)',
-    success: { main: '#22d3a5' },
-    warning: { main: '#fbbf24' },
-    error:   { main: '#f43f5e' },
-    info:    { main: '#38bdf8' },
+    divider: graphite700,
+    success: { main: mint500 },
+    warning: { main: amber500 },
+    error: { main: rose500 },
+    info: { main: sky500 },
   },
 
   typography: {
-    fontFamily: "-apple-system, 'Segoe UI', sans-serif",
-    h1: { fontFamily: "'Syne', sans-serif", fontWeight: 700 },
-    h2: { fontFamily: "'Syne', sans-serif", fontWeight: 700 },
-    h3: { fontFamily: "'Syne', sans-serif", fontWeight: 600 },
-    h4: { fontFamily: "'Syne', sans-serif", fontWeight: 600 },
-    h5: { fontFamily: "'Syne', sans-serif", fontWeight: 600 },
-    h6: { fontFamily: "'Syne', sans-serif", fontWeight: 600 },
+    fontFamily: bodyFontFamily,
+    // Unbounded is reserved for h1-h3 and other brand moments — h4-h6
+    // stay on the body typeface so dense admin UI doesn't feel decorative.
+    h1: { fontFamily: headingFontFamily, fontWeight: 700 },
+    h2: { fontFamily: headingFontFamily, fontWeight: 700 },
+    h3: { fontFamily: headingFontFamily, fontWeight: 600 },
+    h4: { fontFamily: bodyFontFamily, fontWeight: 600 },
+    h5: { fontFamily: bodyFontFamily, fontWeight: 600 },
+    h6: { fontFamily: bodyFontFamily, fontWeight: 600 },
     button: {
-      fontFamily: "'Syne', sans-serif",
+      fontFamily: bodyFontFamily,
       fontWeight: 600,
       textTransform: 'none',
       letterSpacing: '0.01em',
     },
     overline: {
-      fontFamily: "'Syne', sans-serif",
+      fontFamily: bodyFontFamily,
+      fontWeight: 600,
       letterSpacing: '0.1em',
       fontSize: '0.65rem',
     },
+    // Mono is reserved for technical/scannable metadata: IDs, timestamps,
+    // counters — not general-purpose small text.
     caption: {
-      fontFamily: "'IBM Plex Mono', monospace",
+      fontFamily: monoFontFamily,
       fontSize: '0.72rem',
-      color: '#8892b0',
+      color: neutral300,
     },
   },
 
@@ -61,53 +93,30 @@ export const theme = createTheme({
     '0 2px 8px rgba(0,0,0,0.6)',
     '0 4px 16px rgba(0,0,0,0.7)',
     '0 8px 32px rgba(0,0,0,0.8)',
-    // 5 — accent glow
-    '0 0 20px rgba(88,101,242,0.25), 0 4px 16px rgba(0,0,0,0.7)',
-    // 6 — green glow
-    '0 0 20px rgba(34,211,165,0.20), 0 4px 16px rgba(0,0,0,0.7)',
-    // 7 — red glow
-    '0 0 20px rgba(244,63,94,0.20), 0 4px 16px rgba(0,0,0,0.7)',
-    ...Array(17).fill('none'),
+    ...Array(20).fill('0 8px 32px rgba(0,0,0,0.8)'),
   ],
 
   components: {
 
     MuiCssBaseline: {
       styleOverrides: `
-        @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Syne:wght@400;600;700&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&family=Unbounded:wght@600;700&display=swap');
 
         * { box-sizing: border-box; }
 
         body {
-          background: #030507;
+          background: ${graphite950};
           min-height: 100vh;
         }
-
-        body::before {
-          content: '';
-          position: fixed;
-          inset: 0;
-          background:
-            radial-gradient(ellipse 80% 60% at 20% -10%,
-              rgba(88,101,242,0.12) 0%, transparent 60%),
-            radial-gradient(ellipse 60% 50% at 80% 100%,
-              rgba(139,92,246,0.08) 0%, transparent 60%),
-            radial-gradient(ellipse 50% 40% at 50% 50%,
-              rgba(59,130,246,0.04) 0%, transparent 70%);
-          pointer-events: none;
-          z-index: 0;
-        }
-
-        #root { position: relative; z-index: 1; }
 
         ::-webkit-scrollbar { width: 5px; height: 5px; }
         ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb {
-          background: rgba(255,255,255,0.08);
+          background: rgba(242,246,244,0.10);
           border-radius: 10px;
         }
         ::-webkit-scrollbar-thumb:hover {
-          background: rgba(255,255,255,0.14);
+          background: rgba(242,246,244,0.18);
         }
       `,
     },
@@ -116,9 +125,8 @@ export const theme = createTheme({
       styleOverrides: {
         root: {
           backgroundImage: 'none',
-          backgroundColor: '#0a0d16',
-          border: '1px solid rgba(255,255,255,0.07)',
-          backdropFilter: 'blur(12px)',
+          backgroundColor: graphite850,
+          border: `1px solid ${graphite700}`,
         },
       },
     },
@@ -126,13 +134,12 @@ export const theme = createTheme({
     MuiCard: {
       styleOverrides: {
         root: {
-          backgroundColor: 'rgba(10,13,22,0.80)',
-          border: '1px solid rgba(255,255,255,0.07)',
-          backdropFilter: 'blur(16px)',
+          backgroundColor: graphite850,
+          border: `1px solid ${graphite700}`,
           backgroundImage: 'none',
           transition: 'border-color 0.2s ease, box-shadow 0.2s ease',
           '&:hover': {
-            borderColor: 'rgba(255,255,255,0.12)',
+            borderColor: 'rgba(242,246,244,0.24)',
           },
         },
       },
@@ -144,32 +151,43 @@ export const theme = createTheme({
           borderRadius: 8,
           padding: '7px 16px',
           fontSize: '0.82rem',
-          transition: 'all 0.2s ease',
+          transition: 'background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease, transform 0.2s ease',
         },
         contained: {
-          background: 'linear-gradient(135deg, #5865F2 0%, #4752c4 100%)',
-          boxShadow: '0 0 0 rgba(88,101,242,0)',
+          boxShadow: 'none',
+          '&:hover': { boxShadow: 'none' },
+        },
+        containedPrimary: {
+          color: '#09110d',
+          backgroundColor: 'var(--button-primary-bg)',
+          border: '1px solid transparent',
           '&:hover': {
-            background: 'linear-gradient(135deg, #6872f5 0%, #5865F2 100%)',
-            boxShadow: '0 0 20px rgba(88,101,242,0.40)',
+            backgroundColor: 'var(--button-primary-hover-bg)',
+            borderColor: 'rgba(242, 246, 244, 0.28)',
             transform: 'translateY(-1px)',
           },
-          '&:active': { transform: 'translateY(0)' },
+          '&:active': {
+            backgroundColor: 'var(--button-primary-pressed-bg)',
+            transform: 'translateY(0)',
+          },
+          '&.Mui-disabled': {
+            backgroundColor: graphite700,
+            color: 'rgba(242,246,244,0.38)',
+          },
         },
         outlined: {
-          borderColor: 'rgba(88,101,242,0.40)',
-          color: '#7c85f5',
+          borderColor: graphite700,
+          color: neutral050,
           '&:hover': {
-            borderColor: '#5865F2',
-            backgroundColor: 'rgba(88,101,242,0.08)',
-            boxShadow: '0 0 12px rgba(88,101,242,0.15)',
+            borderColor: 'rgba(242,246,244,0.32)',
+            backgroundColor: graphite800,
           },
         },
         text: {
-          color: '#8892b0',
+          color: neutral300,
           '&:hover': {
-            color: '#f0f2ff',
-            backgroundColor: 'rgba(255,255,255,0.05)',
+            color: neutral050,
+            backgroundColor: graphite800,
           },
         },
       },
@@ -180,28 +198,25 @@ export const theme = createTheme({
       styleOverrides: {
         root: {
           '& .MuiOutlinedInput-root': {
-            backgroundColor: '#0d1018',
+            backgroundColor: graphite850,
             fontSize: '0.83rem',
             transition: 'box-shadow 0.2s ease',
             '& fieldset': {
-              borderColor: 'rgba(255,255,255,0.08)',
+              borderColor: graphite700,
               transition: 'border-color 0.2s ease',
             },
             '&:hover fieldset': {
-              borderColor: 'rgba(255,255,255,0.16)',
+              borderColor: 'rgba(242,246,244,0.24)',
             },
             '&.Mui-focused fieldset': {
-              borderColor: '#5865F2',
+              borderColor: mint500,
               borderWidth: 1,
-            },
-            '&.Mui-focused': {
-              boxShadow: '0 0 0 3px rgba(88,101,242,0.15)',
             },
           },
           '& .MuiInputLabel-root': {
             fontSize: '0.83rem',
-            color: '#4a5270',
-            '&.Mui-focused': { color: '#7c85f5' },
+            color: neutral300,
+            '&.Mui-focused': { color: mint500 },
           },
         },
       },
@@ -211,7 +226,7 @@ export const theme = createTheme({
       defaultProps: { size: 'small' },
       styleOverrides: {
         root: {
-          backgroundColor: '#0d1018',
+          backgroundColor: graphite850,
           fontSize: '0.83rem',
         },
       },
@@ -222,9 +237,9 @@ export const theme = createTheme({
         root: { padding: 6 },
         switchBase: {
           '&.Mui-checked': {
-            color: '#5865F2',
+            color: mint500,
             '& + .MuiSwitch-track': {
-              backgroundColor: '#5865F2',
+              backgroundColor: mint500,
               opacity: 0.5,
             },
           },
@@ -232,7 +247,7 @@ export const theme = createTheme({
         thumb: { width: 14, height: 14 },
         track: {
           borderRadius: 10,
-          backgroundColor: 'rgba(255,255,255,0.12)',
+          backgroundColor: 'rgba(242,246,244,0.14)',
         },
       },
     },
@@ -241,7 +256,7 @@ export const theme = createTheme({
       styleOverrides: {
         root: {
           fontSize: '0.72rem',
-          fontFamily: "'IBM Plex Mono', monospace",
+          fontFamily: monoFontFamily,
           height: 22,
           borderRadius: 5,
         },
@@ -251,14 +266,14 @@ export const theme = createTheme({
     MuiTableCell: {
       styleOverrides: {
         root: {
-          borderBottom: '1px solid rgba(255,255,255,0.05)',
+          borderBottom: `1px solid ${graphite700}`,
           padding: '10px 14px',
           fontSize: '0.82rem',
         },
         head: {
-          backgroundColor: '#060810',
-          color: '#4a5270',
-          fontFamily: "'Syne', sans-serif",
+          backgroundColor: graphite900,
+          color: neutral300,
+          fontFamily: bodyFontFamily,
           fontWeight: 600,
           fontSize: '0.68rem',
           textTransform: 'uppercase',
@@ -272,7 +287,7 @@ export const theme = createTheme({
         root: {
           transition: 'background-color 0.15s ease',
           '&:hover': {
-            backgroundColor: 'rgba(255,255,255,0.025) !important',
+            backgroundColor: 'rgba(242,246,244,0.03) !important',
           },
         },
       },
@@ -281,10 +296,10 @@ export const theme = createTheme({
     MuiDrawer: {
       styleOverrides: {
         paper: {
-          backgroundColor: '#0a0d16',
+          backgroundColor: graphite850,
           backgroundImage: 'none',
-          borderLeft: '1px solid rgba(255,255,255,0.07)',
-          boxShadow: '-20px 0 60px rgba(0,0,0,0.8)',
+          borderLeft: `1px solid ${graphite700}`,
+          boxShadow: '-20px 0 60px rgba(0,0,0,0.6)',
         },
       },
     },
@@ -292,9 +307,9 @@ export const theme = createTheme({
     MuiDialog: {
       styleOverrides: {
         paper: {
-          backgroundColor: '#0f1220',
-          border: '1px solid rgba(255,255,255,0.10)',
-          boxShadow: '0 25px 80px rgba(0,0,0,0.9)',
+          backgroundColor: graphite850,
+          border: `1px solid ${graphite700}`,
+          boxShadow: '0 25px 80px rgba(0,0,0,0.7)',
         },
       },
     },
@@ -302,25 +317,25 @@ export const theme = createTheme({
     MuiTooltip: {
       styleOverrides: {
         tooltip: {
-          backgroundColor: '#141828',
-          border: '1px solid rgba(255,255,255,0.10)',
+          backgroundColor: graphite800,
+          border: `1px solid ${graphite700}`,
           fontSize: '0.75rem',
-          fontFamily: "'IBM Plex Mono', monospace",
+          fontFamily: monoFontFamily,
         },
       },
     },
 
     MuiDivider: {
       styleOverrides: {
-        root: { borderColor: 'rgba(255,255,255,0.06)' },
+        root: { borderColor: graphite700 },
       },
     },
 
     MuiLinearProgress: {
       styleOverrides: {
-        root: { backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: 4 },
+        root: { backgroundColor: graphite700, borderRadius: 4 },
         bar: {
-          background: 'linear-gradient(90deg, #5865F2, #8b5cf6)',
+          backgroundColor: mint500,
           borderRadius: 4,
         },
       },
@@ -333,20 +348,20 @@ export const theme = createTheme({
           fontSize: '0.82rem',
         },
         standardError: {
-          backgroundColor: 'rgba(244,63,94,0.08)',
-          borderColor: 'rgba(244,63,94,0.25)',
+          backgroundColor: 'rgba(229,138,148,0.08)',
+          borderColor: 'rgba(229,138,148,0.30)',
         },
         standardSuccess: {
-          backgroundColor: 'rgba(34,211,165,0.08)',
-          borderColor: 'rgba(34,211,165,0.25)',
+          backgroundColor: 'rgba(101,198,156,0.08)',
+          borderColor: 'rgba(101,198,156,0.30)',
         },
         standardWarning: {
-          backgroundColor: 'rgba(251,191,36,0.08)',
-          borderColor: 'rgba(251,191,36,0.25)',
+          backgroundColor: 'rgba(221,184,104,0.08)',
+          borderColor: 'rgba(221,184,104,0.30)',
         },
         standardInfo: {
-          backgroundColor: 'rgba(56,189,248,0.08)',
-          borderColor: 'rgba(56,189,248,0.25)',
+          backgroundColor: 'rgba(103,185,222,0.08)',
+          borderColor: 'rgba(103,185,222,0.30)',
         },
       },
     },
