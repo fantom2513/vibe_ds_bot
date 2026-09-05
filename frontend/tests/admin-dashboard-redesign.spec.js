@@ -462,10 +462,13 @@ test('command center: presents the server overview hierarchy with realistic fixt
   expect(metricTexts[1]).toContain('2')
   expect(metricTexts[2]).toContain('42')
 
-  // The three named panels.
-  await expect(page.getByRole('heading', { name: 'Сейчас в голосе' })).toBeVisible()
-  await expect(page.getByRole('heading', { name: 'Что происходит' })).toBeVisible()
-  await expect(page.getByRole('heading', { name: 'Активные правила' })).toBeVisible()
+  // The three named panels (Panel renders its title as styled text, not a
+  // heading element — see components/ui/Panel.jsx from Task 3).
+  await expect(page.getByText('Сейчас в голосе', { exact: true })).toBeVisible()
+  await expect(page.getByText('Что происходит', { exact: true })).toBeVisible()
+  // Two matches by design: the metric-strip label and the panel title —
+  // assert the panel title specifically (it comes after the strip in DOM order).
+  await expect(page.getByText('Активные правила', { exact: true }).last()).toBeVisible()
 
   // Voice presence: member name, channel, duration.
   const voiceTable = page.getByRole('table', { name: 'Сейчас в голосе' })
