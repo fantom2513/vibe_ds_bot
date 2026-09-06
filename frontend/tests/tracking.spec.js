@@ -4,7 +4,12 @@ import { createServer } from 'vite'
 const requireFromRunner = createRequire(process.argv[1])
 const { test, expect } = requireFromRunner('playwright/test')
 
-const BASE_URL = 'http://127.0.0.1:5173'
+// A distinct port from admin-dashboard-redesign.spec.js's dev server: both
+// files spin up their own `vite` instance in beforeAll/afterAll, and
+// Playwright runs spec files in parallel workers by default, so sharing a
+// port lets whichever file finishes first tear down the server the other
+// file's still-running tests are navigating against (ERR_CONNECTION_REFUSED).
+const BASE_URL = 'http://127.0.0.1:5174'
 
 const memberFixture = {
   id: '42',
@@ -31,7 +36,7 @@ let devServer
 
 test.beforeAll(async () => {
   devServer = await createServer({
-    server: { host: '127.0.0.1', port: 5173 },
+    server: { host: '127.0.0.1', port: 5174 },
     logLevel: 'error',
   })
   await devServer.listen()

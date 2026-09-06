@@ -35,16 +35,54 @@ const statsOverviewFixture = {
 }
 
 // Dashboard.jsx opens a live EventSource on mount; neutralize it so tests
-// don't depend on a real SSE connection.
+// don't depend on a real SSE connection. The stub still records the
+// most-recently-constructed instance on `window.__testEventSource`, and
+// Dashboard.jsx wires its handlers via plain `es.onopen = ...` / `es.onmessage
+// = ...` assignments (not addEventListener), so those handlers land as
+// ordinary properties on that instance — `dispatchSSE*` below calls them
+// directly to synthesize a real SSE event through the same code path
+// Dashboard.jsx would run against a live connection.
 async function neutralizeEventSource(page) {
   await page.addInitScript(() => {
-    class NoopEventSource {
-      constructor() {}
-      addEventListener() {}
+    class TestEventSource {
+      constructor(url) {
+        this.url = url
+        this.readyState = 1
+        this.onopen = null
+        this.onmessage = null
+        this.onerror = null
+        window.__testEventSource = this
+      }
+      addEventListener(type, handler) {
+        if (type === 'open') this.onopen = handler
+        else if (type === 'message') this.onmessage = handler
+        else if (type === 'error') this.onerror = handler
+      }
       removeEventListener() {}
       close() {}
     }
-    window.EventSource = NoopEventSource
+    window.EventSource = TestEventSource
+  })
+}
+
+// Invokes the stubbed EventSource's `onmessage` handler with a synthetic
+// MessageEvent-shaped payload (`{ data }`), exactly like a real SSE
+// connection would — exercises Dashboard.jsx's real parsing/dispatch logic,
+// including the malformed-JSON try/catch guard when `data` isn't valid JSON.
+async function dispatchSSEMessage(page, data) {
+  await page.evaluate((data) => {
+    if (!window.__testEventSource?.onmessage) {
+      throw new Error('no EventSource.onmessage handler registered yet')
+    }
+    window.__testEventSource.onmessage({ data })
+  }, data)
+}
+
+// Invokes the stubbed EventSource's `onerror` handler, simulating a dropped
+// SSE connection.
+async function dispatchSSEError(page) {
+  await page.evaluate(() => {
+    window.__testEventSource?.onerror?.(new Event('error'))
   })
 }
 
@@ -222,10 +260,14 @@ test('dashboard state: renders populated stats and events with no decorative bra
   await expect(page.getByText('2', { exact: true }).first()).toBeVisible()
   await expect(page.getByText('Ada Lovelace')).toBeVisible()
 
-  // The old StatCard took a raw `color` prop and Dashboard.jsx passed Discord
-  // blurple (#5865F2) for the first card's icon tile. The refactored StatCard
-  // takes a semantic `tone` instead, so no element on the page should carry
-  // a blurple-derived background any more.
+  // The old Dashboard rendered StatCard with a raw `color` prop and passed
+  // Discord blurple (#5865F2) for its icon tile. Dashboard.jsx no longer
+  // renders StatCard at all — Task 4 replaced it with the plain metric-strip
+  // `<ul>`/`<li>` above (see StatCard.jsx's own header comment) — and every
+  // status-ish element on the page (metric strip, StatusBadge, ActionChip)
+  // now derives its color from a semantic `tone` rather than a raw hex
+  // value, so no element on the page should carry a blurple-derived
+  // background any more.
   const hasBlurple = await page.evaluate(() => {
     const blurple = /88,\s*101,\s*242/
     return Array.from(document.querySelectorAll('*')).some(el => {
@@ -599,4 +641,115 @@ test('keyboard: the focus outline survives emulated reduced motion', async ({ pa
 
   expect(outline.outlineStyle).not.toBe('none')
   expect(parseFloat(outline.outlineWidth)).toBeGreaterThan(0)
+})
+
+// ---------------------------------------------------------------------------
+// Task 4 Step 5 — the live SSE stream. Earlier tests only neutralized
+// EventSource so page loads didn't depend on a real connection; these drive
+// synthetic events through the same stub's onmessage/onerror handlers to
+// exercise Dashboard.jsx's actual SSE-handling logic (malformed-payload
+// guard, action_log prepend + 20-item cap, voice_update refetch, live badge).
+// ---------------------------------------------------------------------------
+
+test('SSE: a malformed message payload is ignored without crashing the page', async ({ page }) => {
+  await mockDashboard(page) // dashboardFixture: empty online_users / recent_logs
+  await page.goto(`${BASE_URL}/`)
+
+  await expect(page.getByRole('heading', { name: 'Обзор сервера' })).toBeVisible()
+
+  const pageErrors = []
+  page.on('pageerror', err => pageErrors.push(err))
+
+  await dispatchSSEMessage(page, 'not valid json {{{')
+
+  // The plan's Task 4 Step 5 try/catch guard: parsing fails, a warning is
+  // logged, and the page keeps rendering normally rather than crashing.
+  await expect(page.getByRole('heading', { name: 'Обзор сервера' })).toBeVisible()
+  await expect(page.getByText('Нет событий')).toBeVisible()
+  expect(pageErrors).toHaveLength(0)
+})
+
+test('SSE: an action_log event is prepended to the activity stream', async ({ page }) => {
+  await page.route('**/auth/me', route => route.fulfill({ json: { id: '1', username: 'Admin', avatar: null } }))
+  await page.route('**/api/dashboard', route => route.fulfill({ json: commandCenterDashboardFixture }))
+  await page.route('**/api/stats/overview', route => route.fulfill({ json: { total_actions: 42 } }))
+  await neutralizeEventSource(page)
+  await page.goto(`${BASE_URL}/`)
+
+  const activityList = page.getByRole('list', { name: 'Что происходит' })
+  await expect(activityList.getByRole('listitem')).toHaveCount(3) // commandCenterEvents
+
+  await dispatchSSEMessage(page, JSON.stringify({
+    type: 'action_log',
+    timestamp: '2026-09-05T10:10:00Z',
+    discord_id: '999999',
+    action_type: 'move',
+    rule_id: null,
+    is_dry_run: false,
+  }))
+
+  const items = activityList.getByRole('listitem')
+  await expect(items).toHaveCount(4)
+  await expect(items.first()).toContainText('999999')
+  await expect(items.first()).toContainText('move')
+})
+
+test('SSE: the activity stream stays capped at 20 entries', async ({ page }) => {
+  await page.route('**/auth/me', route => route.fulfill({ json: { id: '1', username: 'Admin', avatar: null } }))
+  await page.route('**/api/dashboard', route => route.fulfill({ json: commandCenterDashboardFixture }))
+  await page.route('**/api/stats/overview', route => route.fulfill({ json: { total_actions: 42 } }))
+  await neutralizeEventSource(page)
+  await page.goto(`${BASE_URL}/`)
+
+  const activityList = page.getByRole('list', { name: 'Что происходит' })
+  await expect(activityList.getByRole('listitem')).toHaveCount(3) // commandCenterEvents
+
+  // Fixture already has 3 logs; dispatching 20 more would total 23 without
+  // the cap. Send them sequentially so each setState commits before the next.
+  for (let i = 0; i < 20; i += 1) {
+    await dispatchSSEMessage(page, JSON.stringify({
+      type: 'action_log',
+      timestamp: `2026-09-05T10:${String(i).padStart(2, '0')}:00Z`,
+      discord_id: `cap-${i}`,
+      action_type: 'move',
+      rule_id: null,
+      is_dry_run: false,
+    }))
+  }
+
+  const items = activityList.getByRole('listitem')
+  await expect(items).toHaveCount(20)
+  // Newest-first: the most recently dispatched event is still on top.
+  await expect(items.first()).toContainText('cap-19')
+})
+
+test('SSE: a voice_update event triggers a dashboard refetch', async ({ page }) => {
+  let dashboardCalls = 0
+  await page.route('**/auth/me', route => route.fulfill({ json: { id: '1', username: 'Admin', avatar: null } }))
+  await page.route('**/api/dashboard', route => {
+    dashboardCalls += 1
+    return route.fulfill({ json: dashboardFixture })
+  })
+  await page.route('**/api/stats/overview', route => route.fulfill({ json: statsOverviewFixture }))
+  await neutralizeEventSource(page)
+  await page.goto(`${BASE_URL}/`)
+
+  await expect(page.getByRole('heading', { name: 'Обзор сервера' })).toBeVisible()
+  expect(dashboardCalls).toBe(1)
+
+  await dispatchSSEMessage(page, JSON.stringify({ type: 'voice_update' }))
+
+  await expect.poll(() => dashboardCalls).toBe(2)
+})
+
+test('SSE: onopen/onerror wire the live StatusBadge', async ({ page }) => {
+  await mockDashboard(page)
+  await page.goto(`${BASE_URL}/`)
+
+  // Dashboard.jsx starts `live` true (no need for onopen to have fired yet
+  // for the badge to read "В сети"); onerror is what flips it.
+  await expect(page.getByText('В сети', { exact: true })).toBeVisible()
+
+  await dispatchSSEError(page)
+  await expect(page.getByText('Нет соединения', { exact: true })).toBeVisible()
 })

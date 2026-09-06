@@ -2,6 +2,14 @@ import { Box, Card, Typography } from '@mui/material'
 import { motion, useReducedMotion } from 'framer-motion'
 import { cardVariants } from '../../styles/motion'
 
+// Refactored to the tone/label/value/meta API in Phase 1 (Task 3) but not
+// currently used by Dashboard.jsx, which needs a denser metric strip instead
+// (see Task 4 — its plain <ul>/<li> metric strip deliberately avoids a
+// repeated card shell around every number, per the plan's own requirement).
+// Kept as the semantic stat-card primitive for other admin pages in the
+// Phase 2 migration — do not delete without checking the Follow-on Plans
+// section of docs/superpowers/plans/2026-09-05-admin-dashboard-design-system.md.
+
 // Semantic tone only — no raw `color`/`glowColor` props. Most stat cards
 // should stay neutral; a tone is for the rare card that genuinely reflects a
 // live/positive/warning state (see Dashboard's "in voice now" card).
