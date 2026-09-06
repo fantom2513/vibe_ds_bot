@@ -1,4 +1,4 @@
-import { motion } from 'framer-motion'
+import { motion, useReducedMotion } from 'framer-motion'
 
 export const pageVariants = {
   initial: { opacity: 0, y: 12 },
@@ -40,15 +40,31 @@ export const drawerVariants = {
   },
 }
 
-export const PageWrapper = ({ children }) => (
-  <motion.div
-    variants={pageVariants}
-    initial="initial"
-    animate="animate"
-    exit="exit"
-    transition={pageTransition}
-    style={{ height: '100%' }}
-  >
-    {children}
-  </motion.div>
-)
+// Framer Motion's transforms/opacity animate outside the CSS pipeline, so
+// they escape the blanket `prefers-reduced-motion` rule in global.css.
+// useReducedMotion() reads that same OS/browser preference and lets us fall
+// back to an instant, non-transformed transition here.
+export const PageWrapper = ({ children }) => {
+  const reduceMotion = useReducedMotion()
+
+  return (
+    <motion.div
+      variants={reduceMotion ? reducedPageVariants : pageVariants}
+      initial="initial"
+      animate="animate"
+      exit="exit"
+      transition={reduceMotion ? reducedTransition : pageTransition}
+      style={{ height: '100%' }}
+    >
+      {children}
+    </motion.div>
+  )
+}
+
+const reducedPageVariants = {
+  initial: { opacity: 1 },
+  animate: { opacity: 1 },
+  exit: { opacity: 1 },
+}
+
+const reducedTransition = { duration: 0 }

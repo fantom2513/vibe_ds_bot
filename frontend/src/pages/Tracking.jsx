@@ -27,7 +27,7 @@ import {
   Tooltip,
   Typography,
 } from '@mui/material'
-import { DeleteOutlined, EditOutlined, RefreshOutlined } from '@mui/icons-material'
+import { DeleteOutlined, EditOutlined, PersonOutlineOutlined, RefreshOutlined } from '@mui/icons-material'
 import {
   createTrackedMember,
   deleteTrackedMember,
@@ -326,7 +326,7 @@ export default function Tracking() {
       </Box>
 
       {members.length === 0 ? (
-        <EmptyState text="Нет отслеживаемых участников" icon="👤" />
+        <EmptyState text="Нет отслеживаемых участников" icon={PersonOutlineOutlined} />
       ) : (
         <TableContainer component={Paper} sx={{ mb: 4 }}>
           <Table size="small" aria-label="Отслеживаемые участники">
@@ -428,7 +428,7 @@ export default function Tracking() {
                   </TableBody>
                 </Table>
               </TableContainer>
-            ) : <EmptyState text="Нет личной статистики за период" icon="—" />}
+            ) : <EmptyState text="Нет личной статистики за период" />}
           </Box>
 
           <Box>
@@ -458,7 +458,7 @@ export default function Tracking() {
                   </TableBody>
                 </Table>
               </TableContainer>
-            ) : <EmptyState text="Нет пересечений за период" icon="—" />}
+            ) : <EmptyState text="Нет пересечений за период" />}
           </Box>
         </Box>
       )}
