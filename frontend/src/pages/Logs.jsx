@@ -6,13 +6,25 @@ import {
 import { DownloadOutlined, RefreshOutlined } from '@mui/icons-material'
 import { DataGrid } from '@mui/x-data-grid'
 import { getLogs } from '../api/logs'
-import { ActionChip, PageHeader, ErrorState, DiscordId } from '../components/ui'
+import { ActionChip, PageHeader, ErrorState, DiscordId, Panel } from '../components/ui'
 import { PageWrapper } from '../styles/motion'
 import Timestamp from '../components/Timestamp'
 
 const ACTION_TYPES = ['mute', 'unmute', 'move', 'kick', 'kick_timeout', 'pair_move']
 
 const MONO = { fontFamily: "'IBM Plex Mono', monospace", fontSize: '0.72rem' }
+
+// MUI X DataGrid locale text — the small set of copy strings the page
+// actually surfaces (empty state, selection count, and the rows-per-page
+// control). The installed @mui/x-data-grid major version resolves the
+// rows-per-page string from the top-level `paginationRowsPerPage` key (see
+// constants/localeTextConstants.js) rather than a nested `MuiTablePagination`
+// object used by older majors, so it's set directly here.
+const gridLocale = {
+  noRowsLabel: 'Нет событий',
+  footerRowSelected: count => `Выбрано: ${count}`,
+  paginationRowsPerPage: 'Строк на странице:',
+}
 
 export default function Logs() {
   const [logs, setLogs] = useState([])
@@ -85,19 +97,19 @@ export default function Logs() {
     {
       field: 'discord_id',
       headerName: 'Discord ID',
-      width: 170,
+      width: 160,
       renderCell: ({ value }) => <DiscordId id={value} />,
     },
     {
       field: 'action_type',
       headerName: 'Действие',
-      width: 150,
+      width: 140,
       renderCell: ({ row }) => <ActionChip type={row.action_type} isDryRun={row.is_dry_run} />,
     },
     {
       field: 'rule_id',
-      headerName: 'Rule',
-      width: 70,
+      headerName: 'Правило',
+      width: 90,
       renderCell: ({ value }) => (
         <Typography sx={{ ...MONO, color: value != null ? 'text.primary' : 'text.disabled' }}>
           {value ?? '—'}
@@ -106,8 +118,8 @@ export default function Logs() {
     },
     {
       field: 'channel_id',
-      headerName: 'Channel',
-      width: 170,
+      headerName: 'Канал',
+      width: 150,
       renderCell: ({ value }) => (
         <Typography sx={{ ...MONO, color: value ? 'text.primary' : 'text.disabled' }}>
           {value || '—'}
@@ -121,7 +133,7 @@ export default function Logs() {
   return (
     <PageWrapper>
       <PageHeader
-        title="Logs"
+        title="Журнал"
         subtitle="История действий бота"
         actions={
           <Button variant="outlined" startIcon={<DownloadOutlined />} onClick={exportCsv} size="small">
@@ -130,90 +142,95 @@ export default function Logs() {
         }
       />
 
-      {/* Filter bar */}
-      <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap', mb: 2, alignItems: 'flex-end' }}>
-        <TextField
-          label="Date from"
-          size="small"
-          type="datetime-local"
-          value={filters.date_from}
-          onChange={e => setFilters(f => ({ ...f, date_from: e.target.value }))}
-          InputLabelProps={{ shrink: true }}
-          sx={{ width: 200 }}
-        />
-        <TextField
-          label="Date to"
-          size="small"
-          type="datetime-local"
-          value={filters.date_to}
-          onChange={e => setFilters(f => ({ ...f, date_to: e.target.value }))}
-          InputLabelProps={{ shrink: true }}
-          sx={{ width: 200 }}
-        />
-        <FormControl size="small" sx={{ width: 150 }}>
-          <InputLabel>Action type</InputLabel>
-          <Select
-            value={filters.action_type}
-            label="Action type"
-            onChange={e => setFilters(f => ({ ...f, action_type: e.target.value }))}
-          >
-            <MenuItem value="">Все</MenuItem>
-            {ACTION_TYPES.map(t => <MenuItem key={t} value={t}>{t}</MenuItem>)}
-          </Select>
-        </FormControl>
-        <TextField
-          label="Discord ID"
-          size="small"
-          value={filters.discord_id}
-          onChange={e => setFilters(f => ({ ...f, discord_id: e.target.value }))}
-          sx={{ width: 160 }}
-          inputProps={{ style: { fontFamily: "'IBM Plex Mono', monospace" } }}
-        />
-        <TextField
-          label="Rule ID"
-          size="small"
-          value={filters.rule_id}
-          onChange={e => setFilters(f => ({ ...f, rule_id: e.target.value }))}
-          sx={{ width: 90 }}
-        />
-        <Button variant="contained" startIcon={<RefreshOutlined />} size="small" onClick={handleSearch}>
-          Применить
-        </Button>
-        <Button variant="text" size="small" onClick={handleReset}>
-          Сбросить
-        </Button>
-      </Box>
+      <Panel sx={{ mb: 2 }}>
+        <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap', alignItems: 'flex-end' }}>
+          <TextField
+            label="Дата с"
+            size="small"
+            type="datetime-local"
+            value={filters.date_from}
+            onChange={e => setFilters(f => ({ ...f, date_from: e.target.value }))}
+            InputLabelProps={{ shrink: true }}
+            sx={{ width: { xs: '100%', sm: 200 } }}
+          />
+          <TextField
+            label="Дата по"
+            size="small"
+            type="datetime-local"
+            value={filters.date_to}
+            onChange={e => setFilters(f => ({ ...f, date_to: e.target.value }))}
+            InputLabelProps={{ shrink: true }}
+            sx={{ width: { xs: '100%', sm: 200 } }}
+          />
+          <FormControl size="small" sx={{ width: { xs: '100%', sm: 150 } }}>
+            <InputLabel id="logs-action-type-label">Тип действия</InputLabel>
+            <Select
+              labelId="logs-action-type-label"
+              value={filters.action_type}
+              label="Тип действия"
+              onChange={e => setFilters(f => ({ ...f, action_type: e.target.value }))}
+            >
+              <MenuItem value="">Все</MenuItem>
+              {ACTION_TYPES.map(t => <MenuItem key={t} value={t}>{t}</MenuItem>)}
+            </Select>
+          </FormControl>
+          <TextField
+            label="Discord ID"
+            size="small"
+            value={filters.discord_id}
+            onChange={e => setFilters(f => ({ ...f, discord_id: e.target.value }))}
+            sx={{ width: { xs: '100%', sm: 160 } }}
+            inputProps={{ style: { fontFamily: "'IBM Plex Mono', monospace" } }}
+          />
+          <TextField
+            label="ID правила"
+            size="small"
+            value={filters.rule_id}
+            onChange={e => setFilters(f => ({ ...f, rule_id: e.target.value }))}
+            sx={{ width: { xs: '100%', sm: 100 } }}
+          />
+          <Button variant="contained" startIcon={<RefreshOutlined />} size="small" onClick={handleSearch}>
+            Применить
+          </Button>
+          <Button variant="text" size="small" onClick={handleReset}>
+            Сбросить
+          </Button>
+        </Box>
+      </Panel>
 
-      <DataGrid
-        rows={logs}
-        columns={columns}
-        paginationMode="server"
-        rowCount={rowCount}
-        paginationModel={paginationModel}
-        onPaginationModelChange={setPaginationModel}
-        pageSizeOptions={[25, 50, 100]}
-        loading={loading}
-        autoHeight
-        disableRowSelectionOnClick
-        sx={{
-          border: '1px solid rgba(255,255,255,0.07)',
-          borderRadius: 2,
-          '& .MuiDataGrid-columnHeaders': {
-            backgroundColor: '#060810',
-            borderBottom: '1px solid rgba(255,255,255,0.07)',
-          },
-          '& .MuiDataGrid-row:hover': {
-            backgroundColor: 'rgba(255,255,255,0.025)',
-          },
-          '& .MuiDataGrid-cell': {
-            borderBottom: '1px solid rgba(255,255,255,0.04)',
-            fontSize: '0.82rem',
-          },
-          '& .MuiDataGrid-footerContainer': {
-            borderTop: '1px solid rgba(255,255,255,0.07)',
-          },
-        }}
-      />
+      <Box sx={{ width: '100%' }}>
+        <DataGrid
+          rows={logs}
+          columns={columns}
+          paginationMode="server"
+          rowCount={rowCount}
+          paginationModel={paginationModel}
+          onPaginationModelChange={setPaginationModel}
+          pageSizeOptions={[25, 50, 100]}
+          loading={loading}
+          autoHeight
+          disableRowSelectionOnClick
+          localeText={gridLocale}
+          sx={{
+            border: '1px solid var(--color-border)',
+            borderRadius: 2,
+            '& .MuiDataGrid-columnHeaders': {
+              backgroundColor: 'var(--color-bg-elevated)',
+              borderBottom: '1px solid var(--color-border)',
+            },
+            '& .MuiDataGrid-row:hover': {
+              backgroundColor: 'var(--color-bg-elevated)',
+            },
+            '& .MuiDataGrid-cell': {
+              borderBottom: '1px solid var(--color-border)',
+              fontSize: '0.82rem',
+            },
+            '& .MuiDataGrid-footerContainer': {
+              borderTop: '1px solid var(--color-border)',
+            },
+          }}
+        />
+      </Box>
     </PageWrapper>
   )
 }
