@@ -8,7 +8,7 @@ import { useTheme } from '@mui/material/styles'
 import { AddOutlined, DeleteOutlined, PersonOutlineOutlined } from '@mui/icons-material'
 import { getUsers, addUser, deleteUser } from '../api/users'
 import {
-  MemberCell, MemberAutocomplete, PageHeader, LoadingState, EmptyState,
+  MemberCell, MemberAutocomplete, PageHeader, LoadingState, ErrorState, EmptyState,
   FormDrawer, ConfirmDialog,
 } from '../components/ui'
 import { useMemberResolver } from '../hooks/useMemberResolver'
@@ -49,6 +49,7 @@ function UserTable({ listType, emptyText }) {
   const isCompact = useMediaQuery(theme.breakpoints.down('sm'))
   const [users, setUsers] = useState([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [saving, setSaving] = useState(false)
   const [selectedId, setSelectedId] = useState(null)
@@ -65,7 +66,7 @@ function UserTable({ listType, emptyText }) {
       setUsers(data)
       resolveMany(data.map(u => String(u.discord_id)))
     } catch (e) {
-      setSnack({ msg: e.message, severity: 'error' })
+      setError(e.message)
     } finally {
       setLoading(false)
     }
@@ -124,6 +125,7 @@ function UserTable({ listType, emptyText }) {
   }
 
   if (loading) return <LoadingState />
+  if (error) return <ErrorState message={error} />
 
   return (
     <>

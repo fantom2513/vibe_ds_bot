@@ -511,6 +511,25 @@ test('users requires selecting a member before saving', async ({ page }) => {
   await expect(page.getByText('Выберите участника')).toBeVisible()
 })
 
+test('users shows an error state when the initial list fetch fails', async ({ page }) => {
+  let usersCalls = 0
+  await page.route('**/auth/me', route => route.fulfill({
+    json: { id: '1', username: 'Admin', avatar: null },
+  }))
+  await page.route(/\/api\/users(?:\/([^/?]+))?\/?(?:\?.*)?$/, async route => {
+    usersCalls += 1
+    return route.fulfill({ status: 500, json: { detail: 'Internal error' } })
+  })
+  await page.goto(`${BASE_URL}/users`)
+
+  await expect(page.getByRole('alert')).toBeVisible()
+  // The add trigger and tabs must not render alongside a dead error page —
+  // sibling pages (Rules.jsx, KickTargets.jsx) return the ErrorState in
+  // place of the whole content area on initial-load failure.
+  await expect(page.getByRole('button', { name: 'Добавить' })).toHaveCount(0)
+  expect(usersCalls).toBe(1)
+})
+
 test('users keeps its drawer open and disables the submit button while saving', async ({ page }) => {
   const userSave = deferred()
   await mockMemberManagement(page, { users: [], gates: { userSave } })

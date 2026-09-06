@@ -7,13 +7,13 @@ import {
 } from '@mui/material'
 import { useTheme } from '@mui/material/styles'
 import { AddOutlined, EditOutlined, DeleteOutlined, AccessTimeOutlined } from '@mui/icons-material'
-import cronstrue from 'cronstrue/i18n'
 import { getSchedules, createSchedule, updateSchedule, deleteSchedule } from '../api/schedules'
 import { getRules } from '../api/rules'
 import {
   PageHeader, LoadingState, ErrorState, EmptyState, StatusBadge, FormDrawer, ConfirmDialog,
 } from '../components/ui'
 import { PageWrapper } from '../styles/motion'
+import { cronDescription } from '../utils/cron'
 
 const MONO = { fontFamily: "'IBM Plex Mono', monospace", fontSize: '0.72rem' }
 
@@ -37,14 +37,6 @@ function actionLabel(value) {
 // disable is a restrictive one (amber warning, mirrors ActionChip's "mute").
 function actionTone(value) {
   return value === 'enable' ? 'success' : 'warning'
-}
-
-function cronDescription(expr) {
-  try {
-    return cronstrue.toString(expr, { locale: 'ru', throwExceptionOnParseError: true })
-  } catch {
-    return null
-  }
 }
 
 function ruleName(ruleId, rules) {

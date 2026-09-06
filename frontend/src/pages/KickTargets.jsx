@@ -151,7 +151,9 @@ export default function KickTargets() {
     }
     if (form.maxMinutes !== '') {
       const maxMinutes = Number(form.maxMinutes)
-      if (minMinutes > 0 && maxMinutes < minMinutes) {
+      if (Number.isNaN(maxMinutes)) {
+        nextErrors.maxMinutes = 'Максимальное время должно быть числом'
+      } else if (minMinutes > 0 && maxMinutes < minMinutes) {
         nextErrors.maxMinutes = 'Максимальное время не может быть меньше минимального'
       }
     }
