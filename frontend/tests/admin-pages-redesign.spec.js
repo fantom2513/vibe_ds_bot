@@ -1236,3 +1236,236 @@ test('tracking configuration and preview remain usable at 390 px', async ({ page
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)
   expect(overflow).toBeLessThanOrEqual(0)
 })
+
+// ---------------------------------------------------------------------------
+// Task 5: Logs, Settings, and Login's retired GlowCard usage
+// ---------------------------------------------------------------------------
+
+const logFixture = {
+  id: 1,
+  executed_at: '2026-09-06T10:00:00Z',
+  discord_id: '42',
+  action_type: 'mute',
+  is_dry_run: false,
+  rule_id: 7,
+  channel_id: '100',
+}
+
+// Mocks the authenticated admin identity plus the read-only /api/logs list
+// and /api/logs/export routes. Anchored to the end of the URL (optionally
+// followed by a query string) the same way mockRules/mockSchedules anchor
+// their routes, so this only matches the real endpoints and never Vite's
+// dev-server module URL for the source file src/api/logs.js.
+async function mockLogs(page, { logs = [logFixture] } = {}) {
+  const state = { logs: logs.map(l => ({ ...l })), lastQuery: null, exportQuery: null }
+
+  await page.route('**/auth/me', route => route.fulfill({
+    json: { id: '1', username: 'Admin', avatar: null },
+  }))
+
+  await page.route(/\/api\/logs\/export\/?(?:\?.*)?$/, route => {
+    const url = new URL(route.request().url())
+    state.exportQuery = Object.fromEntries(url.searchParams)
+    return route.fulfill({ status: 200, contentType: 'text/csv', body: 'id\n' })
+  })
+
+  await page.route(/\/api\/logs\/?(?:\?.*)?$/, route => {
+    const request = route.request()
+    if (request.method() !== 'GET') return route.fulfill({ status: 404, json: { detail: 'not found' } })
+    const url = new URL(request.url())
+    state.lastQuery = Object.fromEntries(url.searchParams)
+    return route.fulfill({ json: state.logs })
+  })
+
+  return state
+}
+
+test('logs uses Russian field labels and grid text', async ({ page }) => {
+  await mockLogs(page, { logs: [] })
+  await page.goto(`${BASE_URL}/logs`)
+
+  await expect(page.getByRole('heading', { name: 'Журнал' })).toBeVisible()
+  await expect(page.getByLabel('Дата с')).toBeVisible()
+  await expect(page.getByLabel('Дата по')).toBeVisible()
+  await expect(page.getByLabel('Тип действия')).toBeVisible()
+  await expect(page.getByLabel('Discord ID')).toBeVisible()
+  await expect(page.getByLabel('ID правила')).toBeVisible()
+  await expect(page.getByText('Нет событий')).toBeVisible()
+  await expect(page.getByText('Строк на странице:')).toBeVisible()
+})
+
+test('logs Apply submits the visible filter state and Reset clears it', async ({ page }) => {
+  const state = await mockLogs(page)
+  await page.goto(`${BASE_URL}/logs`)
+
+  await page.getByLabel('Discord ID').fill('42')
+  await page.getByRole('button', { name: 'Применить' }).click()
+  await expect.poll(() => state.lastQuery?.discord_id).toBe('42')
+
+  await page.getByRole('button', { name: 'Сбросить' }).click()
+  await expect.poll(() => state.lastQuery?.discord_id).toBeUndefined()
+})
+
+test('logs export preserves the active filters', async ({ page }) => {
+  await mockLogs(page)
+  await page.addInitScript(() => {
+    window.__exportUrls = []
+    window.open = url => { window.__exportUrls.push(url); return null }
+  })
+  await page.goto(`${BASE_URL}/logs`)
+
+  await page.getByLabel('Discord ID').fill('42')
+  await page.getByRole('button', { name: 'Применить' }).click()
+  await page.getByRole('button', { name: 'Экспорт CSV' }).click()
+
+  const urls = await page.evaluate(() => window.__exportUrls)
+  expect(urls[0]).toContain('discord_id=42')
+})
+
+test('logs date filter inputs keep persistent labels', async ({ page }) => {
+  await mockLogs(page)
+  await page.goto(`${BASE_URL}/logs`)
+
+  await page.getByLabel('Дата с').fill('2026-09-01T00:00')
+  await expect(page.getByText('Дата с')).toBeVisible()
+  await expect(page.getByLabel('Дата с')).toHaveValue('2026-09-01T00:00')
+})
+
+test('logs grid stays contained at 390 px while important columns remain reachable', async ({ page }) => {
+  await mockLogs(page)
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.goto(`${BASE_URL}/logs`)
+
+  await expect(page.getByRole('heading', { name: 'Журнал' })).toBeVisible()
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)
+  expect(overflow).toBeLessThanOrEqual(0)
+
+  const scroller = page.locator('.MuiDataGrid-virtualScroller')
+  await scroller.evaluate(el => { el.scrollLeft = el.scrollWidth })
+  await expect(page.getByRole('columnheader', { name: 'Канал' })).toBeVisible()
+})
+
+const botInfoFixture = {
+  bot_name: 'VibeBot',
+  guild_id: '900',
+  guild_name: 'Vibe Community',
+  uptime_seconds: 3725,
+  latency_ms: 42,
+}
+
+const allowedUsersFixture = {
+  allowed_discord_ids: ['42'],
+  note: 'Доступ настраивается через переменные окружения',
+}
+
+// Mocks the authenticated admin identity plus the read-only
+// /api/settings/bot-info and /api/settings/allowed-users routes and the
+// full /api/settings/debug-mode GET/PATCH surface. `patchStatus` >= 400
+// forces the PATCH response to fail so tests can assert the revert-on-
+// failure behavior; `gates.patch` optionally defers that PATCH response so
+// tests can assert the switch's disabled-while-pending state deterministically.
+async function mockSettings(page, {
+  debugMode = false,
+  patchStatus = 200,
+  botInfo = botInfoFixture,
+  allowedUsers = allowedUsersFixture,
+  gates = {},
+} = {}) {
+  const state = { debugMode, patchPayload: null }
+
+  await page.route('**/auth/me', route => route.fulfill({
+    json: { id: '1', username: 'Admin', avatar: null },
+  }))
+
+  await page.route('**/api/members/batch', route => route.fulfill({ json: memberFixtures }))
+
+  await page.route(/\/api\/settings\/(bot-info|allowed-users|debug-mode)\/?(?:\?.*)?$/, async route => {
+    const request = route.request()
+    const method = request.method()
+    const url = new URL(request.url())
+
+    if (url.pathname === '/api/settings/bot-info' && method === 'GET') {
+      return route.fulfill({ json: botInfo })
+    }
+    if (url.pathname === '/api/settings/allowed-users' && method === 'GET') {
+      return route.fulfill({ json: allowedUsers })
+    }
+    if (url.pathname === '/api/settings/debug-mode' && method === 'GET') {
+      return route.fulfill({ json: { debug_mode: state.debugMode } })
+    }
+    if (url.pathname === '/api/settings/debug-mode' && method === 'PATCH') {
+      state.patchPayload = await request.postDataJSON()
+      if (gates.patch) await gates.patch.promise
+      if (patchStatus >= 400) return route.fulfill({ status: patchStatus, json: { detail: 'Ошибка' } })
+      state.debugMode = state.patchPayload.enabled
+      return route.fulfill({ json: { debug_mode: state.debugMode } })
+    }
+    return route.fulfill({ status: 404, json: { detail: 'not found' } })
+  })
+
+  return state
+}
+
+test('settings shows Russian section titles and semantic bot status', async ({ page }) => {
+  await mockSettings(page)
+  await page.goto(`${BASE_URL}/settings`)
+
+  await expect(page.getByRole('heading', { name: 'Настройки' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Состояние бота' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Режим отладки' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Доступ к панели' })).toBeVisible()
+  await expect(page.getByText('Онлайн')).toBeVisible()
+})
+
+test('settings disables the debug switch while the request is pending', async ({ page }) => {
+  const patch = deferred()
+  await mockSettings(page, { gates: { patch } })
+  await page.goto(`${BASE_URL}/settings`)
+
+  const toggle = page.getByRole('checkbox', { name: 'Режим отладки' })
+  await toggle.check()
+  await expect(toggle).toBeDisabled()
+  patch.resolve()
+  await expect(toggle).toBeEnabled()
+})
+
+test('settings reverts debug mode when saving fails', async ({ page }) => {
+  await mockSettings(page, { debugMode: false, patchStatus: 500 })
+  await page.goto(`${BASE_URL}/settings`)
+  const toggle = page.getByRole('checkbox', { name: 'Режим отладки' })
+  await toggle.check()
+  await expect(page.getByRole('alert')).toContainText('Не удалось изменить режим отладки')
+  await expect(toggle).not.toBeChecked()
+})
+
+test('settings shows access rows through StatusBadge with mono discord ids', async ({ page }) => {
+  await mockSettings(page)
+  await page.goto(`${BASE_URL}/settings`)
+
+  await expect(page.getByText('Разрешён')).toBeVisible()
+  await expect(page.getByText('42', { exact: true })).toBeVisible()
+})
+
+test('settings and login panel contain no legacy glow or shadow treatment', async ({ page }) => {
+  // GlowCard always renders a MUI Card (see components/ui/GlowCard.jsx); Panel
+  // renders a plain Box. Absence of .MuiCard-root on these two pages is
+  // direct evidence GlowCard is no longer composed in production here.
+  await mockSettings(page)
+  await page.goto(`${BASE_URL}/settings`)
+  await expect(page.locator('.MuiCard-root')).toHaveCount(0)
+
+  await page.route('**/auth/me', route => route.fulfill({ status: 401, json: { detail: 'unauthorized' } }))
+  await page.goto(`${BASE_URL}/login`)
+  await expect(page.getByText('Войти через Discord')).toBeVisible()
+  await expect(page.locator('.MuiCard-root')).toHaveCount(0)
+
+  const panelWidth = await page.getByText('Bot Dashboard').evaluate(el => {
+    let node = el.closest('div')
+    while (node) {
+      if (getComputedStyle(node).border.includes('1px')) return node.getBoundingClientRect().width
+      node = node.parentElement
+    }
+    return null
+  })
+  expect(panelWidth).toBeLessThanOrEqual(360)
+})
