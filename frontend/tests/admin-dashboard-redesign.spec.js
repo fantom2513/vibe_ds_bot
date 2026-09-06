@@ -464,13 +464,11 @@ test('command center: presents the server overview hierarchy with realistic fixt
   expect(metricTexts[1]).toContain('2')
   expect(metricTexts[2]).toContain('42')
 
-  // The three named panels (Panel renders its title as styled text, not a
-  // heading element — see components/ui/Panel.jsx from Task 3).
-  await expect(page.getByText('Сейчас в голосе', { exact: true })).toBeVisible()
-  await expect(page.getByText('Что происходит', { exact: true })).toBeVisible()
-  // Two matches by design: the metric-strip label and the panel title —
-  // assert the panel title specifically (it comes after the strip in DOM order).
-  await expect(page.getByText('Активные правила', { exact: true }).last()).toBeVisible()
+  // The three named panels render as real h4 headings (Panel.jsx), nested
+  // under the page's h3 "Обзор сервера" without skipping a level.
+  await expect(page.getByRole('heading', { name: 'Сейчас в голосе' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Что происходит' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Активные правила' })).toBeVisible()
 
   // Voice presence: member name, channel, duration.
   const voiceTable = page.getByRole('table', { name: 'Сейчас в голосе' })
@@ -526,14 +524,15 @@ test('responsive: no horizontal overflow and all sections visible at 390x844', a
   expect(overflow).toBeLessThanOrEqual(0)
 
   // All three named panels stay reachable/visible on a narrow screen.
-  await expect(page.getByText('Сейчас в голосе', { exact: true })).toBeVisible()
-  await expect(page.getByText('Что происходит', { exact: true })).toBeVisible()
-  await expect(page.getByText('Активные правила', { exact: true }).last()).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Сейчас в голосе' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Что происходит' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Активные правила' })).toBeVisible()
 
   // Primary navigation/action targets keep a >=44px touch target on mobile.
   const targets = [
     page.getByRole('button', { name: 'Открыть меню' }),
     page.getByRole('button', { name: 'Создать правило' }),
+    page.getByRole('link', { name: 'Все правила' }),
   ]
   for (const target of targets) {
     const box = await target.boundingBox()
@@ -542,6 +541,16 @@ test('responsive: no horizontal overflow and all sections visible at 390x844', a
     // element whose CSS minHeight is an exact 44px.
     expect(Math.round(box.height)).toBeGreaterThanOrEqual(44)
   }
+
+  // Wide table rows collapse into compact labelled records on narrow
+  // screens, for both tables on this page — not just "Активные правила".
+  // No <table> at all should render at this width.
+  const tableCount = await page.locator('table').count()
+  expect(tableCount).toBe(0)
+
+  // The voice-presence data is still reachable, just as compact records.
+  await expect(page.getByText('Ada Lovelace')).toBeVisible()
+  await expect(page.getByText('General')).toBeVisible()
 })
 
 // Repeatedly presses Tab (real keyboard navigation, not `.focus()` — Chromium

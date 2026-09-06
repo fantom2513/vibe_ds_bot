@@ -28,7 +28,11 @@ export const Panel = ({ title, description, action, children, sx }) => (
       >
         <Box sx={{ minWidth: 0 }}>
           {title && (
-            <Typography sx={{ color: 'text.primary', fontWeight: 600, fontSize: '0.92rem' }}>
+            // A real heading (not styled text) — panels sit under the page's
+            // h3 (e.g. Dashboard's "Обзор сервера"), so h4 keeps the document
+            // outline non-skipping without pulling in Unbounded (h4+ stay on
+            // the body typeface per theme.js).
+            <Typography component="h4" sx={{ color: 'text.primary', fontWeight: 600, fontSize: '0.92rem', m: 0 }}>
               {title}
             </Typography>
           )}

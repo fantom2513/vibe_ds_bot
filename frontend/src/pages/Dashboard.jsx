@@ -64,6 +64,30 @@ function Field({ label, children }) {
 }
 
 // Compact labelled record used in place of a horizontally-scrolling table row
+// on small screens — voice-presence variant (avatar, member, channel, elapsed
+// time), mirroring RuleRecord's structure/styling below.
+function VoiceRecord({ user }) {
+  return (
+    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25, border: '1px solid var(--color-border)', borderRadius: 2, p: 1.75 }}>
+      <Avatar src={user.avatar} sx={{ width: 32, height: 32, fontSize: '0.8rem', flexShrink: 0 }}>
+        {user.username?.[0]?.toUpperCase()}
+      </Avatar>
+      <Box sx={{ minWidth: 0, flex: 1 }}>
+        <Typography sx={{ color: 'text.primary', fontWeight: 600, fontSize: '0.85rem' }}>
+          {user.username}
+        </Typography>
+        <Typography sx={{ color: 'text.secondary', fontSize: '0.78rem' }}>
+          {user.channel_name}
+        </Typography>
+      </Box>
+      <Box sx={{ flexShrink: 0 }}>
+        <Timestamp iso={user.joined_at} />
+      </Box>
+    </Box>
+  )
+}
+
+// Compact labelled record used in place of a horizontally-scrolling table row
 // on small screens.
 function RuleRecord({ rule }) {
   const { scope, schedule, tz } = ruleSummary(rule)
@@ -253,6 +277,10 @@ export default function Dashboard() {
               // not claim "nobody is in voice" when the truth is "this data
               // isn't available yet". Tracked as backend tech debt.
               <EmptyState text="Данные о присутствии в голосе временно недоступны" icon={VolumeOffOutlined} />
+            ) : isCompact ? (
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+                {onlineUsers.map(u => <VoiceRecord key={u.user_id} user={u} />)}
+              </Box>
             ) : (
               <TableContainer>
                 <Table size="small" aria-label="Сейчас в голосе">
@@ -330,6 +358,12 @@ export default function Dashboard() {
             variant="text"
             size="small"
             endIcon={<ArrowForwardOutlined sx={{ fontSize: 16 }} />}
+            // Named nav control (not a dense inline row action), so it gets
+            // the 44px touch-target minimum explicitly — the theme's
+            // MuiButton.sizeSmall is deliberately excluded from that fix
+            // (see theme.js) since most size="small" controls are dense
+            // table-row actions that should stay compact.
+            sx={{ minHeight: 44 }}
           >
             Все правила
           </Button>
