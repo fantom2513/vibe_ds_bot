@@ -1,5 +1,6 @@
 import { createRequire } from 'node:module'
 import { createServer } from 'vite'
+import cronstrue from 'cronstrue/i18n.js'
 
 const requireFromRunner = createRequire(process.argv[1])
 const { test, expect } = requireFromRunner('playwright/test')
@@ -696,6 +697,205 @@ test('stacking pairs has no document overflow at 390x844', async ({ page }) => {
   await page.goto(`${BASE_URL}/stacking-pairs`)
 
   await expect(page.getByRole('heading', { name: 'Стаки' })).toBeVisible()
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)
+  expect(overflow).toBeLessThanOrEqual(0)
+})
+
+// ---------------------------------------------------------------------------
+// Task 3: schedule management workflow (Schedules)
+// ---------------------------------------------------------------------------
+
+// rule_id: 7 deliberately matches the top-level `ruleFixture` (id: 7) defined
+// for Task 1 — Schedules resolves rule_id -> rule name/details via the same
+// /api/rules list the Rules page reads, so reusing that fixture here is the
+// realistic related-rule record rather than a second parallel one.
+const scheduleFixture = {
+  id: 3,
+  rule_id: 7,
+  cron_expr: '0 22 * * 1-5',
+  timezone: 'Europe/Moscow',
+  action: 'enable',
+  is_active: true,
+  created_at: '2026-09-06T10:00:00Z',
+  updated_at: '2026-09-06T10:00:00Z',
+}
+
+// Mocks the authenticated admin identity, a read-only /api/rules list (used
+// only to resolve rule_id -> rule name; Schedules never mutates rules), and
+// the full /api/schedules CRUD surface against an in-memory fixture list.
+// `gates` optionally defers the create/update ("save") or delete response,
+// and/or forces the next non-toggle save to fail with `saveError` so tests
+// can assert pending-state UI and inline drawer error handling
+// deterministically instead of racing a real network response.
+async function mockSchedules(page, {
+  schedules = [scheduleFixture],
+  rules = [ruleFixture],
+  gates = {},
+} = {}) {
+  const state = {
+    schedules: schedules.map(s => ({ ...s })),
+    createdPayload: null,
+    updatedPayload: null,
+    deletedId: null,
+    toggleCalls: 0,
+  }
+
+  await page.route('**/auth/me', route => route.fulfill({
+    json: { id: '1', username: 'Admin', avatar: null },
+  }))
+
+  // Read-only: anchored the same way as mockRules' /api/rules route so this
+  // only matches the real endpoint and never Vite's dev-server module URL
+  // for the source file src/api/rules.js.
+  await page.route(/\/api\/rules(?:\/(\d+))?(?:\/(toggle))?\/?(?:\?.*)?$/, async route => {
+    const request = route.request()
+    const url = new URL(request.url())
+    if (request.method() === 'GET' && url.pathname === '/api/rules') {
+      return route.fulfill({ json: rules })
+    }
+    return route.fulfill({ status: 404, json: { detail: 'not found' } })
+  })
+
+  await page.route(/\/api\/schedules(?:\/(\d+))?\/?(?:\?.*)?$/, async route => {
+    const request = route.request()
+    const method = request.method()
+    const url = new URL(request.url())
+    const match = url.pathname.match(/^\/api\/schedules(?:\/(\d+))?\/?$/)
+    const id = match?.[1] ? Number(match[1]) : null
+
+    if (method === 'GET' && id === null) {
+      return route.fulfill({ json: state.schedules })
+    }
+    if (method === 'POST' && id === null) {
+      const body = await request.postDataJSON()
+      state.createdPayload = body
+      if (gates.save) await gates.save.promise
+      if (gates.saveError) return route.fulfill({ status: 400, json: { detail: gates.saveError } })
+      const now = '2026-09-06T12:00:00Z'
+      const created = { id: Math.max(0, ...state.schedules.map(s => s.id)) + 1, created_at: now, updated_at: now, ...body }
+      state.schedules = [...state.schedules, created]
+      return route.fulfill({ json: created })
+    }
+    if (method === 'PATCH' && id !== null) {
+      const body = await request.postDataJSON()
+      const isToggle = Object.keys(body).length === 1 && 'is_active' in body
+      if (isToggle) {
+        state.toggleCalls += 1
+        if (gates.toggle) await gates.toggle.promise
+      } else {
+        state.updatedPayload = body
+        if (gates.save) await gates.save.promise
+        if (gates.saveError) return route.fulfill({ status: 400, json: { detail: gates.saveError } })
+      }
+      state.schedules = state.schedules.map(s => (s.id === id ? { ...s, ...body, updated_at: '2026-09-06T12:05:00Z' } : s))
+      return route.fulfill({ json: state.schedules.find(s => s.id === id) })
+    }
+    if (method === 'DELETE' && id !== null) {
+      state.deletedId = id
+      if (gates.delete) await gates.delete.promise
+      state.schedules = state.schedules.filter(s => s.id !== id)
+      return route.fulfill({ status: 204 })
+    }
+    return route.fulfill({ status: 404, json: { detail: 'not found' } })
+  })
+
+  return state
+}
+
+test('schedules resolves the related rule name and uses Russian labels', async ({ page }) => {
+  await mockSchedules(page)
+  await page.goto(`${BASE_URL}/schedules`)
+
+  await expect(page.getByRole('heading', { name: 'Расписания' })).toBeVisible()
+  const table = page.getByRole('table')
+  await expect(table.getByRole('columnheader', { name: 'Правило' })).toBeVisible()
+  await expect(table.getByRole('columnheader', { name: 'Cron' })).toBeVisible()
+  await expect(table.getByRole('columnheader', { name: 'Часовой пояс' })).toBeVisible()
+  await expect(table.getByRole('columnheader', { name: 'Действие' })).toBeVisible()
+  await expect(table.getByRole('columnheader', { name: 'Статус' })).toBeVisible()
+  await expect(page.getByText(ruleFixture.name)).toBeVisible()
+})
+
+test('schedules shows the cron expression in mono with a plain-language preview', async ({ page }) => {
+  await mockSchedules(page)
+  await page.goto(`${BASE_URL}/schedules`)
+
+  const expectedPreview = cronstrue.toString(scheduleFixture.cron_expr, { locale: 'ru' })
+  await expect(page.getByText(scheduleFixture.cron_expr, { exact: true })).toBeVisible()
+  await expect(page.getByText(expectedPreview)).toBeVisible()
+})
+
+test('schedules shows semantic badge text for the enable action and active status', async ({ page }) => {
+  await mockSchedules(page, { schedules: [scheduleFixture] }) // action: 'enable', is_active: true
+  await page.goto(`${BASE_URL}/schedules`)
+
+  await expect(page.getByText('Включить правило', { exact: true })).toBeVisible()
+  await expect(page.getByText('Активно', { exact: true })).toBeVisible()
+})
+
+test('schedules shows semantic badge text for the disable action and inactive status', async ({ page }) => {
+  await mockSchedules(page, { schedules: [{ ...scheduleFixture, action: 'disable', is_active: false }] })
+  await page.goto(`${BASE_URL}/schedules`)
+
+  await expect(page.getByText('Отключить правило', { exact: true })).toBeVisible()
+  await expect(page.getByText('Неактивно', { exact: true })).toBeVisible()
+})
+
+test('schedules reports an invalid cron expression beside the cron field', async ({ page }) => {
+  const state = await mockSchedules(page, { schedules: [] })
+  await page.goto(`${BASE_URL}/schedules`)
+  await page.getByRole('button', { name: 'Новое расписание' }).click()
+  await page.getByLabel('Правило').click()
+  await page.getByRole('option', { name: ruleFixture.name }).click()
+  await page.getByLabel('Cron-выражение').fill('не cron')
+  await page.getByRole('button', { name: 'Сохранить' }).click()
+
+  await expect(page.getByText('Невалидное cron-выражение')).toBeVisible()
+  expect(state.createdPayload).toBeNull()
+})
+
+test('schedules keeps its drawer open and controls disabled while saving', async ({ page }) => {
+  const save = deferred()
+  await mockSchedules(page, { gates: { save } })
+  await page.goto(`${BASE_URL}/schedules`)
+  await page.getByRole('button', { name: 'Редактировать: расписание #3' }).click()
+  await page.getByRole('button', { name: 'Сохранить' }).click()
+
+  await expect(page.getByRole('button', { name: 'Сохранение…' })).toBeDisabled()
+  await page.keyboard.press('Escape')
+  await expect(page.getByRole('dialog', { name: 'Редактировать расписание' })).toBeVisible()
+  save.resolve()
+})
+
+test('schedules shows a request error inside the drawer when saving fails', async ({ page }) => {
+  await mockSchedules(page, { gates: { saveError: 'Правило уже занято другим расписанием' } })
+  await page.goto(`${BASE_URL}/schedules`)
+  await page.getByRole('button', { name: 'Редактировать: расписание #3' }).click()
+  await page.getByRole('button', { name: 'Сохранить' }).click()
+
+  const dialog = page.getByRole('dialog', { name: 'Редактировать расписание' })
+  await expect(dialog.getByText('Правило уже занято другим расписанием')).toBeVisible()
+})
+
+test('schedules protects a pending destructive confirmation', async ({ page }) => {
+  const del = deferred()
+  await mockSchedules(page, { gates: { delete: del } })
+  await page.goto(`${BASE_URL}/schedules`)
+  await page.getByRole('button', { name: 'Удалить: расписание #3' }).click()
+  await page.getByRole('button', { name: 'Удалить', exact: true }).click()
+
+  await expect(page.getByRole('button', { name: 'Удаление…' })).toBeDisabled()
+  await page.keyboard.press('Escape')
+  await expect(page.getByRole('dialog', { name: 'Удалить расписание?' })).toBeVisible()
+  del.resolve()
+})
+
+test('schedules has no document overflow at 390x844', async ({ page }) => {
+  await mockSchedules(page)
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.goto(`${BASE_URL}/schedules`)
+
+  await expect(page.getByRole('heading', { name: 'Расписания' })).toBeVisible()
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)
   expect(overflow).toBeLessThanOrEqual(0)
 })
