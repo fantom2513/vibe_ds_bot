@@ -1113,7 +1113,12 @@ test('tracking groups its workspace into four Russian-labelled Panel sections', 
 test('tracking chart uses the dedicated non-semantic series palette', async ({ page }) => {
   await mockTracking(page, { daily: dailyWorkHoursFixture })
   await page.goto(`${BASE_URL}/tracking`)
-  const fills = await page.locator('.recharts-bar-rectangle path').evaluateAll(paths =>
+  // Recharts mounts each grouped Bar's rectangles on a staggered entrance
+  // animation, so the second member's bars can still be absent on the very
+  // first paint — wait for all 4 (2 members x 2 days) before sampling fills.
+  const bars = page.locator('.recharts-bar-rectangle path')
+  await expect(bars).toHaveCount(4)
+  const fills = await bars.evaluateAll(paths =>
     [...new Set(paths.map(path => getComputedStyle(path).fill))]
   )
   expect(fills).not.toContain('rgb(88, 101, 242)')
@@ -1135,7 +1140,7 @@ test('tracking chart grid and axis text consume the border and secondary-text to
     .evaluate(el => getComputedStyle(el).stroke)
   expect(gridStroke).toBe('rgb(37, 50, 57)') // --color-border (graphite-700)
 
-  const axisFill = await page.locator('.recharts-xAxis text').first()
+  const axisFill = await page.locator('.recharts-xAxis-tick-labels .recharts-cartesian-axis-tick-value').first()
     .evaluate(el => getComputedStyle(el).fill)
   expect(axisFill).toBe('rgb(168, 181, 176)') // --color-text-secondary (neutral-300)
 })
