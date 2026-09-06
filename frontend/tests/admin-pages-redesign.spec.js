@@ -1471,3 +1471,218 @@ test('settings and login panel contain no legacy glow or shadow treatment', asyn
   })
   expect(panelWidth).toBeLessThanOrEqual(360)
 })
+
+// ---------------------------------------------------------------------------
+// Task 6: Mute Levels + grouped admin navigation
+// ---------------------------------------------------------------------------
+
+// The real backend MuteLevelResponse/MuteXPResponse/guild-role shapes (see
+// src/api/schemas.py and src/api/routers/guild.py) carry no `is_active`
+// field anywhere in this surface — unlike the plan's illustrative fixture,
+// these fixtures mirror the actual response shapes exactly.
+const muteLevelFixture = {
+  level: 2,
+  xp_required: 500,
+  role_id: 900,
+  label: 'Тишина II',
+  created_at: '2026-09-06T10:00:00Z',
+}
+
+const muteXpFixture = {
+  discord_id: '42',
+  xp: 620,
+  level: 2,
+  total_mute_seconds: 7200,
+  updated_at: '2026-09-06T10:00:00Z',
+}
+
+// Discord returns role.color as the decimal string of the color's int value
+// (see src/api/routers/guild.py).
+const guildRoleFixture = { id: '900', name: 'Тихий', color: '6743708' }
+
+function decimalColorToRgb(color) {
+  const n = Number(color)
+  return `rgb(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255})`
+}
+
+// Mocks the authenticated admin identity plus the full /api/mute-levels CRUD
+// surface, the read-only /api/mute-xp/leaderboard and /api/guild/roles
+// endpoints, and /api/members/batch for leaderboard member resolution.
+async function mockMuteLevels(page, {
+  levels = [muteLevelFixture],
+  leaderboard = [muteXpFixture],
+  roles = [guildRoleFixture],
+  gates = {},
+} = {}) {
+  const state = {
+    levels: levels.map(l => ({ ...l })),
+    createdPayload: null,
+    updatedPayload: null,
+    deletedLevel: null,
+  }
+
+  await page.route('**/auth/me', route => route.fulfill({
+    json: { id: '1', username: 'Admin', avatar: null },
+  }))
+
+  await page.route('**/api/members/batch', route => route.fulfill({ json: memberFixtures }))
+
+  // Anchored the same way as mockRules' /api/rules route so this only
+  // matches the real endpoint and never Vite's dev-server module URL for
+  // the source file src/api/muteLevels.js.
+  await page.route(/\/api\/mute-levels(?:\/(\d+))?\/?(?:\?.*)?$/, async route => {
+    const request = route.request()
+    const method = request.method()
+    const url = new URL(request.url())
+    const match = url.pathname.match(/^\/api\/mute-levels(?:\/(\d+))?\/?$/)
+    const level = match?.[1] ? Number(match[1]) : null
+
+    if (method === 'GET' && level === null) {
+      return route.fulfill({ json: state.levels })
+    }
+    if (method === 'POST' && level === null) {
+      const body = await request.postDataJSON()
+      state.createdPayload = body
+      if (gates.save) await gates.save.promise
+      const created = { created_at: '2026-09-06T12:00:00Z', ...body }
+      state.levels = [...state.levels, created]
+      return route.fulfill({ status: 201, json: created })
+    }
+    if (method === 'PATCH' && level !== null) {
+      const body = await request.postDataJSON()
+      state.updatedPayload = body
+      if (gates.save) await gates.save.promise
+      state.levels = state.levels.map(l => (l.level === level ? { ...l, ...body } : l))
+      return route.fulfill({ json: state.levels.find(l => l.level === level) })
+    }
+    if (method === 'DELETE' && level !== null) {
+      state.deletedLevel = level
+      if (gates.delete) await gates.delete.promise
+      state.levels = state.levels.filter(l => l.level !== level)
+      return route.fulfill({ status: 204 })
+    }
+    return route.fulfill({ status: 404, json: { detail: 'not found' } })
+  })
+
+  await page.route(/\/api\/mute-xp\/leaderboard\/?(?:\?.*)?$/, route => route.fulfill({ json: leaderboard }))
+  await page.route(/\/api\/guild\/roles\/?(?:\?.*)?$/, route => route.fulfill({ json: roles }))
+
+  return state
+}
+
+test('mute levels renders under the protected admin shell', async ({ page }) => {
+  await mockMuteLevels(page)
+  await page.goto(`${BASE_URL}/mute-levels`)
+
+  await expect(page.getByRole('heading', { name: 'Уровни тишины' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Настройка уровней' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Рейтинг участников' })).toBeVisible()
+})
+
+test('expanded navigation groups routes under Мониторинг and Управление and lists Уровни', async ({ page }) => {
+  await mockMuteLevels(page)
+  await page.setViewportSize({ width: 1440, height: 900 })
+  await page.goto(`${BASE_URL}/mute-levels`)
+
+  const nav = page.getByRole('navigation', { name: 'Основная навигация' })
+  await expect(nav.getByText('Мониторинг', { exact: true })).toBeVisible()
+  await expect(nav.getByText('Управление', { exact: true })).toBeVisible()
+  await expect(nav.getByRole('link', { name: 'Уровни' })).toBeVisible()
+})
+
+test('collapsed navigation groups hide their labels but keep accessible link names', async ({ page }) => {
+  await mockMuteLevels(page)
+  await page.setViewportSize({ width: 1440, height: 900 })
+  await page.goto(`${BASE_URL}/mute-levels`)
+
+  await page.getByRole('button', { name: 'Свернуть меню' }).click()
+  const nav = page.getByRole('navigation', { name: 'Основная навигация' })
+  await expect(nav.getByText('Мониторинг', { exact: true })).toHaveCount(0)
+  await expect(nav.getByText('Управление', { exact: true })).toHaveCount(0)
+  await expect(nav.getByRole('link', { name: 'Уровни' })).toBeVisible()
+})
+
+test('mute levels validates level, name, XP threshold, and role before saving', async ({ page }) => {
+  await mockMuteLevels(page)
+  await page.goto(`${BASE_URL}/mute-levels`)
+
+  await page.getByRole('button', { name: 'Добавить уровень' }).click()
+  await page.getByRole('checkbox', { name: 'Выдавать роль при достижении' }).check()
+  await page.getByRole('button', { name: 'Сохранить' }).click()
+
+  await expect(page.getByText('Укажите номер уровня')).toBeVisible()
+  await expect(page.getByText('Название обязательно')).toBeVisible()
+  await expect(page.getByText('XP порог должен быть больше нуля')).toBeVisible()
+  await expect(page.getByText('Выберите роль')).toBeVisible()
+})
+
+test('mute levels creates a level from labelled fields', async ({ page }) => {
+  const state = await mockMuteLevels(page)
+  await page.goto(`${BASE_URL}/mute-levels`)
+
+  await page.getByRole('button', { name: 'Добавить уровень' }).click()
+  await page.getByLabel('Номер уровня').fill('3')
+  await page.getByLabel('Название').fill('Тишина III')
+  await page.getByLabel('XP порог').fill('1000')
+  await page.getByRole('button', { name: 'Сохранить' }).click()
+
+  await expect.poll(() => state.createdPayload?.label).toBe('Тишина III')
+  expect(state.createdPayload.level).toBe(3)
+  expect(state.createdPayload.xp_required).toBe(1000)
+  expect(state.createdPayload.role_id).toBeNull()
+})
+
+test('mute levels shows the guild role color only inside the role selector', async ({ page }) => {
+  await mockMuteLevels(page)
+  await page.goto(`${BASE_URL}/mute-levels`)
+
+  const roleRgb = decimalColorToRgb(guildRoleFixture.color)
+
+  await expect(page.getByText('Тихий')).toBeVisible()
+  const rowHasRoleColor = await page.locator('table').first().evaluate((table, rgb) => (
+    [...table.querySelectorAll('*')].some(el => getComputedStyle(el).backgroundColor === rgb)
+  ), roleRgb)
+  expect(rowHasRoleColor).toBe(false)
+
+  await page.getByRole('button', { name: 'Добавить уровень' }).click()
+  await page.getByRole('checkbox', { name: 'Выдавать роль при достижении' }).check()
+  await page.getByLabel('Роль').click()
+  const option = page.getByRole('option', { name: 'Тихий' })
+  const optionHasRoleColor = await option.evaluate((el, rgb) => (
+    [...el.querySelectorAll('*')].some(node => getComputedStyle(node).backgroundColor === rgb)
+  ), roleRgb)
+  expect(optionHasRoleColor).toBe(true)
+})
+
+test('mute levels protects a pending destructive confirmation', async ({ page }) => {
+  const deleteGate = deferred()
+  await mockMuteLevels(page, { gates: { delete: deleteGate } })
+  await page.goto(`${BASE_URL}/mute-levels`)
+
+  await page.getByRole('button', { name: 'Удалить: Тишина II' }).click()
+  await page.getByRole('button', { name: 'Удалить', exact: true }).click()
+  await expect(page.getByRole('button', { name: 'Удаление…' })).toBeDisabled()
+  await page.keyboard.press('Escape')
+  await expect(page.getByRole('dialog', { name: 'Удалить уровень?' })).toBeVisible()
+  deleteGate.resolve()
+})
+
+test('mute levels leaderboard renders rank as a mono ordinal with an accessible place label', async ({ page }) => {
+  await mockMuteLevels(page)
+  await page.goto(`${BASE_URL}/mute-levels`)
+
+  const rank = page.locator('[aria-label="Место 1"]')
+  await expect(rank).toBeVisible()
+  await expect(rank).toHaveText('1')
+  await expect(rank).toHaveCSS('font-family', /IBM Plex Mono/)
+})
+
+test('mute levels has no document overflow at 390x844', async ({ page }) => {
+  await mockMuteLevels(page)
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.goto(`${BASE_URL}/mute-levels`)
+
+  await expect(page.getByRole('heading', { name: 'Уровни тишины' })).toBeVisible()
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)
+  expect(overflow).toBeLessThanOrEqual(0)
+})
