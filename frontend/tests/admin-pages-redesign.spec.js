@@ -72,7 +72,12 @@ async function mockRules(page, initialRules, { saveGate, deleteGate } = {}) {
     json: { id: '1', username: 'Admin', avatar: null },
   }))
 
-  await page.route('**/api/rules**', async route => {
+  // Anchored to the end of the URL (optionally followed by a query string)
+  // so this only matches the real `/api/rules...` endpoints — a loose
+  // `**/api/rules**` glob also matches Vite's dev-server module URL for the
+  // source file `src/api/rules.js`, hijacking that JS module request and
+  // serving it JSON, which crashes the whole app before it can render.
+  await page.route(/\/api\/rules(?:\/(\d+))?(?:\/(toggle))?\/?(?:\?.*)?$/, async route => {
     const request = route.request()
     const method = request.method()
     const url = new URL(request.url())
@@ -220,7 +225,7 @@ test('rules cannot toggle the same rule twice while a toggle is pending', async 
   const toggleGate = deferred()
   let toggleCalls = 0
   await page.route('**/auth/me', route => route.fulfill({ json: { id: '1', username: 'Admin', avatar: null } }))
-  await page.route('**/api/rules**', async route => {
+  await page.route(/\/api\/rules(?:\/(\d+))?(?:\/(toggle))?\/?(?:\?.*)?$/, async route => {
     const request = route.request()
     const method = request.method()
     const url = new URL(request.url())
@@ -236,7 +241,7 @@ test('rules cannot toggle the same rule twice while a toggle is pending', async 
   })
   await page.goto(`${BASE_URL}/rules`)
 
-  const toggle = page.getByRole('checkbox').first()
+  const toggle = page.getByRole('switch').first()
   await toggle.click()
   await expect(toggle).toBeDisabled()
   await toggle.click({ force: true })
