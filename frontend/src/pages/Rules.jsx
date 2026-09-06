@@ -6,7 +6,7 @@ import {
   Paper, IconButton, Dialog, DialogTitle, DialogContent, DialogActions,
   Snackbar, Alert, Tooltip, Typography, FormControl, InputLabel,
 } from '@mui/material'
-import { AddOutlined, EditOutlined, DeleteOutlined } from '@mui/icons-material'
+import { AddOutlined, EditOutlined, DeleteOutlined, ListAltOutlined } from '@mui/icons-material'
 import { getRules, createRule, updateRule, deleteRule, toggleRule } from '../api/rules'
 import { ActionChip, PageHeader, LoadingState, ErrorState, EmptyState } from '../components/ui'
 import { PageWrapper } from '../styles/motion'
@@ -150,7 +150,7 @@ export default function Rules() {
       />
 
       {rules.length === 0 ? (
-        <EmptyState text="Нет правил" icon="📋" />
+        <EmptyState text="Нет правил" icon={ListAltOutlined} />
       ) : (
         <TableContainer component={Paper}>
           <Table size="small">

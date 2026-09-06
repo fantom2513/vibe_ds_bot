@@ -3,26 +3,51 @@
 
 * { box-sizing: border-box; }
 
+html {
+  scroll-behavior: smooth;
+}
+
 body {
   margin: 0;
-  background: var(--bg-base);
-  color: var(--text-primary);
-  font-family: -apple-system, 'Segoe UI', sans-serif;
+  background: var(--color-bg-canvas);
+  color: var(--color-text-primary);
+  font-family: 'IBM Plex Sans', -apple-system, 'Segoe UI', sans-serif;
   -webkit-font-smoothing: antialiased;
+}
+
+/* Two-part keyboard focus indicator: a mint outline plus a canvas-colored
+   offset ring so it stays visible on mint (and other saturated) controls. */
+:focus-visible {
+  outline: 2px solid var(--focus-ring-color);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 4px var(--focus-ring-offset-color);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 /* Scrollbar */
 ::-webkit-scrollbar { width: 6px; height: 6px; }
-::-webkit-scrollbar-track { background: var(--bg-base); }
+::-webkit-scrollbar-track { background: var(--color-bg-canvas); }
 ::-webkit-scrollbar-thumb {
-  background: var(--border-base);
+  background: var(--color-border);
   border-radius: 3px;
 }
-::-webkit-scrollbar-thumb:hover { background: #3a3d4a; }
+::-webkit-scrollbar-thumb:hover { background: var(--neutral-300); }
 
 /* Tables */
 .table-row:hover td {
-  background: var(--bg-elevated) !important;
+  background: var(--color-bg-elevated) !important;
 }
 
 
@@ -31,8 +56,8 @@ body {
   font-family: 'IBM Plex Mono', monospace;
   font-size: 11px;
   color: var(--text-mono);
-  background: var(--bg-base);
-  border: 1px solid var(--border-subtle);
+  background: var(--color-bg-canvas);
+  border: 1px solid var(--color-border);
   border-radius: 4px;
   padding: 8px 12px;
   margin: 0;

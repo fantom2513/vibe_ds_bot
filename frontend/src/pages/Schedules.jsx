@@ -6,7 +6,7 @@ import {
   TextField, Typography, Tooltip, Snackbar, Alert,
   FormControl, InputLabel, Select, MenuItem,
 } from '@mui/material'
-import { AddOutlined, EditOutlined, DeleteOutlined } from '@mui/icons-material'
+import { AddOutlined, EditOutlined, DeleteOutlined, AccessTimeOutlined } from '@mui/icons-material'
 import cronstrue from 'cronstrue/i18n'
 import { getSchedules, createSchedule, updateSchedule, deleteSchedule } from '../api/schedules'
 import { getRules } from '../api/rules'
@@ -137,7 +137,7 @@ export default function Schedules() {
       />
 
       {schedules.length === 0 ? (
-        <EmptyState text="Нет расписаний" icon="🕐" />
+        <EmptyState text="Нет расписаний" icon={AccessTimeOutlined} />
       ) : (
         <TableContainer component={Paper}>
           <Table size="small">

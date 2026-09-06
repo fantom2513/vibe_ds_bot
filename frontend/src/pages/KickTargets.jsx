@@ -5,7 +5,7 @@ import {
   Paper, IconButton, Drawer, Dialog, DialogTitle, DialogContent, DialogActions,
   TextField, Typography, Tooltip, Snackbar, Alert,
 } from '@mui/material'
-import { AddOutlined, EditOutlined, DeleteOutlined } from '@mui/icons-material'
+import { AddOutlined, EditOutlined, DeleteOutlined, FlashOffOutlined } from '@mui/icons-material'
 import { getKickTargets, createKickTarget, updateKickTarget, deleteKickTarget } from '../api/kickTargets'
 import { MemberCell, MemberAutocomplete, PageHeader, LoadingState, ErrorState, EmptyState } from '../components/ui'
 import { useMemberResolver } from '../hooks/useMemberResolver'
@@ -125,7 +125,7 @@ export default function KickTargets() {
       />
 
       {targets.length === 0 ? (
-        <EmptyState text="Нет целей для кика" icon="⚡" />
+        <EmptyState text="Нет целей для кика" icon={FlashOffOutlined} />
       ) : (
         <TableContainer component={Paper}>
           <Table size="small">
