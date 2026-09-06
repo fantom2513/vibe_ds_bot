@@ -34,6 +34,19 @@ const statsOverviewFixture = {
   total_actions: 0,
 }
 
+test('login uses the Vibe brand mark without emoji', async ({ page }) => {
+  await page.route('**/auth/me', route => route.fulfill({
+    status: 401,
+    json: { detail: 'Not authenticated' },
+  }))
+
+  await page.goto(`${BASE_URL}/login`)
+
+  await expect(page.getByText('Vibe', { exact: true })).toBeVisible()
+  const bodyText = await page.locator('body').innerText()
+  expect(/\p{Extended_Pictographic}/u.test(bodyText)).toBe(false)
+})
+
 // Dashboard.jsx opens a live EventSource on mount; neutralize it so tests
 // don't depend on a real SSE connection. The stub still records the
 // most-recently-constructed instance on `window.__testEventSource`, and
