@@ -9,7 +9,7 @@ export const DiscordId = ({ id }) => {
     setTimeout(() => setCopied(false), 1500)
   }
   return (
-    <Tooltip title={copied ? '✓ Скопировано' : 'Нажми чтобы скопировать'}>
+    <Tooltip title={copied ? 'Скопировано' : 'Нажми чтобы скопировать'}>
       <Typography
         onClick={copy}
         sx={{

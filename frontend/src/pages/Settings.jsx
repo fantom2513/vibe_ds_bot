@@ -4,7 +4,7 @@ import {
   Table, TableBody, TableCell, TableHead, TableRow, TableContainer,
   Paper, Snackbar, Alert,
 } from '@mui/material'
-import { CheckCircleOutlined } from '@mui/icons-material'
+import { CheckCircleOutlined, WarningAmberOutlined } from '@mui/icons-material'
 import { getBotInfo, getAllowedUsers } from '../api/stats'
 import { getDebugMode, setDebugMode } from '../api/muteLevels'
 import { MemberCell, PageHeader, LoadingState, ErrorState } from '../components/ui'
@@ -139,9 +139,13 @@ export default function Settings() {
                 borderRadius: 1,
                 bgcolor: 'rgba(251,191,36,0.08)',
                 border: '1px solid rgba(251,191,36,0.2)',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 0.75,
               }}>
+                <WarningAmberOutlined aria-hidden="true" sx={{ fontSize: 15, color: '#fbbf24' }} />
                 <Typography sx={{ fontSize: '0.73rem', color: '#fbbf24' }}>
-                  ⚠ Debug mode активен — все действия бота отправляются в debug-канал
+                  Debug mode активен — все действия бота отправляются в debug-канал
                 </Typography>
               </Box>
             )}
