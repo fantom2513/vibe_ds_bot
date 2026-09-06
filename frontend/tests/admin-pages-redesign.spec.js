@@ -131,12 +131,29 @@ test('rules creates a named rule from labelled fields', async ({ page }) => {
   await page.getByRole('button', { name: 'Создать правило' }).click()
   await page.getByLabel('Название').fill('Ночное ограничение')
   await page.getByLabel('Описание').fill('Ограничение для ночного канала')
+  await page.getByLabel('Каналы (ID через запятую, пусто = все)').fill('111, 222')
   await page.getByLabel('Действие').click()
   await page.getByRole('option', { name: 'Заглушить' }).click()
   await page.getByRole('button', { name: 'Сохранить' }).click()
 
   await expect.poll(() => state.createdPayload?.name).toBe('Ночное ограничение')
   expect(state.createdPayload.description).toBe('Ограничение для ночного канала')
+  expect(state.createdPayload.channel_ids).toEqual([111, 222])
+  expect(state.createdPayload.channel_ids.every(id => typeof id === 'number')).toBe(true)
+})
+
+test('rules rejects non-numeric channel IDs and blocks submission', async ({ page }) => {
+  const state = await mockRules(page, [ruleFixture])
+  await page.goto(`${BASE_URL}/rules`)
+  await page.getByRole('button', { name: 'Создать правило' }).click()
+  await page.getByLabel('Название').fill('Правило с опечаткой')
+  await page.getByLabel('Каналы (ID через запятую, пусто = все)').fill('123, abc')
+  await page.getByLabel('Действие').click()
+  await page.getByRole('option', { name: 'Заглушить' }).click()
+  await page.getByRole('button', { name: 'Сохранить' }).click()
+
+  await expect(page.getByText('Каналы должны быть числовыми ID через запятую')).toBeVisible()
+  expect(state.createdPayload).toBeNull()
 })
 
 test('rules keeps its drawer open and controls disabled while saving', async ({ page }) => {
