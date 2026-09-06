@@ -276,3 +276,426 @@ test('rules has no document overflow at 390x844', async ({ page }) => {
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)
   expect(overflow).toBeLessThanOrEqual(0)
 })
+
+// ---------------------------------------------------------------------------
+// Task 2: member-management workflows (Users / KickTargets / StackingPairs)
+// ---------------------------------------------------------------------------
+
+const listedUser = {
+  discord_id: '42', list_type: 'whitelist', username: 'Ada',
+  reason: null, created_at: '2026-09-06T10:00:00Z',
+}
+const kickTargetFixture = {
+  discord_id: '42', username: 'Ada', timeout_sec: 1800,
+  max_timeout_sec: 3600, is_active: true,
+}
+const stackingPairFixture = {
+  id: 4, user_id_1: '42', user_id_2: '84',
+  target_channel_id: '100', is_active: true,
+  created_at: '2026-09-06T10:00:00Z',
+}
+
+// Complete {id, username, display_name, label, avatar} member records, as
+// returned by the real /api/members search/batch/single routes, keyed by
+// discord_id so route handlers below can look members up directly.
+const memberFixtures = {
+  '42': { id: '42', username: 'Ada', display_name: 'Ada', label: 'Ada', avatar: null },
+  '84': { id: '84', username: 'Boris', display_name: 'Boris', label: 'Boris', avatar: null },
+}
+
+// Mocks the authenticated admin identity plus the full /api/users,
+// /api/kick-targets, /api/stacking-pairs, and /api/members surfaces used by
+// Users, KickTargets, and StackingPairs against in-memory fixture lists.
+// `gates` optionally defers specific mutation responses (see deferred())
+// so tests can assert pending-state UI deterministically; each gated route
+// also increments a `*Calls` counter so tests can assert a blocked duplicate
+// request never reached the mock a second time.
+async function mockMemberManagement(page, {
+  users = [listedUser],
+  kickTargets = [kickTargetFixture],
+  pairs = [stackingPairFixture],
+  gates = {},
+} = {}) {
+  const state = {
+    users: users.map(u => ({ ...u })),
+    kickTargets: kickTargets.map(t => ({ ...t })),
+    pairs: pairs.map(p => ({ ...p })),
+    createdUserPayload: null,
+    deletedUserId: null,
+    createdKickPayload: null,
+    updatedKickPayload: null,
+    deletedKickId: null,
+    kickToggleCalls: 0,
+    createdPairPayload: null,
+    deletedPairId: null,
+    pairToggleCalls: 0,
+  }
+
+  await page.route('**/auth/me', route => route.fulfill({
+    json: { id: '1', username: 'Admin', avatar: null },
+  }))
+
+  // Anchored the same way as mockRules' /api/rules route so this only
+  // matches the real endpoint and never Vite's dev-server module URL for
+  // the source file src/api/members.js.
+  await page.route(/\/api\/members(?:\/([^/?]+))?\/?(?:\?.*)?$/, async route => {
+    const request = route.request()
+    const method = request.method()
+    const url = new URL(request.url())
+    const match = url.pathname.match(/^\/api\/members(?:\/([^/?]+))?\/?$/)
+    const segment = match?.[1] ?? null
+
+    if (method === 'GET' && segment === null) {
+      const q = (url.searchParams.get('q') || '').toLowerCase()
+      const results = Object.values(memberFixtures).filter(m =>
+        !q || m.display_name.toLowerCase().includes(q) || m.username.toLowerCase().includes(q)
+      )
+      return route.fulfill({ json: results })
+    }
+    if (method === 'POST' && segment === 'batch') {
+      const ids = await request.postDataJSON()
+      const result = {}
+      ids.forEach(id => {
+        result[id] = memberFixtures[id] || {
+          id, username: id, display_name: 'Unknown', avatar: null, label: `Unknown (@${id})`,
+        }
+      })
+      return route.fulfill({ json: result })
+    }
+    if (method === 'GET' && segment !== null) {
+      const member = memberFixtures[segment]
+      if (!member) return route.fulfill({ status: 404, json: { detail: 'not found' } })
+      return route.fulfill({ json: member })
+    }
+    return route.fulfill({ status: 404, json: { detail: 'not found' } })
+  })
+
+  await page.route(/\/api\/users(?:\/([^/?]+))?\/?(?:\?.*)?$/, async route => {
+    const request = route.request()
+    const method = request.method()
+    const url = new URL(request.url())
+    const match = url.pathname.match(/^\/api\/users(?:\/([^/?]+))?\/?$/)
+    const id = match?.[1] ?? null
+    const listType = url.searchParams.get('list_type')
+
+    if (method === 'GET' && id === null) {
+      return route.fulfill({ json: state.users.filter(u => u.list_type === listType) })
+    }
+    if (method === 'POST' && id === null) {
+      const body = await request.postDataJSON()
+      state.createdUserPayload = body
+      if (gates.userSave) await gates.userSave.promise
+      const created = { reason: null, created_at: '2026-09-06T12:00:00Z', ...body, discord_id: String(body.discord_id) }
+      state.users = [...state.users, created]
+      return route.fulfill({ json: created })
+    }
+    if (method === 'DELETE' && id !== null) {
+      state.deletedUserId = id
+      if (gates.userDelete) await gates.userDelete.promise
+      state.users = state.users.filter(u => !(String(u.discord_id) === id && u.list_type === listType))
+      return route.fulfill({ status: 204 })
+    }
+    return route.fulfill({ status: 404, json: { detail: 'not found' } })
+  })
+
+  await page.route(/\/api\/kick-targets(?:\/([^/?]+))?\/?(?:\?.*)?$/, async route => {
+    const request = route.request()
+    const method = request.method()
+    const url = new URL(request.url())
+    const match = url.pathname.match(/^\/api\/kick-targets(?:\/([^/?]+))?\/?$/)
+    const id = match?.[1] ?? null
+
+    if (method === 'GET' && id === null) {
+      return route.fulfill({ json: state.kickTargets })
+    }
+    if (method === 'POST' && id === null) {
+      const body = await request.postDataJSON()
+      state.createdKickPayload = body
+      if (gates.kickSave) await gates.kickSave.promise
+      const created = { is_active: true, ...body, discord_id: String(body.discord_id) }
+      state.kickTargets = [...state.kickTargets, created]
+      return route.fulfill({ json: created })
+    }
+    if (method === 'PATCH' && id !== null) {
+      const body = await request.postDataJSON()
+      const isToggle = Object.keys(body).length === 1 && 'is_active' in body
+      if (isToggle) {
+        state.kickToggleCalls += 1
+        if (gates.kickToggle) await gates.kickToggle.promise
+      } else {
+        state.updatedKickPayload = body
+        if (gates.kickSave) await gates.kickSave.promise
+      }
+      state.kickTargets = state.kickTargets.map(t => (String(t.discord_id) === id ? { ...t, ...body } : t))
+      return route.fulfill({ json: state.kickTargets.find(t => String(t.discord_id) === id) })
+    }
+    if (method === 'DELETE' && id !== null) {
+      state.deletedKickId = id
+      if (gates.kickDelete) await gates.kickDelete.promise
+      state.kickTargets = state.kickTargets.filter(t => String(t.discord_id) !== id)
+      return route.fulfill({ status: 204 })
+    }
+    return route.fulfill({ status: 404, json: { detail: 'not found' } })
+  })
+
+  await page.route(/\/api\/stacking-pairs(?:\/(\d+))?(?:\/(toggle))?\/?(?:\?.*)?$/, async route => {
+    const request = route.request()
+    const method = request.method()
+    const url = new URL(request.url())
+    const match = url.pathname.match(/^\/api\/stacking-pairs(?:\/(\d+))?(?:\/(toggle))?\/?$/)
+    const id = match?.[1] ? Number(match[1]) : null
+    const isToggle = !!match?.[2]
+
+    if (method === 'GET' && id === null) {
+      return route.fulfill({ json: state.pairs })
+    }
+    if (method === 'POST' && id === null) {
+      const body = await request.postDataJSON()
+      state.createdPairPayload = body
+      if (gates.pairSave) await gates.pairSave.promise
+      const now = '2026-09-06T12:00:00Z'
+      const created = { id: Math.max(0, ...state.pairs.map(p => p.id)) + 1, is_active: true, created_at: now, ...body }
+      state.pairs = [...state.pairs, created]
+      return route.fulfill({ json: created })
+    }
+    if (method === 'PATCH' && id !== null && isToggle) {
+      state.pairToggleCalls += 1
+      if (gates.pairToggle) await gates.pairToggle.promise
+      state.pairs = state.pairs.map(p => (p.id === id ? { ...p, is_active: !p.is_active } : p))
+      return route.fulfill({ json: state.pairs.find(p => p.id === id) })
+    }
+    if (method === 'DELETE' && id !== null) {
+      state.deletedPairId = id
+      if (gates.pairDelete) await gates.pairDelete.promise
+      state.pairs = state.pairs.filter(p => p.id !== id)
+      return route.fulfill({ status: 204 })
+    }
+    return route.fulfill({ status: 404, json: { detail: 'not found' } })
+  })
+
+  return state
+}
+
+// Selects a member option in a MemberAutocomplete field identified by its
+// visible label: types the target's display name (triggering the
+// component's own debounced /api/members search) then clicks the matching
+// option once it appears.
+async function selectMember(page, label, name) {
+  const field = page.getByLabel(label)
+  await field.click()
+  await field.fill(name)
+  await page.getByRole('option', { name }).click()
+}
+
+test('users uses semantic tab labels but submits internal list_type values', async ({ page }) => {
+  const state = await mockMemberManagement(page, { users: [] })
+  await page.goto(`${BASE_URL}/users`)
+
+  await expect(page.getByRole('tab', { name: 'Белый список' })).toBeVisible()
+  await page.getByRole('tab', { name: 'Чёрный список' }).click()
+  await page.getByRole('button', { name: 'Добавить' }).click()
+  await selectMember(page, 'Участник', 'Ada')
+  await page.getByRole('button', { name: 'Сохранить' }).click()
+
+  await expect.poll(() => state.createdUserPayload?.list_type).toBe('blacklist')
+  expect(state.createdUserPayload.discord_id).toBe('42')
+})
+
+test('users requires selecting a member before saving', async ({ page }) => {
+  await mockMemberManagement(page, { users: [] })
+  await page.goto(`${BASE_URL}/users`)
+  await page.getByRole('button', { name: 'Добавить' }).click()
+  await page.getByRole('button', { name: 'Сохранить' }).click()
+
+  await expect(page.getByText('Выберите участника')).toBeVisible()
+})
+
+test('users keeps its drawer open and disables the submit button while saving', async ({ page }) => {
+  const userSave = deferred()
+  await mockMemberManagement(page, { users: [], gates: { userSave } })
+  await page.goto(`${BASE_URL}/users`)
+  await page.getByRole('button', { name: 'Добавить' }).click()
+  await selectMember(page, 'Участник', 'Ada')
+  await page.getByRole('button', { name: 'Сохранить' }).click()
+
+  await expect(page.getByRole('button', { name: 'Сохранение…' })).toBeDisabled()
+  await page.keyboard.press('Escape')
+  await expect(page.getByRole('dialog', { name: 'Добавить в белый список' })).toBeVisible()
+  userSave.resolve()
+})
+
+test('users restores focus to the add trigger after the drawer closes', async ({ page }) => {
+  await mockMemberManagement(page, { users: [] })
+  await page.goto(`${BASE_URL}/users`)
+  const addButton = page.getByRole('button', { name: 'Добавить' })
+  await addButton.click()
+  await page.getByRole('button', { name: 'Отмена' }).click()
+
+  await expect(addButton).toBeFocused()
+})
+
+test('users protects a pending destructive confirmation', async ({ page }) => {
+  const userDelete = deferred()
+  await mockMemberManagement(page, { gates: { userDelete } })
+  await page.goto(`${BASE_URL}/users`)
+  await page.getByRole('button', { name: 'Удалить: Ada' }).click()
+  await page.getByRole('button', { name: 'Удалить', exact: true }).click()
+
+  await expect(page.getByRole('button', { name: 'Удаление…' })).toBeDisabled()
+  await page.keyboard.press('Escape')
+  await expect(page.getByRole('dialog', { name: 'Удалить участника?' })).toBeVisible()
+  userDelete.resolve()
+})
+
+test('users has no document overflow at 390x844', async ({ page }) => {
+  await mockMemberManagement(page)
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.goto(`${BASE_URL}/users`)
+
+  await expect(page.getByRole('heading', { name: 'Участники' })).toBeVisible()
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)
+  expect(overflow).toBeLessThanOrEqual(0)
+})
+
+test('kick targets converts minute-based fields into second-based payload', async ({ page }) => {
+  const state = await mockMemberManagement(page, { kickTargets: [] })
+  await page.goto(`${BASE_URL}/kick-targets`)
+  await page.getByRole('button', { name: 'Добавить' }).click()
+  await selectMember(page, 'Участник', 'Ada')
+  await page.getByLabel('Минимальное время').fill('10')
+  await page.getByLabel('Максимальное время').fill('20')
+  await page.getByRole('button', { name: 'Сохранить' }).click()
+
+  await expect.poll(() => state.createdKickPayload?.timeout_sec).toBe(600)
+  expect(state.createdKickPayload.max_timeout_sec).toBe(1200)
+})
+
+test('kick targets validates a positive minimum and a maximum not below minimum', async ({ page }) => {
+  await mockMemberManagement(page, { kickTargets: [] })
+  await page.goto(`${BASE_URL}/kick-targets`)
+  await page.getByRole('button', { name: 'Добавить' }).click()
+  await selectMember(page, 'Участник', 'Ada')
+  await page.getByLabel('Минимальное время').fill('0')
+  await page.getByRole('button', { name: 'Сохранить' }).click()
+  await expect(page.getByText('Минимальное время должно быть больше нуля')).toBeVisible()
+
+  await page.getByLabel('Минимальное время').fill('30')
+  await page.getByLabel('Максимальное время').fill('10')
+  await page.getByRole('button', { name: 'Сохранить' }).click()
+  await expect(page.getByText('Максимальное время не может быть меньше минимального')).toBeVisible()
+})
+
+test('kick targets shows explicit Включено status text', async ({ page }) => {
+  await mockMemberManagement(page, { kickTargets: [kickTargetFixture] })
+  await page.goto(`${BASE_URL}/kick-targets`)
+
+  await expect(page.getByText('Включено', { exact: true })).toBeVisible()
+})
+
+test('kick targets cannot toggle the same target twice while a toggle is pending', async ({ page }) => {
+  const kickToggle = deferred()
+  const state = await mockMemberManagement(page, { kickTargets: [kickTargetFixture], gates: { kickToggle } })
+  await page.goto(`${BASE_URL}/kick-targets`)
+
+  const toggle = page.getByRole('switch').first()
+  await toggle.click()
+  await expect(toggle).toBeDisabled()
+  await toggle.click({ force: true })
+
+  expect(state.kickToggleCalls).toBe(1)
+  kickToggle.resolve()
+})
+
+test('kick targets protects a pending destructive confirmation', async ({ page }) => {
+  const kickDelete = deferred()
+  await mockMemberManagement(page, { kickTargets: [kickTargetFixture], gates: { kickDelete } })
+  await page.goto(`${BASE_URL}/kick-targets`)
+  await page.getByRole('button', { name: 'Удалить: Ada' }).click()
+  await page.getByRole('button', { name: 'Удалить', exact: true }).click()
+
+  await expect(page.getByRole('button', { name: 'Удаление…' })).toBeDisabled()
+  await page.keyboard.press('Escape')
+  await expect(page.getByRole('dialog', { name: 'Удалить цель кика?' })).toBeVisible()
+  kickDelete.resolve()
+})
+
+test('kick targets has no document overflow at 390x844', async ({ page }) => {
+  await mockMemberManagement(page, { kickTargets: [kickTargetFixture] })
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.goto(`${BASE_URL}/kick-targets`)
+
+  await expect(page.getByRole('heading', { name: 'Кик-цели' })).toBeVisible()
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)
+  expect(overflow).toBeLessThanOrEqual(0)
+})
+
+// FormDrawer's submit button couples its `disabled` state to `submitting`
+// (which also swaps its visible label to "Сохранение…") and exposes no
+// independent validity-driven disablement — the shared component's locked
+// interface (see FormDrawer.jsx) has no such knob. So this asserts the
+// behavior that actually matters and is achievable through that interface —
+// the adjacent error is visible and clicking Save never reaches the API —
+// rather than a literal disabled-attribute check on a button still labelled
+// "Сохранить", which the current FormDrawer contract cannot produce.
+test('stacking pairs prevents choosing the same member twice', async ({ page }) => {
+  const state = await mockMemberManagement(page, { pairs: [] })
+  await page.goto(`${BASE_URL}/stacking-pairs`)
+  await page.getByRole('button', { name: 'Добавить пару' }).click()
+  await selectMember(page, 'Первый участник', 'Ada')
+  await selectMember(page, 'Второй участник', 'Ada')
+  await expect(page.getByText('Выберите двух разных участников')).toBeVisible()
+
+  await page.getByRole('button', { name: 'Сохранить' }).click()
+  expect(state.createdPairPayload).toBeNull()
+})
+
+test('stacking pairs creates a pair with two distinct members and a target channel', async ({ page }) => {
+  const state = await mockMemberManagement(page, { pairs: [] })
+  await page.goto(`${BASE_URL}/stacking-pairs`)
+  await page.getByRole('button', { name: 'Добавить пару' }).click()
+  await selectMember(page, 'Первый участник', 'Ada')
+  await selectMember(page, 'Второй участник', 'Boris')
+  await page.getByLabel('Целевой голосовой канал').fill('100')
+  await page.getByRole('button', { name: 'Сохранить' }).click()
+
+  await expect.poll(() => state.createdPairPayload?.target_channel_id).toBe('100')
+  expect(state.createdPairPayload.user_id_1).toBe('42')
+  expect(state.createdPairPayload.user_id_2).toBe('84')
+})
+
+test('stacking pairs cannot toggle the same pair twice while a toggle is pending', async ({ page }) => {
+  const pairToggle = deferred()
+  const state = await mockMemberManagement(page, { pairs: [stackingPairFixture], gates: { pairToggle } })
+  await page.goto(`${BASE_URL}/stacking-pairs`)
+
+  const toggle = page.getByRole('switch').first()
+  await toggle.click()
+  await expect(toggle).toBeDisabled()
+  await toggle.click({ force: true })
+
+  expect(state.pairToggleCalls).toBe(1)
+  pairToggle.resolve()
+})
+
+test('stacking pairs protects a pending destructive confirmation', async ({ page }) => {
+  const pairDelete = deferred()
+  await mockMemberManagement(page, { pairs: [stackingPairFixture], gates: { pairDelete } })
+  await page.goto(`${BASE_URL}/stacking-pairs`)
+  await page.getByRole('button', { name: 'Удалить: пара #4' }).click()
+  await page.getByRole('button', { name: 'Удалить', exact: true }).click()
+
+  await expect(page.getByRole('button', { name: 'Удаление…' })).toBeDisabled()
+  await page.keyboard.press('Escape')
+  await expect(page.getByRole('dialog', { name: 'Удалить пару?' })).toBeVisible()
+  pairDelete.resolve()
+})
+
+test('stacking pairs has no document overflow at 390x844', async ({ page }) => {
+  await mockMemberManagement(page, { pairs: [stackingPairFixture] })
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.goto(`${BASE_URL}/stacking-pairs`)
+
+  await expect(page.getByRole('heading', { name: 'Стаки' })).toBeVisible()
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)
+  expect(overflow).toBeLessThanOrEqual(0)
+})
