@@ -47,6 +47,47 @@ test('login uses the Vibe brand mark without emoji', async ({ page }) => {
   expect(/\p{Extended_Pictographic}/u.test(bodyText)).toBe(false)
 })
 
+test('copied Discord IDs use text feedback without pictographic symbols', async ({ page }) => {
+  await page.route('**/auth/me', route => route.fulfill({
+    json: { id: '1', username: 'Admin', avatar: null },
+  }))
+  await page.route('**/api/dashboard', route => route.fulfill({
+    json: populatedDashboardFixture,
+  }))
+  await page.route('**/api/stats/overview', route => route.fulfill({
+    json: { total_actions: 1 },
+  }))
+  await neutralizeEventSource(page)
+  await page.goto(`${BASE_URL}/`)
+
+  const discordId = page.getByText('123', { exact: true })
+  await discordId.hover()
+  await discordId.click()
+
+  await expect(page.getByText('Скопировано', { exact: true })).toBeVisible()
+  expect(/\p{Extended_Pictographic}/u.test(await page.locator('body').innerText())).toBe(false)
+})
+
+test('debug warning uses accessible text without pictographic symbols', async ({ page }) => {
+  await page.route('**/auth/me', route => route.fulfill({
+    json: { id: '1', username: 'Admin', avatar: null },
+  }))
+  await page.route('**/api/settings/bot-info', route => route.fulfill({
+    json: { bot_name: 'Vibe', guild_id: '1', guild_name: 'Guild', uptime_seconds: 1, latency_ms: 1 },
+  }))
+  await page.route('**/api/settings/allowed-users', route => route.fulfill({
+    json: { allowed_discord_ids: [] },
+  }))
+  await page.route('**/api/settings/debug-mode', route => route.fulfill({
+    json: { debug_mode: true },
+  }))
+
+  await page.goto(`${BASE_URL}/settings`)
+
+  await expect(page.getByText(/Debug mode активен/)).toBeVisible()
+  expect(/\p{Extended_Pictographic}/u.test(await page.locator('body').innerText())).toBe(false)
+})
+
 // Dashboard.jsx opens a live EventSource on mount; neutralize it so tests
 // don't depend on a real SSE connection. The stub still records the
 // most-recently-constructed instance on `window.__testEventSource`, and
