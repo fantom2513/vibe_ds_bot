@@ -1288,7 +1288,7 @@ test('logs uses Russian field labels and grid text', async ({ page }) => {
   await expect(page.getByLabel('Дата с')).toBeVisible()
   await expect(page.getByLabel('Дата по')).toBeVisible()
   await expect(page.getByLabel('Тип действия')).toBeVisible()
-  await expect(page.getByLabel('Discord ID')).toBeVisible()
+  await expect(page.getByLabel('Discord ID', { exact: true })).toBeVisible()
   await expect(page.getByLabel('ID правила')).toBeVisible()
   await expect(page.getByText('Нет событий')).toBeVisible()
   await expect(page.getByText('Строк на странице:')).toBeVisible()
@@ -1298,7 +1298,7 @@ test('logs Apply submits the visible filter state and Reset clears it', async ({
   const state = await mockLogs(page)
   await page.goto(`${BASE_URL}/logs`)
 
-  await page.getByLabel('Discord ID').fill('42')
+  await page.getByLabel('Discord ID', { exact: true }).fill('42')
   await page.getByRole('button', { name: 'Применить' }).click()
   await expect.poll(() => state.lastQuery?.discord_id).toBe('42')
 
@@ -1314,7 +1314,7 @@ test('logs export preserves the active filters', async ({ page }) => {
   })
   await page.goto(`${BASE_URL}/logs`)
 
-  await page.getByLabel('Discord ID').fill('42')
+  await page.getByLabel('Discord ID', { exact: true }).fill('42')
   await page.getByRole('button', { name: 'Применить' }).click()
   await page.getByRole('button', { name: 'Экспорт CSV' }).click()
 
@@ -1327,7 +1327,9 @@ test('logs date filter inputs keep persistent labels', async ({ page }) => {
   await page.goto(`${BASE_URL}/logs`)
 
   await page.getByLabel('Дата с').fill('2026-09-01T00:00')
-  await expect(page.getByText('Дата с')).toBeVisible()
+  // A persistent (shrunk) label stays a real <label> for the field rather
+  // than disappearing/floating away once a value is entered.
+  await expect(page.locator('label').filter({ hasText: 'Дата с' })).toBeVisible()
   await expect(page.getByLabel('Дата с')).toHaveValue('2026-09-01T00:00')
 })
 
