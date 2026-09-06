@@ -107,7 +107,7 @@ class Settings(BaseSettings):
 
     # Dashboard JWT
     JWT_SECRET: str = Field(default="", description="Секрет для подписи JWT токенов дашборда")
-    JWT_EXPIRE_HOURS: int = Field(default=24, description="Срок жизни JWT в часах")
+    JWT_EXPIRE_HOURS: int = Field(default=720, description="Срок жизни JWT в часах")
 
     # Allowlist
     ALLOWED_DISCORD_IDS: list[int] = Field(

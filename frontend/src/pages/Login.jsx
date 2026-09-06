@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { Box, Button, Typography } from '@mui/material'
 import { useAuth } from '../contexts/AuthContext'
 import { GlowCard } from '../components/ui'
+import BrandMark from '../components/BrandMark'
 
 export default function Login() {
   const { user } = useAuth()
@@ -20,14 +21,8 @@ export default function Login() {
       height: '100vh',
     }}>
       <GlowCard glowColor="accent" sx={{ width: 360, p: 4, textAlign: 'center' }}>
-        <Box sx={{
-          width: 56, height: 56, borderRadius: '14px', mx: 'auto', mb: 3,
-          background: 'linear-gradient(135deg, #5865F2, #8b5cf6)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontSize: '24px',
-          boxShadow: '0 0 32px rgba(88,101,242,0.40)',
-        }}>
-          🤖
+        <Box sx={{ display: 'flex', justifyContent: 'center', mb: 3 }}>
+          <BrandMark size={32} />
         </Box>
         <Typography variant="h5" sx={{ mb: 1 }}>
           Bot Dashboard

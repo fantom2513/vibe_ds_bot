@@ -56,7 +56,7 @@ jobs:
           DISCORD_CLIENT_SECRET=${{ secrets.DISCORD_CLIENT_SECRET }}
           DISCORD_REDIRECT_URI=${{ secrets.DISCORD_REDIRECT_URI }}
           JWT_SECRET=${{ secrets.JWT_SECRET }}
-          JWT_EXPIRE_HOURS=24
+          JWT_EXPIRE_HOURS=720
           ALLOWED_DISCORD_IDS=${{ secrets.ALLOWED_DISCORD_IDS }}
           ALERT_WEBHOOK_URL=${{ secrets.ALERT_WEBHOOK_URL }}
           EOF
