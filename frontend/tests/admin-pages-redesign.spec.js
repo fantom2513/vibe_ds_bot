@@ -918,3 +918,316 @@ test('schedules has no document overflow at 390x844', async ({ page }) => {
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)
   expect(overflow).toBeLessThanOrEqual(0)
 })
+
+// ---------------------------------------------------------------------------
+// Task 4: Tracking workspace and its daily-work-hours chart
+// ---------------------------------------------------------------------------
+
+// Same shape as tracking.spec.js's trackedFixture, kept local to this file
+// per this suite's one-helper-per-task convention (see mockRules /
+// mockMemberManagement / mockSchedules above) rather than importing a sibling
+// spec file, which would re-register its top-level tests under this file.
+const trackedMemberFixture = (overrides = {}) => ({
+  discord_id: '42',
+  username: 'Ada',
+  is_active: true,
+  work_days: [0, 1, 2, 3, 4],
+  work_start: '09:00',
+  work_end: '18:00',
+  timezone: 'Europe/Moscow',
+  created_at: '2026-08-28T09:00:00Z',
+  updated_at: '2026-08-28T09:00:00Z',
+  ...overrides,
+})
+
+// Two members so the chart renders a legend and >1 series color.
+const dailyWorkHoursFixture = {
+  members: [
+    { discord_id: '42', username: 'Ada' },
+    { discord_id: '84', username: 'Boris' },
+  ],
+  days: [
+    { date: '2026-08-25', '42': 10800, '84': 7200 },
+    { date: '2026-08-26', '42': 9000, '84': 5400 },
+  ],
+}
+
+const trackingReportFixture = (username = 'Ada', overrides = {}) => ({
+  period_start: '2026-08-28T00:00:00Z',
+  period_end: '2026-08-28T12:00:00Z',
+  members: [{
+    discord_id: '42',
+    username,
+    total_seconds: 3600,
+    session_count: 1,
+    work_seconds: 1800,
+    ...overrides,
+  }],
+  overlaps: [],
+})
+
+// Mocks the authenticated admin identity plus the full /api/tracking/*
+// surface (members CRUD, settings, text-channels, preview, daily work
+// hours) reused against the same /api/members fixtures as
+// mockMemberManagement above. `gates` optionally defers a specific
+// mutation's response so tests can assert pending-state UI deterministically.
+async function mockTracking(page, {
+  initialMembers = [],
+  daily = dailyWorkHoursFixture,
+  gates = {},
+} = {}) {
+  const state = {
+    members: initialMembers.map(m => ({ ...m })),
+    reportChannelId: null,
+    createdPayload: null,
+    updatedPayload: null,
+    deletedId: null,
+  }
+
+  await page.route('**/auth/me', route => route.fulfill({
+    json: { id: '1', username: 'Admin', avatar: null },
+  }))
+
+  await page.route(/\/api\/members(?:\/([^/?]+))?\/?(?:\?.*)?$/, async route => {
+    const request = route.request()
+    const method = request.method()
+    const url = new URL(request.url())
+    const match = url.pathname.match(/^\/api\/members(?:\/([^/?]+))?\/?$/)
+    const segment = match?.[1] ?? null
+
+    if (method === 'GET' && segment === null) {
+      const q = (url.searchParams.get('q') || '').toLowerCase()
+      const results = Object.values(memberFixtures).filter(m =>
+        !q || m.display_name.toLowerCase().includes(q) || m.username.toLowerCase().includes(q)
+      )
+      return route.fulfill({ json: results })
+    }
+    if (method === 'POST' && segment === 'batch') {
+      const ids = await request.postDataJSON()
+      const result = {}
+      ids.forEach(id => { result[id] = memberFixtures[id] || { id, username: id, display_name: 'Unknown', avatar: null, label: `Unknown (@${id})` } })
+      return route.fulfill({ json: result })
+    }
+    if (method === 'GET' && segment !== null) {
+      const memberRecord = memberFixtures[segment]
+      if (!memberRecord) return route.fulfill({ status: 404, json: { detail: 'not found' } })
+      return route.fulfill({ json: memberRecord })
+    }
+    return route.fulfill({ status: 404, json: { detail: 'not found' } })
+  })
+
+  // Anchored on the trailing slash after "tracking" so this only matches the
+  // real /api/tracking/... endpoints and never Vite's dev-server module URL
+  // for the source file src/api/tracking.js (no trailing slash there).
+  await page.route(/\/api\/tracking\//, async route => {
+    const request = route.request()
+    const url = new URL(request.url())
+    const method = request.method()
+
+    if (url.pathname === '/api/tracking/members' && method === 'GET') {
+      return route.fulfill({ json: state.members })
+    }
+    if (url.pathname === '/api/tracking/members' && method === 'POST') {
+      const body = await request.postDataJSON()
+      state.createdPayload = body
+      if (gates.add) await gates.add.promise
+      const created = trackedMemberFixture({ ...body, username: body.username ?? null })
+      state.members = [created]
+      return route.fulfill({ json: created })
+    }
+    const memberMatch = url.pathname.match(/^\/api\/tracking\/members\/([^/]+)$/)
+    if (memberMatch && method === 'PATCH') {
+      const body = await request.postDataJSON()
+      state.updatedPayload = body
+      if (gates.schedule) await gates.schedule.promise
+      state.members = state.members.map(m => (String(m.discord_id) === memberMatch[1] ? { ...m, ...body } : m))
+      return route.fulfill({ json: state.members.find(m => String(m.discord_id) === memberMatch[1]) })
+    }
+    if (memberMatch && method === 'DELETE') {
+      state.deletedId = memberMatch[1]
+      if (gates.delete) await gates.delete.promise
+      state.members = state.members.filter(m => String(m.discord_id) !== memberMatch[1])
+      return route.fulfill({ status: 204 })
+    }
+    if (url.pathname === '/api/tracking/settings' && method === 'GET') {
+      return route.fulfill({ json: { report_channel_id: state.reportChannelId } })
+    }
+    if (url.pathname === '/api/tracking/settings' && method === 'PATCH') {
+      const body = await request.postDataJSON()
+      if (gates.channel) await gates.channel.promise
+      state.reportChannelId = body.report_channel_id
+      return route.fulfill({ json: { report_channel_id: state.reportChannelId } })
+    }
+    if (url.pathname === '/api/tracking/text-channels') {
+      return route.fulfill({ json: [{ id: '99', name: 'reports' }] })
+    }
+    if (url.pathname === '/api/tracking/preview') {
+      if (gates.preview) await gates.preview.promise
+      return route.fulfill({
+        json: {
+          ...trackingReportFixture(),
+          members: state.members.map(tracked => ({
+            discord_id: tracked.discord_id,
+            username: tracked.username,
+            total_seconds: 3600,
+            session_count: 1,
+            work_seconds: 1800,
+          })),
+        },
+      })
+    }
+    if (url.pathname === '/api/tracking/daily-work-hours') {
+      return route.fulfill({ json: daily })
+    }
+
+    return route.fulfill({ status: 404, json: { detail: 'Unhandled test route' } })
+  })
+
+  return state
+}
+
+test('tracking groups its workspace into four Russian-labelled Panel sections', async ({ page }) => {
+  await mockTracking(page, { initialMembers: [trackedMemberFixture()] })
+  await page.goto(`${BASE_URL}/tracking`)
+
+  await expect(page.getByRole('heading', { name: 'Отслеживание' })).toBeVisible()
+  for (const title of ['Канал отчётов', 'Отслеживаемые участники', 'Предпросмотр отчёта', 'Рабочие часы — последние 14 дней']) {
+    const heading = page.getByRole('heading', { name: title })
+    await expect(heading).toBeVisible()
+    // A Panel boundary is a bordered/surfaced container, not an arbitrary
+    // div — assert the heading sits inside one by walking to the nearest
+    // ancestor painted with the approved surface token (--color-bg-surface,
+    // graphite-850 => rgb(16, 22, 25)), rather than an untokenized card.
+    const surfaced = await heading.evaluate(el => {
+      let node = el.closest('div')
+      while (node) {
+        if (getComputedStyle(node).backgroundColor === 'rgb(16, 22, 25)') return true
+        node = node.parentElement
+      }
+      return false
+    })
+    expect(surfaced).toBe(true)
+  }
+})
+
+test('tracking chart uses the dedicated non-semantic series palette', async ({ page }) => {
+  await mockTracking(page, { daily: dailyWorkHoursFixture })
+  await page.goto(`${BASE_URL}/tracking`)
+  const fills = await page.locator('.recharts-bar-rectangle path').evaluateAll(paths =>
+    [...new Set(paths.map(path => getComputedStyle(path).fill))]
+  )
+  expect(fills).not.toContain('rgb(88, 101, 242)')
+  expect(fills).not.toContain('rgb(139, 92, 246)')
+  expect(fills.length).toBeGreaterThan(1)
+  // Pins the assertion to the actual approved chartSeriesColors values (not
+  // just "isn't blurple") so this test genuinely fails before the palette
+  // file exists: '#65C69C' and '#67B9DE' are the first two stable entries,
+  // assigned by member order to Ada ('42') and Boris ('84').
+  expect(fills).toContain('rgb(101, 198, 156)')
+  expect(fills).toContain('rgb(103, 185, 222)')
+})
+
+test('tracking chart grid and axis text consume the border and secondary-text tokens', async ({ page }) => {
+  await mockTracking(page, { daily: dailyWorkHoursFixture })
+  await page.goto(`${BASE_URL}/tracking`)
+
+  const gridStroke = await page.locator('.recharts-cartesian-grid line').first()
+    .evaluate(el => getComputedStyle(el).stroke)
+  expect(gridStroke).toBe('rgb(37, 50, 57)') // --color-border (graphite-700)
+
+  const axisFill = await page.locator('.recharts-xAxis text').first()
+    .evaluate(el => getComputedStyle(el).fill)
+  expect(axisFill).toBe('rgb(168, 181, 176)') // --color-text-secondary (neutral-300)
+})
+
+test('tracking chart tooltip uses the elevated-surface and border tokens', async ({ page }) => {
+  await mockTracking(page, { daily: dailyWorkHoursFixture })
+  await page.goto(`${BASE_URL}/tracking`)
+
+  await page.locator('.recharts-bar-rectangle path').first().hover()
+  const tooltipBox = page.locator('.recharts-tooltip-wrapper > div').first()
+  await expect(tooltipBox).toBeVisible()
+  const styles = await tooltipBox.evaluate(el => {
+    const s = getComputedStyle(el)
+    return { background: s.backgroundColor, border: s.borderTopColor }
+  })
+  expect(styles.background).toBe('rgb(21, 29, 33)') // --color-bg-elevated (graphite-800)
+  expect(styles.border).toBe('rgb(37, 50, 57)') // --color-border (graphite-700)
+})
+
+test('tracking chart legend text uses the secondary-text token', async ({ page }) => {
+  await mockTracking(page, { daily: dailyWorkHoursFixture }) // 2 members => legend renders
+  await page.goto(`${BASE_URL}/tracking`)
+
+  const legend = page.locator('.recharts-legend-wrapper')
+  await expect(legend).toBeVisible()
+  const color = await legend.evaluate(el => getComputedStyle(el).color)
+  expect(color).toBe('rgb(168, 181, 176)') // --color-text-secondary (neutral-300)
+})
+
+test('tracking still saves the report channel and adds a tracked member after the redesign', async ({ page }) => {
+  const state = await mockTracking(page)
+  await page.goto(`${BASE_URL}/tracking`)
+
+  await page.getByLabel('Пользователь').fill('Ada')
+  await page.getByRole('option', { name: 'Ada' }).click()
+  await page.getByRole('button', { name: 'Добавить', exact: true }).click()
+  await expect(page.getByRole('heading', { name: 'Рабочий график' })).toBeVisible()
+  await page.getByRole('button', { name: 'Сохранить', exact: true }).click()
+  await expect(page.getByText('Расписание сохранено')).toBeVisible()
+
+  await page.getByLabel('Канал отчётов').click()
+  await page.getByRole('option', { name: '#reports' }).click()
+  await page.getByRole('button', { name: 'Сохранить канал' }).click()
+  await expect(page.getByText('Канал отчётов сохранён')).toBeVisible()
+
+  expect(state.createdPayload?.discord_id).toBe('42')
+})
+
+test('tracking protects a pending member deletion through the shared confirm dialog', async ({ page }) => {
+  const del = deferred()
+  await mockTracking(page, { initialMembers: [trackedMemberFixture()], gates: { delete: del } })
+  await page.goto(`${BASE_URL}/tracking`)
+  await page.getByRole('button', { name: 'Удалить: Ada' }).click()
+  await page.getByRole('button', { name: 'Удалить', exact: true }).click()
+
+  await expect(page.getByRole('button', { name: 'Удаление…' })).toBeDisabled()
+  await page.keyboard.press('Escape')
+  await expect(page.getByRole('dialog', { name: 'Удалить участника?' })).toBeVisible()
+  del.resolve()
+})
+
+test('tracking blocks escape while a schedule save is pending in the shared form drawer', async ({ page }) => {
+  const scheduleGate = deferred()
+  await mockTracking(page, { initialMembers: [trackedMemberFixture()], gates: { schedule: scheduleGate } })
+  await page.goto(`${BASE_URL}/tracking`)
+  await page.getByRole('button', { name: 'Редактировать график: Ada' }).click()
+  await page.getByRole('button', { name: 'Сохранить', exact: true }).click()
+
+  await expect(page.getByRole('button', { name: 'Сохранение…' })).toBeDisabled()
+  await page.keyboard.press('Escape')
+  await expect(page.getByRole('heading', { name: 'Рабочий график' })).toBeVisible()
+  scheduleGate.resolve()
+})
+
+test('tracking still changes the preview period and refreshes the preview on demand', async ({ page }) => {
+  await mockTracking(page, { initialMembers: [trackedMemberFixture()] })
+  await page.goto(`${BASE_URL}/tracking`)
+
+  await page.getByRole('combobox', { name: 'Период' }).click()
+  await page.getByRole('option', { name: 'Неделя' }).click()
+  await expect(page.getByRole('combobox', { name: 'Период' })).toContainText('Неделя')
+
+  await page.getByRole('button', { name: 'Обновить предпросмотр' }).click()
+  await expect(page.getByRole('table', { name: 'Личная статистика' })).toBeVisible()
+})
+
+test('tracking configuration and preview remain usable at 390 px', async ({ page }) => {
+  await mockTracking(page, { initialMembers: [trackedMemberFixture()] })
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.goto(`${BASE_URL}/tracking`)
+
+  await expect(page.getByRole('heading', { name: 'Отслеживание' })).toBeVisible()
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)
+  expect(overflow).toBeLessThanOrEqual(0)
+})
