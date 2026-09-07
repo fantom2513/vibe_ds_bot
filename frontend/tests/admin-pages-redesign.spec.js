@@ -1607,7 +1607,7 @@ test('mute levels validates level, name, XP threshold, and role before saving', 
   await page.goto(`${BASE_URL}/mute-levels`)
 
   await page.getByRole('button', { name: 'Добавить уровень' }).click()
-  await page.getByRole('checkbox', { name: 'Выдавать роль при достижении' }).check()
+  await page.getByRole('switch', { name: 'Выдавать роль при достижении' }).click()
   await page.getByRole('button', { name: 'Сохранить' }).click()
 
   await expect(page.getByText('Укажите номер уровня')).toBeVisible()
@@ -1645,8 +1645,8 @@ test('mute levels shows the guild role color only inside the role selector', asy
   expect(rowHasRoleColor).toBe(false)
 
   await page.getByRole('button', { name: 'Добавить уровень' }).click()
-  await page.getByRole('checkbox', { name: 'Выдавать роль при достижении' }).check()
-  await page.getByLabel('Роль').click()
+  await page.getByRole('switch', { name: 'Выдавать роль при достижении' }).click()
+  await page.getByLabel('Роль', { exact: true }).click()
   const option = page.getByRole('option', { name: 'Тихий' })
   const optionHasRoleColor = await option.evaluate((el, rgb) => (
     [...el.querySelectorAll('*')].some(node => getComputedStyle(node).backgroundColor === rgb)
