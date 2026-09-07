@@ -1711,3 +1711,283 @@ test('mute levels has no document overflow at 390x844', async ({ page }) => {
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)
   expect(overflow).toBeLessThanOrEqual(0)
 })
+
+// ---------------------------------------------------------------------------
+// Task 7: full admin regression — route matrix + keyboard/mutation-state
+// matrix. Reuses every mock*() helper defined above rather than duplicating
+// per-page route handlers a third time.
+// ---------------------------------------------------------------------------
+
+// Dashboard.jsx opens a live EventSource on mount and expects /api/dashboard
+// + /api/stats/overview; neutralized the same way
+// admin-dashboard-redesign.spec.js does, so visiting '/' in the route matrix
+// never depends on (or hangs on) a real SSE connection.
+async function neutralizeEventSource(page) {
+  await page.addInitScript(() => {
+    class TestEventSource {
+      constructor(url) {
+        this.url = url
+        this.readyState = 1
+        this.onopen = null
+        this.onmessage = null
+        this.onerror = null
+      }
+      addEventListener() {}
+      removeEventListener() {}
+      close() {}
+    }
+    window.EventSource = TestEventSource
+  })
+}
+
+async function mockDashboardRoute(page) {
+  await page.route('**/auth/me', route => route.fulfill({
+    json: { id: '1', username: 'Admin', avatar: null },
+  }))
+  await page.route('**/api/dashboard', route => route.fulfill({
+    json: { active_rules: [], voice_online_count: 0, online_users: [], recent_logs: [] },
+  }))
+  await page.route('**/api/stats/overview', route => route.fulfill({
+    json: { total_actions: 0 },
+  }))
+  await neutralizeEventSource(page)
+}
+
+const adminRoutes = [
+  '/', '/rules', '/users', '/kick-targets', '/stacking-pairs',
+  '/tracking', '/schedules', '/logs', '/settings', '/mute-levels',
+]
+
+// Each route's exact major-heading text, matching what this route's own
+// dedicated workflow tests above already assert (e.g. "rules page uses
+// Russian labels...", "mute levels renders under the protected admin shell").
+const routeHeadings = {
+  '/': 'Обзор сервера',
+  '/rules': 'Правила',
+  '/users': 'Участники',
+  '/kick-targets': 'Кик-цели',
+  '/stacking-pairs': 'Стаки',
+  '/tracking': 'Отслеживание',
+  '/schedules': 'Расписания',
+  '/logs': 'Журнал',
+  '/settings': 'Настройки',
+  '/mute-levels': 'Уровни тишины',
+}
+
+const routeSetups = {
+  '/': page => mockDashboardRoute(page),
+  '/rules': page => mockRules(page, [ruleFixture]),
+  '/users': page => mockMemberManagement(page),
+  '/kick-targets': page => mockMemberManagement(page, { kickTargets: [kickTargetFixture] }),
+  '/stacking-pairs': page => mockMemberManagement(page, { pairs: [stackingPairFixture] }),
+  '/tracking': page => mockTracking(page, { initialMembers: [trackedMemberFixture()] }),
+  '/schedules': page => mockSchedules(page),
+  '/logs': page => mockLogs(page, { logs: [logFixture] }),
+  '/settings': page => mockSettings(page),
+  '/mute-levels': page => mockMuteLevels(page),
+}
+
+// Discord blurple and the retired decorative purple, in the same computed
+// rgb() form the browser reports for color/background/border/fill/stroke.
+const LEGACY_COLORS = ['rgb(88, 101, 242)', 'rgb(139, 92, 246)']
+
+async function hasLegacyColor(page) {
+  return page.evaluate((forbidden) => {
+    const props = ['color', 'backgroundColor', 'borderColor', 'borderTopColor', 'fill', 'stroke']
+    for (const el of document.querySelectorAll('*')) {
+      const cs = getComputedStyle(el)
+      if (props.some(prop => forbidden.includes(cs[prop]))) return true
+    }
+    return false
+  }, LEGACY_COLORS)
+}
+
+for (const route of adminRoutes) {
+  test(`route matrix: ${route} shows one heading, fits 390px, and carries no emoji or legacy palette`, async ({ page }) => {
+    await routeSetups[route](page)
+    await page.setViewportSize({ width: 390, height: 844 })
+    await page.goto(`${BASE_URL}${route}`)
+
+    const heading = page.getByRole('heading', { name: routeHeadings[route], exact: true })
+    await expect(heading).toBeVisible()
+    await expect(heading).toHaveCount(1)
+
+    const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)
+    expect(overflow).toBeLessThanOrEqual(0)
+
+    const bodyText = await page.locator('body').innerText()
+    expect(/\p{Extended_Pictographic}/u.test(bodyText)).toBe(false)
+
+    expect(await hasLegacyColor(page)).toBe(false)
+  })
+}
+
+// ---------------------------------------------------------------------------
+// Keyboard and mutation-state matrix: one representative drawer, dialog, tab
+// set, switch, filter toolbar, and DataGrid.
+// ---------------------------------------------------------------------------
+
+// Presses Tab (from wherever focus currently sits) until `locator`'s element
+// becomes document.activeElement, so these tests exercise real keyboard
+// traversal instead of a synthetic .focus() call. Throws if the control
+// isn't reached within `maxPresses`, so a broken tab order fails loudly
+// instead of hanging.
+async function tabUntilFocused(page, locator, maxPresses = 60) {
+  for (let i = 0; i <= maxPresses; i++) {
+    if (await locator.evaluate(el => el === document.activeElement).catch(() => false)) return
+    await page.keyboard.press('Tab')
+  }
+  throw new Error('keyboard matrix: control was not reached via Tab navigation')
+}
+
+// True when the currently focused element carries a visible focus
+// indicator — the global `:focus-visible` rule in styles/global.css (mirrored
+// by `.Mui-focusVisible` in theme.js) draws a 2px outline plus ring
+// box-shadow on every interactive control app-wide.
+async function assertVisibleFocus(page) {
+  const visible = await page.evaluate(() => {
+    const el = document.activeElement
+    if (!el || el === document.body) return false
+    try {
+      if (el.matches(':focus-visible')) return true
+    } catch { /* engines without :focus-visible support fall through */ }
+    const cs = getComputedStyle(el)
+    return cs.outlineStyle !== 'none' && cs.outlineWidth !== '0px'
+  })
+  expect(visible).toBe(true)
+}
+
+test('keyboard matrix: drawer is keyboard reachable, blocks Escape while saving, and restores row-action focus on close', async ({ page }) => {
+  const saveGate = deferred()
+  await mockRules(page, [ruleFixture], { saveGate })
+  await page.goto(`${BASE_URL}/rules`)
+
+  const trigger = page.getByRole('button', { name: 'Редактировать: Лимит времени' })
+  await tabUntilFocused(page, trigger)
+  await assertVisibleFocus(page)
+  await page.keyboard.press('Enter')
+
+  const drawer = page.getByRole('dialog', { name: 'Редактировать правило' })
+  await expect(drawer).toBeVisible()
+
+  const saveButton = page.getByRole('button', { name: 'Сохранить' })
+  await tabUntilFocused(page, saveButton)
+  await assertVisibleFocus(page)
+  await page.keyboard.press('Enter')
+
+  await expect(page.getByRole('button', { name: 'Сохранение…' })).toBeDisabled()
+  await page.keyboard.press('Escape')
+  await expect(drawer).toBeVisible()
+
+  saveGate.resolve()
+  await expect(drawer).not.toBeVisible()
+  await expect(trigger).toBeFocused()
+})
+
+test('keyboard matrix: dialog is keyboard reachable, Escape closes and restores focus when idle, but is blocked while a delete is pending', async ({ page }) => {
+  const deleteGate = deferred()
+  await mockRules(page, [ruleFixture], { deleteGate })
+  await page.goto(`${BASE_URL}/rules`)
+
+  const trigger = page.getByRole('button', { name: 'Удалить: Лимит времени' })
+  await tabUntilFocused(page, trigger)
+  await assertVisibleFocus(page)
+  await page.keyboard.press('Enter')
+
+  let dialog = page.getByRole('dialog', { name: 'Удалить правило?' })
+  await expect(dialog).toBeVisible()
+
+  await page.keyboard.press('Escape')
+  await expect(dialog).not.toBeVisible()
+  await expect(trigger).toBeFocused()
+
+  await page.keyboard.press('Enter')
+  dialog = page.getByRole('dialog', { name: 'Удалить правило?' })
+  await expect(dialog).toBeVisible()
+
+  const confirmButton = page.getByRole('button', { name: 'Удалить', exact: true })
+  await tabUntilFocused(page, confirmButton)
+  await assertVisibleFocus(page)
+  await page.keyboard.press('Enter')
+
+  await expect(page.getByRole('button', { name: 'Удаление…' })).toBeDisabled()
+  await page.keyboard.press('Escape')
+  await expect(dialog).toBeVisible()
+
+  deleteGate.resolve()
+})
+
+test('keyboard matrix: tab set is keyboard reachable and shows visible focus while switching lists', async ({ page }) => {
+  await mockMemberManagement(page, { users: [] })
+  await page.goto(`${BASE_URL}/users`)
+
+  const whitelistTab = page.getByRole('tab', { name: 'Белый список' })
+  await tabUntilFocused(page, whitelistTab)
+  await assertVisibleFocus(page)
+
+  // MUI Tabs follows the WAI-ARIA manual-activation pattern by default:
+  // arrow keys move the roving-tabindex focus between tabs, and a separate
+  // Enter/Space activates the focused tab — it does not select on focus
+  // alone.
+  await page.keyboard.press('ArrowRight')
+  const blacklistTab = page.getByRole('tab', { name: 'Чёрный список' })
+  await expect(blacklistTab).toBeFocused()
+  await assertVisibleFocus(page)
+
+  await page.keyboard.press('Enter')
+  await expect(blacklistTab).toHaveAttribute('aria-selected', 'true')
+})
+
+test('keyboard matrix: switch is keyboard reachable, toggles via Space, and cannot repeat its pending request', async ({ page }) => {
+  const patch = deferred()
+  await mockSettings(page, { gates: { patch } })
+  await page.goto(`${BASE_URL}/settings`)
+
+  const toggle = page.getByRole('switch', { name: 'Режим отладки' })
+  await tabUntilFocused(page, toggle)
+  await assertVisibleFocus(page)
+
+  await page.keyboard.press('Space')
+  await expect(toggle).toBeDisabled()
+
+  patch.resolve()
+  await expect(toggle).toBeEnabled()
+})
+
+test('keyboard matrix: filter toolbar is keyboard reachable and applies its filter via keyboard', async ({ page }) => {
+  const state = await mockLogs(page)
+  await page.goto(`${BASE_URL}/logs`)
+
+  const discordIdField = page.getByLabel('Discord ID', { exact: true })
+  await tabUntilFocused(page, discordIdField)
+  await assertVisibleFocus(page)
+  await page.keyboard.type('42')
+
+  const applyButton = page.getByRole('button', { name: 'Применить' })
+  await tabUntilFocused(page, applyButton)
+  await assertVisibleFocus(page)
+  await page.keyboard.press('Enter')
+
+  await expect.poll(() => state.lastQuery?.discord_id).toBe('42')
+})
+
+test('keyboard matrix: data grid is keyboard reachable, shows visible cell focus, and moves focus with arrow keys', async ({ page }) => {
+  await mockLogs(page, { logs: [logFixture] })
+  await page.goto(`${BASE_URL}/logs`)
+
+  await expect(page.locator('.MuiDataGrid-root')).toBeVisible()
+
+  const isInsideGrid = () => page.evaluate(() => !!document.activeElement?.closest('.MuiDataGrid-root'))
+  for (let i = 0; i < 60 && !(await isInsideGrid()); i++) {
+    await page.keyboard.press('Tab')
+  }
+  expect(await isInsideGrid()).toBe(true)
+  await assertVisibleFocus(page)
+
+  const before = await page.evaluate(() => document.activeElement?.getAttribute('data-field') ?? document.activeElement?.textContent)
+  await page.keyboard.press('ArrowRight')
+  const after = await page.evaluate(() => document.activeElement?.getAttribute('data-field') ?? document.activeElement?.textContent)
+
+  expect(await isInsideGrid()).toBe(true)
+  expect(after).not.toBe(before)
+})
