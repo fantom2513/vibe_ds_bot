@@ -1435,7 +1435,12 @@ test('settings reverts debug mode when saving fails', async ({ page }) => {
   await mockSettings(page, { debugMode: false, patchStatus: 500 })
   await page.goto(`${BASE_URL}/settings`)
   const toggle = page.getByRole('checkbox', { name: 'Режим отладки' })
-  await toggle.check()
+  // A plain click (not .check()) avoids racing Playwright's own actionability
+  // polling against the app's optimistic revert: the mocked PATCH below
+  // rejects near-instantly, so setDebugModeState(previous) in Settings.jsx
+  // can flip the checkbox back to unchecked before .check() finishes
+  // verifying the state it just set, which throws "did not change its state".
+  await toggle.click()
   await expect(page.getByRole('alert')).toContainText('Не удалось изменить режим отладки')
   await expect(toggle).not.toBeChecked()
 })
@@ -1470,6 +1475,26 @@ test('settings and login panel contain no legacy glow or shadow treatment', asyn
     return null
   })
   expect(panelWidth).toBeLessThanOrEqual(360)
+})
+
+test('settings has no document overflow at 390x844', async ({ page }) => {
+  await mockSettings(page)
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.goto(`${BASE_URL}/settings`)
+
+  await expect(page.getByRole('heading', { name: 'Настройки' })).toBeVisible()
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)
+  expect(overflow).toBeLessThanOrEqual(0)
+})
+
+test('login has no document overflow at 390x844', async ({ page }) => {
+  await page.route('**/auth/me', route => route.fulfill({ status: 401, json: { detail: 'unauthorized' } }))
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.goto(`${BASE_URL}/login`)
+
+  await expect(page.getByRole('heading', { name: 'Bot Dashboard' })).toBeVisible()
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)
+  expect(overflow).toBeLessThanOrEqual(0)
 })
 
 // ---------------------------------------------------------------------------
