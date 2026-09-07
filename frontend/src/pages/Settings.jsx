@@ -136,13 +136,14 @@ export default function Settings() {
               disabled={debugSaving}
               size="small"
               color={debugMode ? 'warning' : 'default'}
-              // MUI Switch's input defaults to role="switch"; the shared
-              // test contract for this control (matching how it is
-              // authored elsewhere in this admin zone) expects role
-              // "checkbox", so it is overridden explicitly here via the
-              // slotProps API rather than the legacy `inputProps`, whose
-              // `role` would otherwise be shadowed by Switch's own default.
-              slotProps={{ input: { role: 'checkbox', 'aria-label': 'Режим отладки' } }}
+              // MUI Switch's `slotProps.input`, when provided at all,
+              // *replaces* the whole default input slot object rather than
+              // merging into it — so passing an `aria-label` here would
+              // silently drop the default `role="switch"` if `role` weren't
+              // restated explicitly. Kept as "switch" to match the control's
+              // actual on/off semantics (see MuteLevels.jsx's equivalent,
+              // unoverridden Switch).
+              slotProps={{ input: { role: 'switch', 'aria-label': 'Режим отладки' } }}
               sx={{ ml: 2, mr: 0 }}
             />
           </Box>

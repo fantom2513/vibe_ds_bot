@@ -1424,8 +1424,8 @@ test('settings disables the debug switch while the request is pending', async ({
   await mockSettings(page, { gates: { patch } })
   await page.goto(`${BASE_URL}/settings`)
 
-  const toggle = page.getByRole('checkbox', { name: 'Режим отладки' })
-  await toggle.check()
+  const toggle = page.getByRole('switch', { name: 'Режим отладки' })
+  await toggle.click()
   await expect(toggle).toBeDisabled()
   patch.resolve()
   await expect(toggle).toBeEnabled()
@@ -1434,11 +1434,11 @@ test('settings disables the debug switch while the request is pending', async ({
 test('settings reverts debug mode when saving fails', async ({ page }) => {
   await mockSettings(page, { debugMode: false, patchStatus: 500 })
   await page.goto(`${BASE_URL}/settings`)
-  const toggle = page.getByRole('checkbox', { name: 'Режим отладки' })
+  const toggle = page.getByRole('switch', { name: 'Режим отладки' })
   // A plain click (not .check()) avoids racing Playwright's own actionability
   // polling against the app's optimistic revert: the mocked PATCH below
   // rejects near-instantly, so setDebugModeState(previous) in Settings.jsx
-  // can flip the checkbox back to unchecked before .check() finishes
+  // can flip the switch back to unchecked before .check() finishes
   // verifying the state it just set, which throws "did not change its state".
   await toggle.click()
   await expect(page.getByRole('alert')).toContainText('Не удалось изменить режим отладки')
