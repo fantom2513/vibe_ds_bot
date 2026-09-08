@@ -1,8 +1,5 @@
-import { createRequire } from 'node:module'
+import { test, expect } from '@playwright/test'
 import { createServer } from 'vite'
-
-const requireFromRunner = createRequire(process.argv[1])
-const { test, expect } = requireFromRunner('playwright/test')
 
 // A distinct port from admin-dashboard-redesign.spec.js's dev server: both
 // files spin up their own `vite` instance in beforeAll/afterAll, and

@@ -1,9 +1,6 @@
-import { createRequire } from 'node:module'
+import { test, expect } from '@playwright/test'
 import { createServer } from 'vite'
 import { theme } from '../src/styles/theme.js'
-
-const requireFromRunner = createRequire(process.argv[1])
-const { test, expect } = requireFromRunner('playwright/test')
 
 const BASE_URL = 'http://127.0.0.1:5173'
 
