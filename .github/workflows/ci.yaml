@@ -185,9 +185,20 @@ jobs:
         # с package.json — то есть сама команда и есть проверка.
         run: npm ci --ignore-scripts
 
+      # Версия зафиксирована по той же причине, что и версия uv выше:
+      # скрипт установки по умолчанию тянет последний релиз, а новый
+      # actionlint с новым правилом покрасил бы CI без единого изменения
+      # в нашем коде.
+      #
+      # Учти при локальной проверке: actionlint запускает shellcheck только
+      # если тот установлен. На раннере он есть, на машине разработчика под
+      # Windows обычно нет — то есть локальный прогон слабее этого, и часть
+      # замечаний увидишь только здесь.
       - name: Lint workflow files
+        env:
+          ACTIONLINT_VERSION: '1.7.12'
         run: |
-          bash <(curl -fsSL https://raw.githubusercontent.com/rhysd/actionlint/main/scripts/download-actionlint.bash)
+          bash <(curl -fsSL https://raw.githubusercontent.com/rhysd/actionlint/main/scripts/download-actionlint.bash) "$ACTIONLINT_VERSION"
           ./actionlint -color
 
   lint-frontend:

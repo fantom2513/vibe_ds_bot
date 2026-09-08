@@ -72,8 +72,15 @@ jobs:
           curl -f http://localhost:8181/api/health || exit 1
           curl -f http://localhost:8181/ || exit 1
 
+      # ВНИМАНИЕ: эта проверка сейчас фиктивна. POSTGRES_USER не задан в
+      # окружении джобы, поэтому подстановка всегда сваливается в литерал
+      # `bot`, и pg_isready спрашивает не того пользователя, под которым
+      # реально поднят postgres. Здесь исправлено только экранирование
+      # (shellcheck SC2086) — чтобы джоба герметичности была зелёной.
+      # Сама проверка чинится в фазе 8 вместе с переписыванием деплоя,
+      # где юзер приедет из секрета.
       - name: Health check — database
-        run: docker compose exec -T postgres pg_isready -U ${POSTGRES_USER:-bot}
+        run: docker compose exec -T postgres pg_isready -U "${POSTGRES_USER:-bot}"
 
       - name: Health check — bot-api is running
         run: |
