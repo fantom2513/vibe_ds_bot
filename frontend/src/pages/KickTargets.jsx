@@ -2,20 +2,96 @@ import { useState, useEffect } from 'react'
 import {
   Box, Button, Switch,
   Table, TableBody, TableCell, TableHead, TableRow, TableContainer,
-  Paper, IconButton, Drawer, Dialog, DialogTitle, DialogContent, DialogActions,
-  TextField, Typography, Tooltip, Snackbar, Alert,
+  Paper, IconButton, TextField, Typography, Tooltip, Snackbar, Alert,
+  useMediaQuery,
 } from '@mui/material'
+import { useTheme } from '@mui/material/styles'
 import { AddOutlined, EditOutlined, DeleteOutlined, FlashOffOutlined } from '@mui/icons-material'
 import { getKickTargets, createKickTarget, updateKickTarget, deleteKickTarget } from '../api/kickTargets'
-import { MemberCell, MemberAutocomplete, PageHeader, LoadingState, ErrorState, EmptyState } from '../components/ui'
+import {
+  MemberCell, MemberAutocomplete, PageHeader, LoadingState, ErrorState, EmptyState,
+  StatusBadge, FormDrawer, ConfirmDialog,
+} from '../components/ui'
 import { useMemberResolver } from '../hooks/useMemberResolver'
 import { PageWrapper } from '../styles/motion'
 
 const MONO = { fontFamily: "'IBM Plex Mono', monospace", fontSize: '0.72rem' }
 
-const defaultForm = () => ({ discord_id: null, timeout_sec: '1800', max_timeout_sec: '' })
+function minutesToSeconds(minutes) {
+  return Math.round(Number(minutes) * 60)
+}
+
+function secondsToMinutesLabel(seconds) {
+  return seconds ? `${Math.round(seconds / 60)} мин` : '—'
+}
+
+function targetName(target, memberData) {
+  return memberData?.display_name || target.username || target.discord_id
+}
+
+const defaultForm = () => ({ discord_id: null, minMinutes: '30', maxMinutes: '' })
+
+// Row-level building blocks shared between the mobile KickTargetRecord card
+// and the desktop table row — mirrors Rules.jsx's shared-row-helper pattern.
+function KickTargetStatusToggle({ target, name, pending, onToggle }) {
+  return (
+    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+      <Switch
+        checked={target.is_active}
+        size="small"
+        disabled={pending}
+        onChange={() => onToggle(target)}
+        inputProps={{ 'aria-label': `Переключить: ${name}` }}
+      />
+      <StatusBadge tone={target.is_active ? 'success' : 'neutral'}>
+        {target.is_active ? 'Включено' : 'Отключено'}
+      </StatusBadge>
+    </Box>
+  )
+}
+
+function KickTargetRowActions({ target, name, pending, onEdit, onDelete }) {
+  return (
+    <Box sx={{ display: 'flex', gap: 0.5 }}>
+      <Tooltip title={`Редактировать: ${name}`}>
+        <IconButton size="small" aria-label={`Редактировать: ${name}`} onClick={() => onEdit(target)}>
+          <EditOutlined sx={{ fontSize: 15 }} />
+        </IconButton>
+      </Tooltip>
+      <Tooltip title={`Удалить: ${name}`}>
+        <IconButton size="small" color="error" aria-label={`Удалить: ${name}`} onClick={() => onDelete(target)} disabled={pending}>
+          <DeleteOutlined sx={{ fontSize: 15 }} />
+        </IconButton>
+      </Tooltip>
+    </Box>
+  )
+}
+
+function KickTargetRecord({ target, memberData, pending, onEdit, onDelete, onToggle }) {
+  const name = targetName(target, memberData)
+  return (
+    <Box sx={{ border: '1px solid var(--color-border)', borderRadius: 2, p: 1.75 }}>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 1, mb: 1 }}>
+        <MemberCell id={String(target.discord_id)} memberData={memberData} />
+        <KickTargetRowActions target={target} name={name} pending={pending} onEdit={onEdit} onDelete={onDelete} />
+      </Box>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 1, mb: 1 }}>
+        <Typography sx={{ ...MONO, color: 'text.secondary' }}>
+          Мин.: {secondsToMinutesLabel(target.timeout_sec)}
+        </Typography>
+        <Typography sx={{ ...MONO, color: target.max_timeout_sec ? 'text.secondary' : 'text.disabled' }}>
+          Макс.: {secondsToMinutesLabel(target.max_timeout_sec)}
+        </Typography>
+      </Box>
+      <KickTargetStatusToggle target={target} name={name} pending={pending} onToggle={onToggle} />
+    </Box>
+  )
+}
 
 export default function KickTargets() {
+  const theme = useTheme()
+  const isCompact = useMediaQuery(theme.breakpoints.down('sm'))
+
   const [targets, setTargets] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -23,7 +99,10 @@ export default function KickTargets() {
   const [editing, setEditing] = useState(null)
   const [saving, setSaving] = useState(false)
   const [form, setForm] = useState(defaultForm())
+  const [errors, setErrors] = useState({})
   const [deleteTarget, setDeleteTarget] = useState(null)
+  const [deleting, setDeleting] = useState(false)
+  const [pendingTargetIds, setPendingTargetIds] = useState(() => new Set())
   const [snack, setSnack] = useState(null)
   const { get, resolveMany } = useMemberResolver()
 
@@ -46,6 +125,7 @@ export default function KickTargets() {
   const openCreate = () => {
     setEditing(null)
     setForm(defaultForm())
+    setErrors({})
     setDrawerOpen(true)
   }
 
@@ -53,59 +133,91 @@ export default function KickTargets() {
     setEditing(t)
     setForm({
       discord_id: String(t.discord_id),
-      timeout_sec: String(t.timeout_sec),
-      max_timeout_sec: t.max_timeout_sec != null ? String(t.max_timeout_sec) : '',
+      minMinutes: String(Math.round(t.timeout_sec / 60)),
+      maxMinutes: t.max_timeout_sec != null ? String(Math.round(t.max_timeout_sec / 60)) : '',
     })
+    setErrors({})
     setDrawerOpen(true)
   }
 
+  const closeDrawer = () => setDrawerOpen(false)
+
   const handleSave = async () => {
-    if (!form.discord_id) {
-      showSnack('Выберите пользователя', 'error')
+    const nextErrors = {}
+    if (!form.discord_id) nextErrors.discord_id = 'Выберите участника'
+    const minMinutes = Number(form.minMinutes)
+    if (!form.minMinutes || !(minMinutes > 0)) {
+      nextErrors.minMinutes = 'Минимальное время должно быть больше нуля'
+    }
+    if (form.maxMinutes !== '') {
+      const maxMinutes = Number(form.maxMinutes)
+      if (Number.isNaN(maxMinutes)) {
+        nextErrors.maxMinutes = 'Максимальное время должно быть числом'
+      } else if (minMinutes > 0 && maxMinutes < minMinutes) {
+        nextErrors.maxMinutes = 'Максимальное время не может быть меньше минимального'
+      }
+    }
+    if (Object.keys(nextErrors).length) {
+      setErrors(nextErrors)
       return
     }
+    setErrors({})
+
     const memberData = get(form.discord_id)
     const payload = {
       discord_id: form.discord_id,
       username: memberData?.username || null,
-      timeout_sec: Number(form.timeout_sec) || 1800,
-      max_timeout_sec: form.max_timeout_sec ? Number(form.max_timeout_sec) : null,
+      timeout_sec: minutesToSeconds(form.minMinutes),
+      max_timeout_sec: form.maxMinutes !== '' ? minutesToSeconds(form.maxMinutes) : null,
     }
     setSaving(true)
     try {
       if (editing) {
         await updateKickTarget(editing.discord_id, payload)
-        showSnack('Обновлено')
+        showSnack('Цель обновлена')
       } else {
         await createKickTarget(payload)
-        showSnack('Добавлен')
+        showSnack('Цель добавлена')
       }
       setDrawerOpen(false)
       load()
     } catch (e) {
-      showSnack(e.response?.data?.detail || 'Ошибка', 'error')
+      showSnack(e.response?.data?.detail || 'Ошибка сохранения', 'error')
     } finally {
       setSaving(false)
     }
   }
 
   const handleToggle = async (t) => {
+    const id = t.discord_id
+    if (pendingTargetIds.has(id)) return
+    setPendingTargetIds(prev => new Set(prev).add(id))
     try {
-      await updateKickTarget(t.discord_id, { is_active: !t.is_active })
-      load()
+      await updateKickTarget(id, { is_active: !t.is_active })
+      await load()
     } catch (e) {
       showSnack(e.response?.data?.detail || 'Ошибка', 'error')
+    } finally {
+      setPendingTargetIds(prev => {
+        const next = new Set(prev)
+        next.delete(id)
+        return next
+      })
     }
   }
 
   const handleDelete = async () => {
+    if (!deleteTarget) return
+    setDeleting(true)
     try {
       await deleteKickTarget(deleteTarget.discord_id)
-      showSnack('Удалён')
+      showSnack('Цель удалена')
       setDeleteTarget(null)
       load()
     } catch (e) {
-      showSnack(e.response?.data?.detail || 'Ошибка', 'error')
+      showSnack(e.response?.data?.detail || 'Ошибка удаления', 'error')
+    } finally {
+      setDeleting(false)
     }
   }
 
@@ -115,8 +227,8 @@ export default function KickTargets() {
   return (
     <PageWrapper>
       <PageHeader
-        title="Kick Targets"
-        subtitle="Пользователи с автоматическим таймаутом кика из голосового канала"
+        title="Кик-цели"
+        subtitle="Автоматический кик участников по истечении таймаута в голосовом канале"
         actions={
           <Button variant="contained" startIcon={<AddOutlined />} onClick={openCreate}>
             Добавить
@@ -125,108 +237,108 @@ export default function KickTargets() {
       />
 
       {targets.length === 0 ? (
-        <EmptyState text="Нет целей для кика" icon={FlashOffOutlined} />
+        <EmptyState text="Нет целей для автоматического кика. Добавьте цель через кнопку выше." icon={FlashOffOutlined} />
+      ) : isCompact ? (
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+          {targets.map(t => (
+            <KickTargetRecord
+              key={t.discord_id}
+              target={t}
+              memberData={get(String(t.discord_id))}
+              pending={pendingTargetIds.has(t.discord_id)}
+              onEdit={openEdit}
+              onDelete={setDeleteTarget}
+              onToggle={handleToggle}
+            />
+          ))}
+        </Box>
       ) : (
         <TableContainer component={Paper}>
           <Table size="small">
             <TableHead>
               <TableRow>
                 <TableCell>Участник</TableCell>
-                <TableCell>Timeout</TableCell>
-                <TableCell>Max Timeout</TableCell>
-                <TableCell>Активно</TableCell>
+                <TableCell>Минимальное время</TableCell>
+                <TableCell>Максимальное время</TableCell>
+                <TableCell>Статус</TableCell>
                 <TableCell />
               </TableRow>
             </TableHead>
             <TableBody>
-              {targets.map(t => (
-                <TableRow key={t.discord_id}>
-                  <TableCell sx={{ minWidth: 200 }}>
-                    <MemberCell id={String(t.discord_id)} memberData={get(String(t.discord_id))} />
-                  </TableCell>
-                  <TableCell sx={MONO}>{Math.round(t.timeout_sec / 60)} мин</TableCell>
-                  <TableCell sx={{ ...MONO, color: t.max_timeout_sec ? 'text.primary' : 'text.disabled' }}>
-                    {t.max_timeout_sec ? `${Math.round(t.max_timeout_sec / 60)} мин` : '—'}
-                  </TableCell>
-                  <TableCell>
-                    <Switch checked={t.is_active} size="small" onChange={() => handleToggle(t)} />
-                  </TableCell>
-                  <TableCell>
-                    <Box sx={{ display: 'flex', gap: 0.5 }}>
-                      <Tooltip title="Редактировать">
-                        <IconButton size="small" onClick={() => openEdit(t)}>
-                          <EditOutlined sx={{ fontSize: 15 }} />
-                        </IconButton>
-                      </Tooltip>
-                      <Tooltip title="Удалить">
-                        <IconButton size="small" color="error" onClick={() => setDeleteTarget(t)}>
-                          <DeleteOutlined sx={{ fontSize: 15 }} />
-                        </IconButton>
-                      </Tooltip>
-                    </Box>
-                  </TableCell>
-                </TableRow>
-              ))}
+              {targets.map(t => {
+                const pending = pendingTargetIds.has(t.discord_id)
+                const memberData = get(String(t.discord_id))
+                const name = targetName(t, memberData)
+                return (
+                  <TableRow key={t.discord_id}>
+                    <TableCell sx={{ minWidth: 200 }}>
+                      <MemberCell id={String(t.discord_id)} memberData={memberData} />
+                    </TableCell>
+                    <TableCell sx={MONO}>{secondsToMinutesLabel(t.timeout_sec)}</TableCell>
+                    <TableCell sx={{ ...MONO, color: t.max_timeout_sec ? 'text.primary' : 'text.disabled' }}>
+                      {secondsToMinutesLabel(t.max_timeout_sec)}
+                    </TableCell>
+                    <TableCell>
+                      <KickTargetStatusToggle target={t} name={name} pending={pending} onToggle={handleToggle} />
+                    </TableCell>
+                    <TableCell>
+                      <KickTargetRowActions target={t} name={name} pending={pending} onEdit={openEdit} onDelete={setDeleteTarget} />
+                    </TableCell>
+                  </TableRow>
+                )
+              })}
             </TableBody>
           </Table>
         </TableContainer>
       )}
 
-      <Drawer
-        anchor="right"
+      <FormDrawer
         open={drawerOpen}
-        onClose={() => setDrawerOpen(false)}
-        PaperProps={{ sx: { width: 420, p: 3 } }}
+        title={editing ? 'Редактировать кик-цель' : 'Новая кик-цель'}
+        onClose={closeDrawer}
+        onSubmit={handleSave}
+        submitting={saving}
+        submitLabel="Сохранить"
+        width={420}
       >
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-          <Typography variant="h6" sx={{ fontSize: '1rem' }}>
-            {editing ? 'Редактировать' : 'Добавить цель кика'}
-          </Typography>
-          <Button variant="contained" size="small" onClick={handleSave} disabled={saving}>
-            {saving ? 'Сохранение...' : 'Сохранить'}
-          </Button>
-        </Box>
+        <MemberAutocomplete
+          label="Участник"
+          value={form.discord_id}
+          onChange={id => setForm(f => ({ ...f, discord_id: id }))}
+          error={!!errors.discord_id}
+          helperText={errors.discord_id}
+          disabled={!!editing}
+        />
+        <TextField
+          label="Минимальное время"
+          fullWidth
+          type="number"
+          value={form.minMinutes}
+          onChange={e => setForm(f => ({ ...f, minMinutes: e.target.value }))}
+          error={!!errors.minMinutes}
+          helperText={errors.minMinutes || 'В минутах, до кика'}
+        />
+        <TextField
+          label="Максимальное время"
+          fullWidth
+          type="number"
+          value={form.maxMinutes}
+          onChange={e => setForm(f => ({ ...f, maxMinutes: e.target.value }))}
+          error={!!errors.maxMinutes}
+          helperText={errors.maxMinutes || 'В минутах, необязательно — рандомизирует таймаут в диапазоне'}
+        />
+      </FormDrawer>
 
-        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-          <MemberAutocomplete
-            label="Пользователь"
-            value={form.discord_id}
-            onChange={id => setForm(f => ({ ...f, discord_id: id }))}
-            disabled={!!editing}
-          />
-          <TextField
-            label="Timeout (секунды)"
-            size="small"
-            fullWidth
-            type="number"
-            value={form.timeout_sec}
-            onChange={e => setForm(f => ({ ...f, timeout_sec: e.target.value }))}
-            helperText="Минимальное время в голосе до кика"
-          />
-          <TextField
-            label="Max Timeout (секунды, необязательно)"
-            size="small"
-            fullWidth
-            type="number"
-            value={form.max_timeout_sec}
-            onChange={e => setForm(f => ({ ...f, max_timeout_sec: e.target.value }))}
-            helperText="Если задан — таймаут рандомизируется в диапазоне"
-          />
-        </Box>
-      </Drawer>
-
-      <Dialog open={!!deleteTarget} onClose={() => setDeleteTarget(null)}>
-        <DialogTitle>Удалить цель?</DialogTitle>
-        <DialogContent>
-          <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-            {deleteTarget?.discord_id} будет удалён из списка автокика.
-          </Typography>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setDeleteTarget(null)}>Отмена</Button>
-          <Button color="error" variant="contained" onClick={handleDelete}>Удалить</Button>
-        </DialogActions>
-      </Dialog>
+      <ConfirmDialog
+        open={!!deleteTarget}
+        title="Удалить цель кика?"
+        description={`Цель «${targetName(deleteTarget || {}, get(String(deleteTarget?.discord_id)))}» будет удалена из списка автокика.`}
+        confirmLabel="Удалить"
+        busyLabel="Удаление…"
+        busy={deleting}
+        onCancel={() => setDeleteTarget(null)}
+        onConfirm={handleDelete}
+      />
 
       <Snackbar
         open={!!snack}

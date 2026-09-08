@@ -3,17 +3,11 @@ import {
   Alert,
   Box,
   Button,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogTitle,
-  Drawer,
   FormControl,
   FormControlLabel,
   IconButton,
   InputLabel,
   MenuItem,
-  Paper,
   Select,
   Snackbar,
   Switch,
@@ -41,12 +35,16 @@ import {
 } from '../api/tracking'
 import DailyWorkHoursChart from '../components/DailyWorkHoursChart'
 import {
+  ConfirmDialog,
   EmptyState,
   ErrorState,
+  FormDrawer,
   LoadingState,
   MemberAutocomplete,
   MemberCell,
   PageHeader,
+  Panel,
+  StatusBadge,
 } from '../components/ui'
 import { useMemberResolver } from '../hooks/useMemberResolver'
 import { PageWrapper } from '../styles/motion'
@@ -283,307 +281,290 @@ export default function Tracking() {
         subtitle="Графики участников, канал публикации и ручной предпросмотр отчёта"
       />
 
-      <Typography variant="subtitle1" component="h2" sx={{ mb: 1 }}>
-        Канал отчётов
-      </Typography>
-      <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, gap: 1.5, alignItems: { sm: 'flex-start' }, mb: 3 }}>
-        <FormControl size="small" sx={{ minWidth: { xs: '100%', sm: 280 } }}>
-          <InputLabel id="tracking-channel-label">Канал отчётов</InputLabel>
-          <Select
-            labelId="tracking-channel-label"
-            label="Канал отчётов"
-            value={reportChannelId}
-            disabled={busy}
-            onChange={event => setReportChannelId(event.target.value)}
-          >
-            <MenuItem value=""><em>Не выбран</em></MenuItem>
-            {channels.map(channel => (
-              <MenuItem key={channel.id} value={String(channel.id)}>#{channel.name}</MenuItem>
-            ))}
-          </Select>
-        </FormControl>
-        <Button variant="contained" onClick={handleChannelSave} disabled={busy}>
-          {pendingAction === 'channel' ? 'Сохранение…' : 'Сохранить канал'}
-        </Button>
-      </Box>
-
-      <Typography variant="subtitle1" component="h2" sx={{ mb: 1 }}>
-        Отслеживаемые участники
-      </Typography>
-      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'minmax(260px, 420px) auto' }, gap: 1.5, alignItems: 'start', mb: 2 }}>
-        <MemberAutocomplete
-          label="Пользователь"
-          value={selectedId}
-          onChange={(id, member) => {
-            setSelectedId(id)
-            setSelectedMember(member)
-          }}
-          disabled={busy}
-        />
-        <Button variant="contained" onClick={handleAdd} disabled={busy || !selectedId}>
-          {pendingAction === 'add' ? 'Добавление…' : 'Добавить'}
-        </Button>
-      </Box>
-
-      {members.length === 0 ? (
-        <EmptyState text="Нет отслеживаемых участников" icon={PersonOutlineOutlined} />
-      ) : (
-        <TableContainer component={Paper} sx={{ mb: 4 }}>
-          <Table size="small" aria-label="Отслеживаемые участники">
-            <TableHead>
-              <TableRow>
-                <TableCell>Участник</TableCell>
-                <TableCell>Рабочие дни</TableCell>
-                <TableCell>Время</TableCell>
-                <TableCell>Часовой пояс</TableCell>
-                <TableCell>Статус</TableCell>
-                <TableCell align="right">Действия</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {members.map(member => {
-                const id = String(member.discord_id)
-                const name = member.username || id
-                return (
-                  <TableRow key={id}>
-                    <TableCell sx={{ minWidth: 190 }}>
-                      <MemberCell id={id} memberData={get(id)} />
-                    </TableCell>
-                    <TableCell sx={{ whiteSpace: 'nowrap' }}>
-                      {member.work_days.map(day => WEEKDAYS.find(item => item.value === day)?.label).join(', ')}
-                    </TableCell>
-                    <TableCell sx={{ whiteSpace: 'nowrap' }}>
-                      {normalizeTime(member.work_start)}–{normalizeTime(member.work_end)}
-                    </TableCell>
-                    <TableCell>{member.timezone}</TableCell>
-                    <TableCell>{member.is_active ? 'Активен' : 'Отключён'}</TableCell>
-                    <TableCell align="right" sx={{ whiteSpace: 'nowrap' }}>
-                      <Tooltip title="Редактировать график">
-                        <IconButton size="small" aria-label={`Редактировать график: ${name}`} onClick={() => openSchedule(member)} disabled={busy}>
-                          <EditOutlined sx={{ fontSize: 16 }} />
-                        </IconButton>
-                      </Tooltip>
-                      <Tooltip title="Удалить">
-                        <IconButton size="small" color="error" aria-label={`Удалить: ${name}`} onClick={() => setDeleteTarget(member)} disabled={busy}>
-                          <DeleteOutlined sx={{ fontSize: 16 }} />
-                        </IconButton>
-                      </Tooltip>
-                    </TableCell>
-                  </TableRow>
-                )
-              })}
-            </TableBody>
-          </Table>
-        </TableContainer>
-      )}
-
-      <Box sx={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', gap: 1.5, alignItems: 'center', mb: 1.5 }}>
-        <Typography variant="subtitle1" component="h2">Предпросмотр отчёта</Typography>
-        <Box sx={{ display: 'flex', gap: 1 }}>
-          <FormControl size="small" sx={{ minWidth: 150 }}>
-            <InputLabel id="tracking-period-label">Период</InputLabel>
-            <Select labelId="tracking-period-label" label="Период" value={period} onChange={handlePeriodChange}>
-              <MenuItem value="today">Сегодня</MenuItem>
-              <MenuItem value="week">Неделя</MenuItem>
-              <MenuItem value="month">Месяц</MenuItem>
-            </Select>
-          </FormControl>
-          <Tooltip title="Обновить предпросмотр">
-            <span>
-              <IconButton aria-label="Обновить предпросмотр" onClick={refreshCurrentPreview} disabled={previewLoading}>
-                <RefreshOutlined />
-              </IconButton>
-            </span>
-          </Tooltip>
-        </Box>
-      </Box>
-
-      {previewError && <Alert severity="error" sx={{ mb: 2 }}>{previewError}</Alert>}
-      {previewLoading ? (
-        <LoadingState text="Расчёт отчёта…" />
-      ) : (
-        <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', lg: 'minmax(0, 3fr) minmax(320px, 2fr)' }, gap: 2 }}>
-          <Box>
-            <Typography variant="body2" component="h3" sx={{ color: 'text.secondary', mb: 1 }}>Личная статистика</Typography>
-            {preview?.members?.length ? (
-              <TableContainer component={Paper}>
-                <Table size="small" aria-label="Личная статистика">
-                  <TableHead>
-                    <TableRow>
-                      <TableCell>Участник</TableCell>
-                      <TableCell>Всего</TableCell>
-                      <TableCell>Сессии</TableCell>
-                      <TableCell>В рабочее время</TableCell>
-                    </TableRow>
-                  </TableHead>
-                  <TableBody>
-                    {preview.members.map(member => (
-                      <TableRow key={member.discord_id}>
-                        <TableCell>{member.username || member.discord_id}</TableCell>
-                        <TableCell>{durationLabel(member.total_seconds)}</TableCell>
-                        <TableCell>{numberLabel(member.session_count)}</TableCell>
-                        <TableCell>{durationLabel(member.work_seconds)}</TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </TableContainer>
-            ) : <EmptyState text="Нет личной статистики за период" />}
-          </Box>
-
-          <Box>
-            <Typography variant="body2" component="h3" sx={{ color: 'text.secondary', mb: 1 }}>Стаки</Typography>
-            {preview?.overlaps?.length ? (
-              <TableContainer component={Paper}>
-                <Table size="small" aria-label="Стаки участников">
-                  <TableHead>
-                    <TableRow>
-                      <TableCell>Пара</TableCell>
-                      <TableCell>Канал</TableCell>
-                      <TableCell>Вместе</TableCell>
-                    </TableRow>
-                  </TableHead>
-                  <TableBody>
-                    {preview.overlaps.map((overlap, index) => (
-                      <TableRow key={`${overlap.member_ids.join('-')}-${overlap.channel_id}-${index}`}>
-                        <TableCell>{overlap.member_ids.map(id => previewNames[String(id)] || id).join(' + ')}</TableCell>
-                        <TableCell>#{channelNames[String(overlap.channel_id)] || overlap.channel_id}</TableCell>
-                        <TableCell>{durationLabel(overlap.seconds)}</TableCell>
-                      </TableRow>
-                    ))}
-                    <TableRow>
-                      <TableCell sx={{ fontWeight: 600 }} colSpan={2}>Все вместе</TableCell>
-                      <TableCell sx={{ fontWeight: 600 }}>{durationLabel(preview.all_together_seconds)}</TableCell>
-                    </TableRow>
-                  </TableBody>
-                </Table>
-              </TableContainer>
-            ) : <EmptyState text="Нет пересечений за период" />}
-          </Box>
-        </Box>
-      )}
-
-      {dailyWorkHours?.days?.length > 0 && (
-        <Box sx={{ mt: 4 }}>
-          <Typography variant="subtitle1" component="h2" sx={{ mb: 1 }}>
-            Рабочие часы — последние 14 дней
-          </Typography>
-          <Paper sx={{ p: 2 }}>
-            <DailyWorkHoursChart data={dailyWorkHours} />
-          </Paper>
-        </Box>
-      )}
-
-      <Drawer
-        anchor="right"
-        open={drawerOpen}
-        onClose={() => { if (!busy) setDrawerOpen(false) }}
-        PaperProps={{ sx: { width: { xs: '100vw', sm: 480 }, p: 3 } }}
-      >
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 2, mb: 3 }}>
-          <Box sx={{ minWidth: 0, flex: 1 }}>
-            <Typography variant="h6" sx={{ fontSize: '1rem' }}>Рабочий график</Typography>
-            <Typography variant="caption" sx={{ display: 'block', overflowWrap: 'anywhere' }}>
-              {editing?.username || editing?.discord_id}
-            </Typography>
-          </Box>
-          <Box sx={{ display: 'flex', gap: 1, flexShrink: 0 }}>
-            <Button size="small" onClick={() => setDrawerOpen(false)} disabled={busy}>
-              Отмена
-            </Button>
-            <Button variant="contained" size="small" onClick={handleScheduleSave} disabled={busy}>
-              {pendingAction === 'schedule' ? 'Сохранение…' : 'Сохранить'}
-            </Button>
-          </Box>
-        </Box>
-
-        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-          <Box role="group" aria-labelledby="tracking-workdays-label">
-            <Typography id="tracking-workdays-label" variant="body2" sx={{ mb: 1 }}>Рабочие дни</Typography>
-            <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(7, minmax(0, 1fr))', gap: 0.5 }}>
-              {WEEKDAYS.map(day => {
-                const selected = schedule.work_days.includes(day.value)
-                return (
-                  <Button
-                    key={day.value}
-                    variant={selected ? 'contained' : 'outlined'}
-                    size="small"
-                    aria-pressed={selected}
-                    onClick={() => toggleWeekday(day.value)}
-                    disabled={busy}
-                    sx={{ minWidth: 0, px: 0.5 }}
-                  >
-                    {day.label}
-                  </Button>
-                )
-              })}
-            </Box>
-          </Box>
-
-          <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1.5 }}>
-            <TextField
-              label="Начало рабочего дня"
-              type="time"
-              value={schedule.work_start}
-              disabled={busy}
-              onChange={event => setSchedule(current => ({ ...current, work_start: event.target.value }))}
-              inputProps={{ step: 60 }}
-              InputLabelProps={{ shrink: true }}
-            />
-            <TextField
-              label="Конец рабочего дня"
-              type="time"
-              value={schedule.work_end}
-              disabled={busy}
-              onChange={event => setSchedule(current => ({ ...current, work_end: event.target.value }))}
-              inputProps={{ step: 60 }}
-              InputLabelProps={{ shrink: true }}
-            />
-          </Box>
-
-          <FormControl size="small" fullWidth>
-            <InputLabel id="tracking-timezone-label">Часовой пояс</InputLabel>
+      <Panel title="Канал отчётов" sx={{ mb: 3 }}>
+        <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, gap: 1.5, alignItems: { sm: 'flex-start' } }}>
+          <FormControl size="small" sx={{ minWidth: { xs: '100%', sm: 280 } }}>
+            <InputLabel id="tracking-channel-label">Канал отчётов</InputLabel>
             <Select
-              labelId="tracking-timezone-label"
-              label="Часовой пояс"
-              value={schedule.timezone}
+              labelId="tracking-channel-label"
+              label="Канал отчётов"
+              value={reportChannelId}
               disabled={busy}
-              onChange={event => setSchedule(current => ({ ...current, timezone: event.target.value }))}
+              onChange={event => setReportChannelId(event.target.value)}
             >
-              {(TIMEZONES.includes(schedule.timezone) ? TIMEZONES : [schedule.timezone, ...TIMEZONES]).map(timezone => (
-                <MenuItem key={timezone} value={timezone}>{timezone}</MenuItem>
+              <MenuItem value=""><em>Не выбран</em></MenuItem>
+              {channels.map(channel => (
+                <MenuItem key={channel.id} value={String(channel.id)}>#{channel.name}</MenuItem>
               ))}
             </Select>
           </FormControl>
+          <Button variant="contained" onClick={handleChannelSave} disabled={busy}>
+            {pendingAction === 'channel' ? 'Сохранение…' : 'Сохранить канал'}
+          </Button>
+        </Box>
+      </Panel>
 
-          <FormControlLabel
-            control={
-              <Switch
-                checked={schedule.is_active}
-                disabled={busy}
-                onChange={event => setSchedule(current => ({ ...current, is_active: event.target.checked }))}
-                inputProps={{ 'aria-label': 'Активно' }}
-              />
-            }
-            label="Активно"
+      <Panel title="Отслеживаемые участники" sx={{ mb: 3 }}>
+        <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'minmax(260px, 420px) auto' }, gap: 1.5, alignItems: 'start', mb: 2 }}>
+          <MemberAutocomplete
+            label="Пользователь"
+            value={selectedId}
+            onChange={(id, member) => {
+              setSelectedId(id)
+              setSelectedMember(member)
+            }}
+            disabled={busy}
+          />
+          <Button variant="contained" onClick={handleAdd} disabled={busy || !selectedId}>
+            {pendingAction === 'add' ? 'Добавление…' : 'Добавить'}
+          </Button>
+        </Box>
+
+        {members.length === 0 ? (
+          <EmptyState text="Нет отслеживаемых участников" icon={PersonOutlineOutlined} />
+        ) : (
+          <TableContainer sx={{ border: '1px solid var(--color-border)', borderRadius: 1.5 }}>
+            <Table size="small" aria-label="Отслеживаемые участники">
+              <TableHead>
+                <TableRow>
+                  <TableCell>Участник</TableCell>
+                  <TableCell>Рабочие дни</TableCell>
+                  <TableCell>Время</TableCell>
+                  <TableCell>Часовой пояс</TableCell>
+                  <TableCell>Статус</TableCell>
+                  <TableCell align="right">Действия</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {members.map(member => {
+                  const id = String(member.discord_id)
+                  const name = member.username || id
+                  return (
+                    <TableRow key={id}>
+                      <TableCell sx={{ minWidth: 190 }}>
+                        <MemberCell id={id} memberData={get(id)} />
+                      </TableCell>
+                      <TableCell sx={{ whiteSpace: 'nowrap' }}>
+                        {member.work_days.map(day => WEEKDAYS.find(item => item.value === day)?.label).join(', ')}
+                      </TableCell>
+                      <TableCell sx={{ whiteSpace: 'nowrap' }}>
+                        {normalizeTime(member.work_start)}–{normalizeTime(member.work_end)}
+                      </TableCell>
+                      <TableCell>{member.timezone}</TableCell>
+                      <TableCell>
+                        <StatusBadge tone={member.is_active ? 'success' : 'neutral'}>
+                          {member.is_active ? 'Активен' : 'Отключён'}
+                        </StatusBadge>
+                      </TableCell>
+                      <TableCell align="right" sx={{ whiteSpace: 'nowrap' }}>
+                        <Tooltip title="Редактировать график">
+                          <IconButton size="small" aria-label={`Редактировать график: ${name}`} onClick={() => openSchedule(member)} disabled={busy}>
+                            <EditOutlined sx={{ fontSize: 16 }} />
+                          </IconButton>
+                        </Tooltip>
+                        <Tooltip title="Удалить">
+                          <IconButton size="small" color="error" aria-label={`Удалить: ${name}`} onClick={() => setDeleteTarget(member)} disabled={busy}>
+                            <DeleteOutlined sx={{ fontSize: 16 }} />
+                          </IconButton>
+                        </Tooltip>
+                      </TableCell>
+                    </TableRow>
+                  )
+                })}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        )}
+      </Panel>
+
+      <Panel
+        title="Предпросмотр отчёта"
+        sx={{ mb: 3 }}
+        action={
+          <Box sx={{ display: 'flex', gap: 1 }}>
+            <FormControl size="small" sx={{ minWidth: 150 }}>
+              <InputLabel id="tracking-period-label">Период</InputLabel>
+              <Select labelId="tracking-period-label" label="Период" value={period} onChange={handlePeriodChange}>
+                <MenuItem value="today">Сегодня</MenuItem>
+                <MenuItem value="week">Неделя</MenuItem>
+                <MenuItem value="month">Месяц</MenuItem>
+              </Select>
+            </FormControl>
+            <Tooltip title="Обновить предпросмотр">
+              <span>
+                <IconButton aria-label="Обновить предпросмотр" onClick={refreshCurrentPreview} disabled={previewLoading}>
+                  <RefreshOutlined />
+                </IconButton>
+              </span>
+            </Tooltip>
+          </Box>
+        }
+      >
+        {previewError && <Alert severity="error" sx={{ mb: 2 }}>{previewError}</Alert>}
+        {previewLoading ? (
+          <LoadingState text="Расчёт отчёта…" />
+        ) : (
+          <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', lg: 'minmax(0, 3fr) minmax(320px, 2fr)' }, gap: 2 }}>
+            <Box>
+              <Typography variant="body2" component="h3" sx={{ color: 'text.secondary', mb: 1 }}>Личная статистика</Typography>
+              {preview?.members?.length ? (
+                <TableContainer sx={{ border: '1px solid var(--color-border)', borderRadius: 1.5 }}>
+                  <Table size="small" aria-label="Личная статистика">
+                    <TableHead>
+                      <TableRow>
+                        <TableCell>Участник</TableCell>
+                        <TableCell>Всего</TableCell>
+                        <TableCell>Сессии</TableCell>
+                        <TableCell>В рабочее время</TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {preview.members.map(member => (
+                        <TableRow key={member.discord_id}>
+                          <TableCell>{member.username || member.discord_id}</TableCell>
+                          <TableCell>{durationLabel(member.total_seconds)}</TableCell>
+                          <TableCell>{numberLabel(member.session_count)}</TableCell>
+                          <TableCell>{durationLabel(member.work_seconds)}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+              ) : <EmptyState text="Нет личной статистики за период" />}
+            </Box>
+
+            <Box>
+              <Typography variant="body2" component="h3" sx={{ color: 'text.secondary', mb: 1 }}>Стаки</Typography>
+              {preview?.overlaps?.length ? (
+                <TableContainer sx={{ border: '1px solid var(--color-border)', borderRadius: 1.5 }}>
+                  <Table size="small" aria-label="Стаки участников">
+                    <TableHead>
+                      <TableRow>
+                        <TableCell>Пара</TableCell>
+                        <TableCell>Канал</TableCell>
+                        <TableCell>Вместе</TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {preview.overlaps.map((overlap, index) => (
+                        <TableRow key={`${overlap.member_ids.join('-')}-${overlap.channel_id}-${index}`}>
+                          <TableCell>{overlap.member_ids.map(id => previewNames[String(id)] || id).join(' + ')}</TableCell>
+                          <TableCell>#{channelNames[String(overlap.channel_id)] || overlap.channel_id}</TableCell>
+                          <TableCell>{durationLabel(overlap.seconds)}</TableCell>
+                        </TableRow>
+                      ))}
+                      <TableRow>
+                        <TableCell sx={{ fontWeight: 600 }} colSpan={2}>Все вместе</TableCell>
+                        <TableCell sx={{ fontWeight: 600 }}>{durationLabel(preview.all_together_seconds)}</TableCell>
+                      </TableRow>
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+              ) : <EmptyState text="Нет пересечений за период" />}
+            </Box>
+          </Box>
+        )}
+      </Panel>
+
+      {dailyWorkHours?.days?.length > 0 && (
+        <Panel title="Рабочие часы — последние 14 дней" sx={{ mb: 3 }}>
+          <DailyWorkHoursChart data={dailyWorkHours} />
+        </Panel>
+      )}
+
+      <FormDrawer
+        open={drawerOpen}
+        title="Рабочий график"
+        onClose={() => setDrawerOpen(false)}
+        onSubmit={handleScheduleSave}
+        submitting={busy}
+        submitLabel="Сохранить"
+      >
+        <Typography variant="caption" sx={{ display: 'block', overflowWrap: 'anywhere', color: 'text.secondary' }}>
+          {editing?.username || editing?.discord_id}
+        </Typography>
+
+        <Box role="group" aria-labelledby="tracking-workdays-label">
+          <Typography id="tracking-workdays-label" variant="body2" sx={{ mb: 1 }}>Рабочие дни</Typography>
+          <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(7, minmax(0, 1fr))', gap: 0.5 }}>
+            {WEEKDAYS.map(day => {
+              const selected = schedule.work_days.includes(day.value)
+              return (
+                <Button
+                  key={day.value}
+                  variant={selected ? 'contained' : 'outlined'}
+                  size="small"
+                  aria-pressed={selected}
+                  onClick={() => toggleWeekday(day.value)}
+                  disabled={busy}
+                  sx={{ minWidth: 0, px: 0.5 }}
+                >
+                  {day.label}
+                </Button>
+              )
+            })}
+          </Box>
+        </Box>
+
+        <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1.5 }}>
+          <TextField
+            label="Начало рабочего дня"
+            type="time"
+            value={schedule.work_start}
+            disabled={busy}
+            onChange={event => setSchedule(current => ({ ...current, work_start: event.target.value }))}
+            inputProps={{ step: 60 }}
+            InputLabelProps={{ shrink: true }}
+          />
+          <TextField
+            label="Конец рабочего дня"
+            type="time"
+            value={schedule.work_end}
+            disabled={busy}
+            onChange={event => setSchedule(current => ({ ...current, work_end: event.target.value }))}
+            inputProps={{ step: 60 }}
+            InputLabelProps={{ shrink: true }}
           />
         </Box>
-      </Drawer>
 
-      <Dialog open={!!deleteTarget} onClose={() => { if (!busy) setDeleteTarget(null) }}>
-        <DialogTitle>Удалить участника?</DialogTitle>
-        <DialogContent>
-          <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-            {deleteTarget?.username || deleteTarget?.discord_id} больше не будет участвовать в отчётах.
-          </Typography>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setDeleteTarget(null)} disabled={busy}>Отмена</Button>
-          <Button color="error" variant="contained" onClick={handleDelete} disabled={busy}>
-            {pendingAction === 'delete' ? 'Удаление…' : 'Удалить'}
-          </Button>
-        </DialogActions>
-      </Dialog>
+        <FormControl size="small" fullWidth>
+          <InputLabel id="tracking-timezone-label">Часовой пояс</InputLabel>
+          <Select
+            labelId="tracking-timezone-label"
+            label="Часовой пояс"
+            value={schedule.timezone}
+            disabled={busy}
+            onChange={event => setSchedule(current => ({ ...current, timezone: event.target.value }))}
+          >
+            {(TIMEZONES.includes(schedule.timezone) ? TIMEZONES : [schedule.timezone, ...TIMEZONES]).map(timezone => (
+              <MenuItem key={timezone} value={timezone}>{timezone}</MenuItem>
+            ))}
+          </Select>
+        </FormControl>
+
+        <FormControlLabel
+          control={
+            <Switch
+              checked={schedule.is_active}
+              disabled={busy}
+              onChange={event => setSchedule(current => ({ ...current, is_active: event.target.checked }))}
+              inputProps={{ 'aria-label': 'Активно' }}
+            />
+          }
+          label="Активно"
+        />
+      </FormDrawer>
+
+      <ConfirmDialog
+        open={!!deleteTarget}
+        title="Удалить участника?"
+        description={`${deleteTarget?.username || deleteTarget?.discord_id} больше не будет участвовать в отчётах.`}
+        confirmLabel="Удалить"
+        busyLabel="Удаление…"
+        busy={pendingAction === 'delete'}
+        onCancel={() => setDeleteTarget(null)}
+        onConfirm={handleDelete}
+      />
 
       <Snackbar
         open={!!snack}

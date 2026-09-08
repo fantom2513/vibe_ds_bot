@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Outlet, NavLink, useLocation } from 'react-router-dom'
 import {
   Box, Drawer, List, ListItemButton, ListItemIcon, ListItemText,
-  Avatar, IconButton, Tooltip, useMediaQuery,
+  Avatar, IconButton, Tooltip, Typography, useMediaQuery,
 } from '@mui/material'
 import { useTheme } from '@mui/material/styles'
 import { AnimatePresence } from 'framer-motion'
@@ -17,6 +17,7 @@ import {
   SettingsOutlined,
   FlashOnOutlined,
   PeopleOutlined,
+  MilitaryTechOutlined,
   ChevronLeftOutlined,
   MenuOutlined,
   LogoutOutlined,
@@ -29,16 +30,27 @@ const TOPBAR_HEIGHT = 56
 const CONTENT_MAX_WIDTH = 1440
 const SIDEBAR_COLLAPSED_STORAGE_KEY = 'vibe.admin.sidebarCollapsed'
 
-const navItems = [
-  { path: '/', label: 'Обзор', Icon: DashboardOutlined },
-  { path: '/rules', label: 'Правила', Icon: ListAltOutlined },
-  { path: '/users', label: 'Участники', Icon: GroupOutlined },
-  { path: '/kick-targets', label: 'Кик-цели', Icon: FlashOnOutlined },
-  { path: '/stacking-pairs', label: 'Стаки', Icon: PeopleOutlined },
-  { path: '/tracking', label: 'Отслеживание', Icon: QueryStatsOutlined },
-  { path: '/schedules', label: 'Расписания', Icon: AccessTimeOutlined },
-  { path: '/logs', label: 'Журнал', Icon: ArticleOutlined },
-  { path: '/settings', label: 'Настройки', Icon: SettingsOutlined },
+const navGroups = [
+  {
+    label: 'Мониторинг',
+    items: [
+      { path: '/', label: 'Обзор', Icon: DashboardOutlined },
+      { path: '/tracking', label: 'Отслеживание', Icon: QueryStatsOutlined },
+      { path: '/logs', label: 'Журнал', Icon: ArticleOutlined },
+    ],
+  },
+  {
+    label: 'Управление',
+    items: [
+      { path: '/rules', label: 'Правила', Icon: ListAltOutlined },
+      { path: '/schedules', label: 'Расписания', Icon: AccessTimeOutlined },
+      { path: '/users', label: 'Участники', Icon: GroupOutlined },
+      { path: '/kick-targets', label: 'Кик-цели', Icon: FlashOnOutlined },
+      { path: '/stacking-pairs', label: 'Стаки', Icon: PeopleOutlined },
+      { path: '/mute-levels', label: 'Уровни', Icon: MilitaryTechOutlined },
+      { path: '/settings', label: 'Настройки', Icon: SettingsOutlined },
+    ],
+  },
 ]
 
 function readStoredCollapsed() {
@@ -47,6 +59,27 @@ function readStoredCollapsed() {
   } catch {
     return false
   }
+}
+
+// Quiet sentence-case group heading, hidden entirely in collapsed mode.
+// Purely a visual/textual grouping aid — the links beneath it stay
+// independently reachable and labelled regardless of this text.
+function NavGroupLabel({ children }) {
+  return (
+    <Typography
+      component="p"
+      sx={{
+        px: 1.5,
+        pt: 1.5,
+        pb: 0.5,
+        fontSize: '0.72rem',
+        fontWeight: 500,
+        color: 'var(--color-text-secondary)',
+      }}
+    >
+      {children}
+    </Typography>
+  )
 }
 
 function NavList({ collapsed }) {
@@ -58,55 +91,60 @@ function NavList({ collapsed }) {
       aria-label="Основная навигация"
       sx={{ flex: 1, pt: 1, px: collapsed ? 0.75 : 1.25, overflowY: 'auto', overflowX: 'hidden' }}
     >
-      {navItems.map(({ path, label, Icon }) => {
-        const active = location.pathname === path
-        const item = (
-          <ListItemButton
-            component={NavLink}
-            to={path}
-            end={path === '/'}
-            aria-label={collapsed ? label : undefined}
-            sx={{
-              borderRadius: 2,
-              mb: 0.5,
-              minHeight: 44,
-              justifyContent: collapsed ? 'center' : 'flex-start',
-              px: collapsed ? 1 : 1.5,
-              color: 'var(--color-text-secondary)',
-              textDecoration: 'none',
-              border: '1px solid transparent',
-              transition: 'background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease',
-              '&:hover': {
-                backgroundColor: 'var(--color-bg-elevated)',
-                color: 'var(--color-text-primary)',
-              },
-              ...(active && {
-                backgroundColor: 'rgba(101, 198, 156, 0.10)',
-                borderColor: 'var(--color-action-primary)',
-                color: 'var(--color-text-primary)',
-              }),
-            }}
-          >
-            <ListItemIcon sx={{ minWidth: collapsed ? 0 : 32, color: 'inherit' }}>
-              <Icon sx={{ fontSize: 18 }} />
-            </ListItemIcon>
-            {!collapsed && (
-              <ListItemText
-                primary={label}
-                primaryTypographyProps={{ fontSize: '0.85rem', fontWeight: active ? 600 : 500 }}
-              />
-            )}
-          </ListItemButton>
-        )
+      {navGroups.map(group => (
+        <Box key={group.label}>
+          {!collapsed && <NavGroupLabel>{group.label}</NavGroupLabel>}
+          {group.items.map(({ path, label, Icon }) => {
+            const active = location.pathname === path
+            const item = (
+              <ListItemButton
+                component={NavLink}
+                to={path}
+                end={path === '/'}
+                aria-label={collapsed ? label : undefined}
+                sx={{
+                  borderRadius: 2,
+                  mb: 0.5,
+                  minHeight: 44,
+                  justifyContent: collapsed ? 'center' : 'flex-start',
+                  px: collapsed ? 1 : 1.5,
+                  color: 'var(--color-text-secondary)',
+                  textDecoration: 'none',
+                  border: '1px solid transparent',
+                  transition: 'background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease',
+                  '&:hover': {
+                    backgroundColor: 'var(--color-bg-elevated)',
+                    color: 'var(--color-text-primary)',
+                  },
+                  ...(active && {
+                    backgroundColor: 'rgba(101, 198, 156, 0.10)',
+                    borderColor: 'var(--color-action-primary)',
+                    color: 'var(--color-text-primary)',
+                  }),
+                }}
+              >
+                <ListItemIcon sx={{ minWidth: collapsed ? 0 : 32, color: 'inherit' }}>
+                  <Icon sx={{ fontSize: 18 }} />
+                </ListItemIcon>
+                {!collapsed && (
+                  <ListItemText
+                    primary={label}
+                    primaryTypographyProps={{ fontSize: '0.85rem', fontWeight: active ? 600 : 500 }}
+                  />
+                )}
+              </ListItemButton>
+            )
 
-        return collapsed ? (
-          <Tooltip key={path} title={label} placement="right">
-            {item}
-          </Tooltip>
-        ) : (
-          <Box key={path}>{item}</Box>
-        )
-      })}
+            return collapsed ? (
+              <Tooltip key={path} title={label} placement="right">
+                {item}
+              </Tooltip>
+            ) : (
+              <Box key={path}>{item}</Box>
+            )
+          })}
+        </Box>
+      ))}
     </List>
   )
 }

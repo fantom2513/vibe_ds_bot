@@ -401,8 +401,9 @@ test('dashboard state: exposes role=status while loading', async ({ page }) => {
 test('keeps primary hover distinct without changing secondary nav semantics', async ({ page }) => {
   // Exercises the two shared component families (MuiButton containedPrimary
   // vs. an anchor-backed nav/link control) through two independent routes:
-  // Rules' real "Новое правило" primary action + the sidebar's "Обзор"
-  // secondary nav link (a standing regression guard for the shared
+  // Rules' real "Создать правило" primary action (renamed from "Новое
+  // правило" by the admin-pages design migration, Task 1) + the sidebar's
+  // "Обзор" secondary nav link (a standing regression guard for the shared
   // button/link theme so the families can't drift apart), and — per the
   // plan's original reference test, now that Task 4 has built the real
   // markup — Dashboard's own "Создать правило" primary action and "Все
@@ -412,7 +413,7 @@ test('keeps primary hover distinct without changing secondary nav semantics', as
   await page.setViewportSize({ width: 1440, height: 900 })
   await page.goto(`${BASE_URL}/rules`)
 
-  const primary = page.getByRole('button', { name: 'Новое правило' })
+  const primary = page.getByRole('button', { name: 'Создать правило' })
   const secondary = page.getByRole('link', { name: 'Обзор' })
 
   const before = await primary.evaluate(el => getComputedStyle(el).backgroundColor)

@@ -13,22 +13,14 @@ import {
   ListAltOutlined,
   VolumeOffOutlined,
 } from '@mui/icons-material'
-import cronstrue from 'cronstrue/i18n'
 import { getDashboard } from '../api/dashboard'
 import { getStatsOverview } from '../api/stats'
 import { Panel, StatusBadge, ActionChip, LoadingState, ErrorState, EmptyState, DiscordId } from '../components/ui'
 import { PageWrapper } from '../styles/motion'
 import Timestamp from '../components/Timestamp'
+import { cronDescription } from '../utils/cron'
 
 const MONO = { fontFamily: "'IBM Plex Mono', monospace" }
-
-function cronDescription(expr) {
-  try {
-    return cronstrue.toString(expr, { locale: 'ru', throwExceptionOnParseError: true })
-  } catch {
-    return null
-  }
-}
 
 // Scope + schedule as a short human summary (with the raw cron/tz kept
 // available as the mono detail line underneath it) — this is what "scope/

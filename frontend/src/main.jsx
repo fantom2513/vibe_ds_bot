@@ -19,6 +19,7 @@ import Settings from './pages/Settings'
 import KickTargets from './pages/KickTargets'
 import StackingPairs from './pages/StackingPairs'
 import Tracking from './pages/Tracking'
+import MuteLevels from './pages/MuteLevels'
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <ThemeProvider theme={theme}>
@@ -38,6 +39,7 @@ ReactDOM.createRoot(document.getElementById('root')).render(
               <Route path="/schedules" element={<Schedules />} />
               <Route path="/logs" element={<Logs />} />
               <Route path="/settings" element={<Settings />} />
+              <Route path="/mute-levels" element={<MuteLevels />} />
             </Route>
           </Route>
         </Routes>
