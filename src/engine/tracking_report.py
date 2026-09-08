@@ -33,7 +33,6 @@ class MemberTotal:
 @dataclass(frozen=True)
 class PairOverlap:
     member_ids: tuple[int, int]
-    channel_id: int
     seconds: int
 
 
@@ -105,7 +104,11 @@ def calculate_pair_overlaps(
     period_start: datetime,
     period_end: datetime,
 ) -> list[PairOverlap]:
-    """Посчитать пересечения сессий разных участников в одном голосовом канале."""
+    """
+    Посчитать пересечения сессий разных участников в одном голосовом канале.
+    Одна пара может пересекаться в нескольких разных каналах за период — секунды
+    суммируются в одну запись на пару, без разбивки по каналам.
+    """
     sessions_by_channel: dict[int, list[Session]] = {}
     for session in sessions:
         if session.discord_id not in tracked_member_ids:
@@ -114,8 +117,8 @@ def calculate_pair_overlaps(
         if clipped is not None:
             sessions_by_channel.setdefault(clipped.channel_id, []).append(clipped)
 
-    totals: dict[tuple[tuple[int, int], int], int] = {}
-    for channel_id, channel_sessions in sessions_by_channel.items():
+    totals: dict[tuple[int, int], int] = {}
+    for channel_sessions in sessions_by_channel.values():
         for first, second in combinations(channel_sessions, 2):
             if first.discord_id == second.discord_id:
                 continue
@@ -125,13 +128,33 @@ def calculate_pair_overlaps(
             )
             if seconds:
                 member_ids = tuple(sorted((first.discord_id, second.discord_id)))
-                key = (member_ids, channel_id)
-                totals[key] = totals.get(key, 0) + seconds
+                totals[member_ids] = totals.get(member_ids, 0) + seconds
 
     return [
-        PairOverlap(member_ids=member_ids, channel_id=channel_id, seconds=seconds)
-        for (member_ids, channel_id), seconds in sorted(totals.items())
+        PairOverlap(member_ids=member_ids, seconds=seconds)
+        for member_ids, seconds in sorted(totals.items())
     ]
+
+
+def period_bounds(
+    period: str, now: datetime, tz_name: str = "Europe/Moscow",
+) -> tuple[datetime, datetime]:
+    """
+    Границы периода для отчётов (preview на дашборде и /tracking report у бота):
+    - "today" — календарный, с полуночи по tz_name до `now`;
+    - "week"/"month" — плавающее окно от `now` назад (последние 7×24ч / 30×24ч),
+      а не с понедельника этой недели или с 1-го числа календарного месяца.
+    """
+    if period == "today":
+        tz = ZoneInfo(tz_name)
+        start = datetime.combine(now.astimezone(tz).date(), time.min, tz).astimezone(timezone.utc)
+    elif period == "week":
+        start = now - timedelta(days=7)
+    elif period == "month":
+        start = now - timedelta(days=30)
+    else:
+        raise ValueError(f"Unknown period: {period}")
+    return start, now
 
 
 def daily_boundaries(days: int, now: datetime, tz_name: str = "Europe/Moscow") -> list[datetime]:

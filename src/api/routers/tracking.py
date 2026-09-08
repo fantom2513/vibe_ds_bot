@@ -1,5 +1,5 @@
 """API управления отслеживаемыми участниками и предпросмотром отчёта."""
-from datetime import datetime, time, timedelta, timezone
+from datetime import datetime, time, timezone
 from typing import Annotated
 from zoneinfo import ZoneInfo
 
@@ -20,6 +20,7 @@ from src.engine.tracking_report import (
     calculate_member_totals,
     calculate_pair_overlaps,
     daily_boundaries,
+    period_bounds,
 )
 from src.config.settings import get_settings as get_app_settings
 
@@ -107,20 +108,6 @@ async def list_text_channels(
     ]
 
 
-def _period_bounds(period: str, now: datetime) -> tuple[datetime, datetime]:
-    msk = ZoneInfo("Europe/Moscow")
-    local_now = now.astimezone(msk)
-    if period == "today":
-        start = local_now.date()
-    elif period == "week":
-        start = local_now.date() - timedelta(days=local_now.weekday())
-    elif period == "month":
-        start = local_now.date().replace(day=1)
-    else:
-        raise ValueError("Unknown period")
-    return datetime.combine(start, time.min, msk).astimezone(timezone.utc), now
-
-
 def _as_time(value: str | time) -> time:
     return value if isinstance(value, time) else time.fromisoformat(value)
 
@@ -133,7 +120,7 @@ async def preview_report(
     pool: Annotated[asyncpg.Pool, Depends(get_db_pool)] = None,
 ) -> dict:
     now = datetime.now(timezone.utc)
-    period_start, period_end = _period_bounds(period, now)
+    period_start, period_end = period_bounds(period, now)
     active_members = [row for row in await tracking_repo.list_tracked_members(pool) if row["is_active"]]
     schedules = {
         row["discord_id"]: MemberSchedule(
@@ -156,7 +143,7 @@ async def preview_report(
             for row in active_members
         ],
         "overlaps": [
-            {"member_ids": [str(member_id) for member_id in overlap.member_ids], "channel_id": str(overlap.channel_id), "seconds": overlap.seconds}
+            {"member_ids": [str(member_id) for member_id in overlap.member_ids], "seconds": overlap.seconds}
             for overlap in calculate_pair_overlaps(sessions, set(schedules), period_start, period_end)
         ],
         "all_together_seconds": calculate_all_together_seconds(sessions, set(schedules), period_start, period_end),

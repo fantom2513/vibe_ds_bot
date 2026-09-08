@@ -266,11 +266,6 @@ export default function Tracking() {
     return names
   }, [members, preview])
 
-  const channelNames = useMemo(
-    () => Object.fromEntries(channels.map(channel => [String(channel.id), channel.name])),
-    [channels],
-  )
-
   if (loading) return <LoadingState text="Загрузка настроек отслеживания…" />
   if (error) return <ErrorState message={error} />
 
@@ -441,20 +436,18 @@ export default function Tracking() {
                     <TableHead>
                       <TableRow>
                         <TableCell>Пара</TableCell>
-                        <TableCell>Канал</TableCell>
                         <TableCell>Вместе</TableCell>
                       </TableRow>
                     </TableHead>
                     <TableBody>
-                      {preview.overlaps.map((overlap, index) => (
-                        <TableRow key={`${overlap.member_ids.join('-')}-${overlap.channel_id}-${index}`}>
+                      {preview.overlaps.map(overlap => (
+                        <TableRow key={overlap.member_ids.join('-')}>
                           <TableCell>{overlap.member_ids.map(id => previewNames[String(id)] || id).join(' + ')}</TableCell>
-                          <TableCell>#{channelNames[String(overlap.channel_id)] || overlap.channel_id}</TableCell>
                           <TableCell>{durationLabel(overlap.seconds)}</TableCell>
                         </TableRow>
                       ))}
                       <TableRow>
-                        <TableCell sx={{ fontWeight: 600 }} colSpan={2}>Все вместе</TableCell>
+                        <TableCell sx={{ fontWeight: 600 }}>Все вместе</TableCell>
                         <TableCell sx={{ fontWeight: 600 }}>{durationLabel(preview.all_together_seconds)}</TableCell>
                       </TableRow>
                     </TableBody>
