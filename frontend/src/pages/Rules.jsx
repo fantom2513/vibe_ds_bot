@@ -1,17 +1,41 @@
 import { useState, useEffect } from 'react'
 import {
   Box,
-  Button, Select, MenuItem, TextField, Switch, FormControlLabel,
-  Table, TableBody, TableCell, TableHead, TableRow, TableContainer,
-  Paper, IconButton, Snackbar, Alert, Tooltip, Typography,
-  FormControl, InputLabel, FormHelperText, useMediaQuery,
+  Button,
+  Select,
+  MenuItem,
+  TextField,
+  Switch,
+  FormControlLabel,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableRow,
+  TableContainer,
+  Paper,
+  IconButton,
+  Snackbar,
+  Alert,
+  Tooltip,
+  Typography,
+  FormControl,
+  InputLabel,
+  FormHelperText,
+  useMediaQuery,
 } from '@mui/material'
 import { useTheme } from '@mui/material/styles'
 import { AddOutlined, EditOutlined, DeleteOutlined, ListAltOutlined } from '@mui/icons-material'
 import { getRules, createRule, updateRule, deleteRule, toggleRule } from '../api/rules'
 import {
-  ActionChip, PageHeader, LoadingState, ErrorState, EmptyState,
-  StatusBadge, FormDrawer, ConfirmDialog,
+  ActionChip,
+  PageHeader,
+  LoadingState,
+  ErrorState,
+  EmptyState,
+  StatusBadge,
+  FormDrawer,
+  ConfirmDialog,
 } from '../components/ui'
 import { PageWrapper } from '../styles/motion'
 
@@ -75,12 +99,22 @@ function RuleRowActions({ rule, pending, onEdit, onDelete }) {
   return (
     <Box sx={{ display: 'flex', gap: 0.5 }}>
       <Tooltip title={`Редактировать: ${rule.name}`}>
-        <IconButton size="small" aria-label={`Редактировать: ${rule.name}`} onClick={() => onEdit(rule)}>
+        <IconButton
+          size="small"
+          aria-label={`Редактировать: ${rule.name}`}
+          onClick={() => onEdit(rule)}
+        >
           <EditOutlined sx={{ fontSize: 15 }} />
         </IconButton>
       </Tooltip>
       <Tooltip title={`Удалить: ${rule.name}`}>
-        <IconButton size="small" color="error" aria-label={`Удалить: ${rule.name}`} onClick={() => onDelete(rule)} disabled={pending}>
+        <IconButton
+          size="small"
+          color="error"
+          aria-label={`Удалить: ${rule.name}`}
+          onClick={() => onDelete(rule)}
+          disabled={pending}
+        >
           <DeleteOutlined sx={{ fontSize: 15 }} />
         </IconButton>
       </Tooltip>
@@ -107,12 +141,22 @@ function RuleRecord({ rule, pending, onEdit, onDelete, onToggle }) {
   const hasChannels = Array.isArray(rule.channel_ids) && rule.channel_ids.length > 0
   return (
     <Box sx={{ border: '1px solid var(--color-border)', borderRadius: 2, p: 1.75 }}>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 1, mb: 1 }}>
+      <Box
+        sx={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'flex-start',
+          gap: 1,
+          mb: 1,
+        }}
+      >
         <Box sx={{ minWidth: 0 }}>
           <Typography sx={{ color: 'text.primary', fontWeight: 600, fontSize: '0.85rem' }}>
             {rule.name}
           </Typography>
-          <Typography sx={{ ...MONO, color: 'text.secondary', fontSize: '0.68rem' }}>#{rule.id}</Typography>
+          <Typography sx={{ ...MONO, color: 'text.secondary', fontSize: '0.68rem' }}>
+            #{rule.id}
+          </Typography>
         </Box>
         <RuleRowActions rule={rule} pending={pending} onEdit={onEdit} onDelete={onDelete} />
       </Box>
@@ -165,7 +209,9 @@ export default function Rules() {
     }
   }
 
-  useEffect(() => { load() }, [])
+  useEffect(() => {
+    load()
+  }, [])
 
   const showSnack = (msg, severity = 'success') => setSnack({ msg, severity })
 
@@ -176,7 +222,7 @@ export default function Rules() {
     setDrawerOpen(true)
   }
 
-  const openEdit = (rule) => {
+  const openEdit = rule => {
     setEditing(rule)
     setForm({
       name: rule.name || '',
@@ -185,9 +231,10 @@ export default function Rules() {
       channel_ids: (rule.channel_ids || []).join(', '),
       max_time_sec: rule.max_time_sec ?? '',
       action_type: rule.action_type || '',
-      action_params: typeof rule.action_params === 'object'
-        ? JSON.stringify(rule.action_params, null, 2)
-        : (rule.action_params || '{}'),
+      action_params:
+        typeof rule.action_params === 'object'
+          ? JSON.stringify(rule.action_params, null, 2)
+          : rule.action_params || '{}',
       priority: rule.priority ?? 0,
       is_active: rule.is_active,
       is_dry_run: rule.is_dry_run,
@@ -202,7 +249,10 @@ export default function Rules() {
     const nextErrors = {}
     if (!form.name.trim()) nextErrors.name = 'Название обязательно'
     if (!form.action_type) nextErrors.action_type = 'Действие обязательно'
-    const channelIdTokens = form.channel_ids.split(',').map(s => s.trim()).filter(Boolean)
+    const channelIdTokens = form.channel_ids
+      .split(',')
+      .map(s => s.trim())
+      .filter(Boolean)
     if (channelIdTokens.some(token => Number.isNaN(Number(token)))) {
       nextErrors.channel_ids = 'Каналы должны быть числовыми ID через запятую'
     }
@@ -264,7 +314,7 @@ export default function Rules() {
     }
   }
 
-  const handleToggle = async (rule) => {
+  const handleToggle = async rule => {
     if (pendingRuleIds.has(rule.id)) return
     setPendingRuleIds(prev => new Set(prev).add(rule.id))
     try {
@@ -334,20 +384,43 @@ export default function Rules() {
                   <TableRow key={r.id}>
                     <TableCell sx={MONO}>{r.id}</TableCell>
                     <TableCell sx={{ color: 'text.primary' }}>{r.name}</TableCell>
-                    <TableCell><TargetListBadge targetList={r.target_list} /></TableCell>
-                    <TableCell sx={{ color: Array.isArray(r.channel_ids) && r.channel_ids.length ? 'text.primary' : 'text.disabled', ...MONO }}>
+                    <TableCell>
+                      <TargetListBadge targetList={r.target_list} />
+                    </TableCell>
+                    <TableCell
+                      sx={{
+                        color:
+                          Array.isArray(r.channel_ids) && r.channel_ids.length
+                            ? 'text.primary'
+                            : 'text.disabled',
+                        ...MONO,
+                      }}
+                    >
                       {formatChannelIds(r.channel_ids)}
                     </TableCell>
                     <TableCell sx={MONO}>
-                      {r.max_time_sec ? formatMaxTime(r.max_time_sec) : <Typography sx={{ color: 'text.disabled', fontSize: '0.72rem' }}>—</Typography>}
+                      {r.max_time_sec ? (
+                        formatMaxTime(r.max_time_sec)
+                      ) : (
+                        <Typography sx={{ color: 'text.disabled', fontSize: '0.72rem' }}>
+                          —
+                        </Typography>
+                      )}
                     </TableCell>
-                    <TableCell><ActionChip type={r.action_type} isDryRun={r.is_dry_run} /></TableCell>
+                    <TableCell>
+                      <ActionChip type={r.action_type} isDryRun={r.is_dry_run} />
+                    </TableCell>
                     <TableCell sx={MONO}>{r.priority}</TableCell>
                     <TableCell>
                       <RuleStatusToggle rule={r} pending={pending} onToggle={handleToggle} />
                     </TableCell>
                     <TableCell>
-                      <RuleRowActions rule={r} pending={pending} onEdit={openEdit} onDelete={setDeleteTarget} />
+                      <RuleRowActions
+                        rule={r}
+                        pending={pending}
+                        onEdit={openEdit}
+                        onDelete={setDeleteTarget}
+                      />
                     </TableCell>
                   </TableRow>
                 )
@@ -393,7 +466,9 @@ export default function Rules() {
             onChange={e => setForm(f => ({ ...f, target_list: e.target.value }))}
           >
             {TARGET_LIST_OPTIONS.map(o => (
-              <MenuItem key={o.value || 'all'} value={o.value}>{o.label}</MenuItem>
+              <MenuItem key={o.value || 'all'} value={o.value}>
+                {o.label}
+              </MenuItem>
             ))}
           </Select>
         </FormControl>
@@ -427,7 +502,9 @@ export default function Rules() {
             onChange={e => setForm(f => ({ ...f, action_type: e.target.value }))}
           >
             {ACTION_TYPE_OPTIONS.map(o => (
-              <MenuItem key={o.value} value={o.value}>{o.label}</MenuItem>
+              <MenuItem key={o.value} value={o.value}>
+                {o.label}
+              </MenuItem>
             ))}
           </Select>
           {errors.action_type && <FormHelperText>{errors.action_type}</FormHelperText>}

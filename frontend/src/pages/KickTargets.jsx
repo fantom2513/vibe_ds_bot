@@ -1,16 +1,41 @@
 import { useState, useEffect } from 'react'
 import {
-  Box, Button, Switch,
-  Table, TableBody, TableCell, TableHead, TableRow, TableContainer,
-  Paper, IconButton, TextField, Typography, Tooltip, Snackbar, Alert,
+  Box,
+  Button,
+  Switch,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableRow,
+  TableContainer,
+  Paper,
+  IconButton,
+  TextField,
+  Typography,
+  Tooltip,
+  Snackbar,
+  Alert,
   useMediaQuery,
 } from '@mui/material'
 import { useTheme } from '@mui/material/styles'
 import { AddOutlined, EditOutlined, DeleteOutlined, FlashOffOutlined } from '@mui/icons-material'
-import { getKickTargets, createKickTarget, updateKickTarget, deleteKickTarget } from '../api/kickTargets'
 import {
-  MemberCell, MemberAutocomplete, PageHeader, LoadingState, ErrorState, EmptyState,
-  StatusBadge, FormDrawer, ConfirmDialog,
+  getKickTargets,
+  createKickTarget,
+  updateKickTarget,
+  deleteKickTarget,
+} from '../api/kickTargets'
+import {
+  MemberCell,
+  MemberAutocomplete,
+  PageHeader,
+  LoadingState,
+  ErrorState,
+  EmptyState,
+  StatusBadge,
+  FormDrawer,
+  ConfirmDialog,
 } from '../components/ui'
 import { useMemberResolver } from '../hooks/useMemberResolver'
 import { PageWrapper } from '../styles/motion'
@@ -54,12 +79,22 @@ function KickTargetRowActions({ target, name, pending, onEdit, onDelete }) {
   return (
     <Box sx={{ display: 'flex', gap: 0.5 }}>
       <Tooltip title={`Редактировать: ${name}`}>
-        <IconButton size="small" aria-label={`Редактировать: ${name}`} onClick={() => onEdit(target)}>
+        <IconButton
+          size="small"
+          aria-label={`Редактировать: ${name}`}
+          onClick={() => onEdit(target)}
+        >
           <EditOutlined sx={{ fontSize: 15 }} />
         </IconButton>
       </Tooltip>
       <Tooltip title={`Удалить: ${name}`}>
-        <IconButton size="small" color="error" aria-label={`Удалить: ${name}`} onClick={() => onDelete(target)} disabled={pending}>
+        <IconButton
+          size="small"
+          color="error"
+          aria-label={`Удалить: ${name}`}
+          onClick={() => onDelete(target)}
+          disabled={pending}
+        >
           <DeleteOutlined sx={{ fontSize: 15 }} />
         </IconButton>
       </Tooltip>
@@ -71,15 +106,31 @@ function KickTargetRecord({ target, memberData, pending, onEdit, onDelete, onTog
   const name = targetName(target, memberData)
   return (
     <Box sx={{ border: '1px solid var(--color-border)', borderRadius: 2, p: 1.75 }}>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 1, mb: 1 }}>
+      <Box
+        sx={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'flex-start',
+          gap: 1,
+          mb: 1,
+        }}
+      >
         <MemberCell id={String(target.discord_id)} memberData={memberData} />
-        <KickTargetRowActions target={target} name={name} pending={pending} onEdit={onEdit} onDelete={onDelete} />
+        <KickTargetRowActions
+          target={target}
+          name={name}
+          pending={pending}
+          onEdit={onEdit}
+          onDelete={onDelete}
+        />
       </Box>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 1, mb: 1 }}>
         <Typography sx={{ ...MONO, color: 'text.secondary' }}>
           Мин.: {secondsToMinutesLabel(target.timeout_sec)}
         </Typography>
-        <Typography sx={{ ...MONO, color: target.max_timeout_sec ? 'text.secondary' : 'text.disabled' }}>
+        <Typography
+          sx={{ ...MONO, color: target.max_timeout_sec ? 'text.secondary' : 'text.disabled' }}
+        >
           Макс.: {secondsToMinutesLabel(target.max_timeout_sec)}
         </Typography>
       </Box>
@@ -118,7 +169,9 @@ export default function KickTargets() {
     }
   }
 
-  useEffect(() => { load() }, [])
+  useEffect(() => {
+    load()
+  }, [])
 
   const showSnack = (msg, severity = 'success') => setSnack({ msg, severity })
 
@@ -129,7 +182,7 @@ export default function KickTargets() {
     setDrawerOpen(true)
   }
 
-  const openEdit = (t) => {
+  const openEdit = t => {
     setEditing(t)
     setForm({
       discord_id: String(t.discord_id),
@@ -188,7 +241,7 @@ export default function KickTargets() {
     }
   }
 
-  const handleToggle = async (t) => {
+  const handleToggle = async t => {
     const id = t.discord_id
     if (pendingTargetIds.has(id)) return
     setPendingTargetIds(prev => new Set(prev).add(id))
@@ -237,7 +290,10 @@ export default function KickTargets() {
       />
 
       {targets.length === 0 ? (
-        <EmptyState text="Нет целей для автоматического кика. Добавьте цель через кнопку выше." icon={FlashOffOutlined} />
+        <EmptyState
+          text="Нет целей для автоматического кика. Добавьте цель через кнопку выше."
+          icon={FlashOffOutlined}
+        />
       ) : isCompact ? (
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
           {targets.map(t => (
@@ -275,14 +331,27 @@ export default function KickTargets() {
                       <MemberCell id={String(t.discord_id)} memberData={memberData} />
                     </TableCell>
                     <TableCell sx={MONO}>{secondsToMinutesLabel(t.timeout_sec)}</TableCell>
-                    <TableCell sx={{ ...MONO, color: t.max_timeout_sec ? 'text.primary' : 'text.disabled' }}>
+                    <TableCell
+                      sx={{ ...MONO, color: t.max_timeout_sec ? 'text.primary' : 'text.disabled' }}
+                    >
                       {secondsToMinutesLabel(t.max_timeout_sec)}
                     </TableCell>
                     <TableCell>
-                      <KickTargetStatusToggle target={t} name={name} pending={pending} onToggle={handleToggle} />
+                      <KickTargetStatusToggle
+                        target={t}
+                        name={name}
+                        pending={pending}
+                        onToggle={handleToggle}
+                      />
                     </TableCell>
                     <TableCell>
-                      <KickTargetRowActions target={t} name={name} pending={pending} onEdit={openEdit} onDelete={setDeleteTarget} />
+                      <KickTargetRowActions
+                        target={t}
+                        name={name}
+                        pending={pending}
+                        onEdit={openEdit}
+                        onDelete={setDeleteTarget}
+                      />
                     </TableCell>
                   </TableRow>
                 )
@@ -325,7 +394,9 @@ export default function KickTargets() {
           value={form.maxMinutes}
           onChange={e => setForm(f => ({ ...f, maxMinutes: e.target.value }))}
           error={!!errors.maxMinutes}
-          helperText={errors.maxMinutes || 'В минутах, необязательно — рандомизирует таймаут в диапазоне'}
+          helperText={
+            errors.maxMinutes || 'В минутах, необязательно — рандомизирует таймаут в диапазоне'
+          }
         />
       </FormDrawer>
 

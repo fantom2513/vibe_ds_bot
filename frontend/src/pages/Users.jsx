@@ -1,15 +1,34 @@
 import { useState, useEffect } from 'react'
 import {
-  Box, Button, Tabs, Tab,
-  Table, TableBody, TableCell, TableHead, TableRow, TableContainer,
-  Paper, IconButton, Tooltip, Snackbar, Alert, useMediaQuery,
+  Box,
+  Button,
+  Tabs,
+  Tab,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableRow,
+  TableContainer,
+  Paper,
+  IconButton,
+  Tooltip,
+  Snackbar,
+  Alert,
+  useMediaQuery,
 } from '@mui/material'
 import { useTheme } from '@mui/material/styles'
 import { AddOutlined, DeleteOutlined, PersonOutlineOutlined } from '@mui/icons-material'
 import { getUsers, addUser, deleteUser } from '../api/users'
 import {
-  MemberCell, MemberAutocomplete, PageHeader, LoadingState, ErrorState, EmptyState,
-  FormDrawer, ConfirmDialog,
+  MemberCell,
+  MemberAutocomplete,
+  PageHeader,
+  LoadingState,
+  ErrorState,
+  EmptyState,
+  FormDrawer,
+  ConfirmDialog,
 } from '../components/ui'
 import { useMemberResolver } from '../hooks/useMemberResolver'
 import { PageWrapper } from '../styles/motion'
@@ -28,7 +47,12 @@ function UserRowActions({ user, memberData, onDelete }) {
   const name = memberData?.display_name || user.username || user.discord_id
   return (
     <Tooltip title={`Удалить: ${name}`}>
-      <IconButton size="small" color="error" aria-label={`Удалить: ${name}`} onClick={() => onDelete(user)}>
+      <IconButton
+        size="small"
+        color="error"
+        aria-label={`Удалить: ${name}`}
+        onClick={() => onDelete(user)}
+      >
         <DeleteOutlined sx={{ fontSize: 15 }} />
       </IconButton>
     </Tooltip>
@@ -37,7 +61,17 @@ function UserRowActions({ user, memberData, onDelete }) {
 
 function UserRecord({ user, memberData, onDelete }) {
   return (
-    <Box sx={{ border: '1px solid var(--color-border)', borderRadius: 2, p: 1.75, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1 }}>
+    <Box
+      sx={{
+        border: '1px solid var(--color-border)',
+        borderRadius: 2,
+        p: 1.75,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: 1,
+      }}
+    >
       <MemberCell id={String(user.discord_id)} memberData={memberData} showId />
       <UserRowActions user={user} memberData={memberData} onDelete={onDelete} />
     </Box>
@@ -72,7 +106,9 @@ function UserTable({ listType, emptyText }) {
     }
   }
 
-  useEffect(() => { load() }, [listType])
+  useEffect(() => {
+    load()
+  }, [listType])
 
   const showSnack = (msg, severity = 'success') => setSnack({ msg, severity })
 
@@ -162,11 +198,21 @@ function UserTable({ listType, emptyText }) {
               {users.map(u => (
                 <TableRow key={`${u.discord_id}-${u.list_type}`}>
                   <TableCell sx={{ minWidth: 200 }}>
-                    <MemberCell id={String(u.discord_id)} memberData={get(String(u.discord_id))} showId />
+                    <MemberCell
+                      id={String(u.discord_id)}
+                      memberData={get(String(u.discord_id))}
+                      showId
+                    />
                   </TableCell>
-                  <TableCell><Timestamp iso={u.created_at} /></TableCell>
                   <TableCell>
-                    <UserRowActions user={u} memberData={get(String(u.discord_id))} onDelete={setDeleteTarget} />
+                    <Timestamp iso={u.created_at} />
+                  </TableCell>
+                  <TableCell>
+                    <UserRowActions
+                      user={u}
+                      memberData={get(String(u.discord_id))}
+                      onDelete={setDeleteTarget}
+                    />
                   </TableCell>
                 </TableRow>
               ))}
@@ -187,7 +233,10 @@ function UserTable({ listType, emptyText }) {
         <MemberAutocomplete
           label="Участник"
           value={selectedId}
-          onChange={id => { setSelectedId(id); if (id) setSelectError(null) }}
+          onChange={id => {
+            setSelectedId(id)
+            if (id) setSelectError(null)
+          }}
           error={!!selectError}
           helperText={selectError}
         />
@@ -224,10 +273,7 @@ export default function Users() {
 
   return (
     <PageWrapper>
-      <PageHeader
-        title="Участники"
-        subtitle="Управление белым и чёрным списками участников"
-      />
+      <PageHeader title="Участники" subtitle="Управление белым и чёрным списками участников" />
       <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ mb: 2 }}>
         {LIST_TABS.map(t => (
           <Tab key={t.listType} label={t.label} />

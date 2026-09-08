@@ -2,7 +2,14 @@ import { useMemo } from 'react'
 import { Box, useMediaQuery } from '@mui/material'
 import { useTheme } from '@mui/material/styles'
 import {
-  Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis,
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Legend,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
 } from 'recharts'
 import { chartSeriesColors } from '../styles/chartPalette'
 
@@ -27,7 +34,7 @@ export default function DailyWorkHoursChart({ data }) {
 
   const chartData = useMemo(
     () => days.map(day => ({ ...day, dateLabel: formatDateShort(day.date) })),
-    [days],
+    [days]
   )
 
   if (members.length === 0 || days.length === 0) return null
@@ -35,7 +42,12 @@ export default function DailyWorkHoursChart({ data }) {
   return (
     <Box sx={{ width: '100%', height: isCompact ? 240 : 320, overflow: 'hidden' }}>
       <ResponsiveContainer>
-        <BarChart data={chartData} margin={{ top: 8, right: 8, left: 0, bottom: 0 }} barGap={2} barCategoryGap="20%">
+        <BarChart
+          data={chartData}
+          margin={{ top: 8, right: 8, left: 0, bottom: 0 }}
+          barGap={2}
+          barCategoryGap="20%"
+        >
           <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} />
           <XAxis
             dataKey="dateLabel"
@@ -52,14 +64,18 @@ export default function DailyWorkHoursChart({ data }) {
           />
           <Tooltip
             contentStyle={{
-              background: 'var(--color-bg-elevated)', border: '1px solid var(--color-border)',
-              borderRadius: 8, fontSize: 12,
+              background: 'var(--color-bg-elevated)',
+              border: '1px solid var(--color-border)',
+              borderRadius: 8,
+              fontSize: 12,
             }}
             labelStyle={{ color: 'var(--color-text-primary)' }}
             itemStyle={{ color: 'var(--color-text-primary)' }}
             formatter={tooltipFormatter}
           />
-          {members.length > 1 && <Legend wrapperStyle={{ fontSize: 12, color: 'var(--color-text-secondary)' }} />}
+          {members.length > 1 && (
+            <Legend wrapperStyle={{ fontSize: 12, color: 'var(--color-text-secondary)' }} />
+          )}
           {members.map((member, index) => (
             <Bar
               key={member.discord_id}

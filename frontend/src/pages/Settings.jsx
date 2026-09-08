@@ -1,14 +1,29 @@
 import { useState, useEffect } from 'react'
 import { flushSync } from 'react-dom'
 import {
-  Box, Typography, Switch,
-  Table, TableBody, TableCell, TableHead, TableRow, TableContainer,
-  Snackbar, Alert,
+  Box,
+  Typography,
+  Switch,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableRow,
+  TableContainer,
+  Snackbar,
+  Alert,
 } from '@mui/material'
 import { CheckCircleOutlined } from '@mui/icons-material'
 import { getBotInfo, getAllowedUsers } from '../api/stats'
 import { getDebugMode, setDebugMode } from '../api/muteLevels'
-import { MemberCell, PageHeader, LoadingState, ErrorState, Panel, StatusBadge } from '../components/ui'
+import {
+  MemberCell,
+  PageHeader,
+  LoadingState,
+  ErrorState,
+  Panel,
+  StatusBadge,
+} from '../components/ui'
 import { PageWrapper } from '../styles/motion'
 import { useMemberResolver } from '../hooks/useMemberResolver'
 
@@ -23,12 +38,14 @@ function formatUptime(seconds) {
 
 function InfoRow({ label, value }) {
   return (
-    <Box sx={{
-      display: 'flex',
-      py: 1.5,
-      borderBottom: '1px solid var(--color-border)',
-      '&:last-child': { borderBottom: 'none' },
-    }}>
+    <Box
+      sx={{
+        display: 'flex',
+        py: 1.5,
+        borderBottom: '1px solid var(--color-border)',
+        '&:last-child': { borderBottom: 'none' },
+      }}
+    >
       <Typography sx={{ width: 160, color: 'text.secondary', fontSize: '0.82rem', flexShrink: 0 }}>
         {label}
       </Typography>
@@ -50,7 +67,11 @@ export default function Settings() {
   const showSnack = (msg, severity = 'success') => setSnack({ msg, severity })
 
   useEffect(() => {
-    Promise.all([getBotInfo(), getAllowedUsers(), getDebugMode().catch(() => ({ debug_mode: false }))])
+    Promise.all([
+      getBotInfo(),
+      getAllowedUsers(),
+      getDebugMode().catch(() => ({ debug_mode: false })),
+    ])
       .then(([info, users, dbg]) => {
         setBotInfo(info)
         setAllowedUsers(users)
@@ -71,7 +92,7 @@ export default function Settings() {
   // a fast (or immediately-rejecting) response can resolve before React's
   // own batched re-render commits, so the switch would appear to never
   // have moved at all instead of visibly flipping and then reverting.
-  const handleDebugToggle = (e) => {
+  const handleDebugToggle = e => {
     const enabled = e.target.checked
     const previous = debugMode
     flushSync(() => {
@@ -97,15 +118,14 @@ export default function Settings() {
 
   return (
     <PageWrapper>
-      <PageHeader
-        title="Настройки"
-        subtitle="Статус бота, режим отладки и доступ к панели"
-      />
+      <PageHeader title="Настройки" subtitle="Статус бота, режим отладки и доступ к панели" />
 
       <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
         <Panel title="Состояние бота">
           <Box sx={{ display: 'flex', py: 1.5, borderBottom: '1px solid var(--color-border)' }}>
-            <Typography sx={{ width: 160, color: 'text.secondary', fontSize: '0.82rem', flexShrink: 0 }}>
+            <Typography
+              sx={{ width: 160, color: 'text.secondary', fontSize: '0.82rem', flexShrink: 0 }}
+            >
               Статус
             </Typography>
             <StatusBadge tone="success">
@@ -116,8 +136,14 @@ export default function Settings() {
           <InfoRow label="Имя бота" value={botInfo?.bot_name} />
           <InfoRow label="Guild ID" value={botInfo?.guild_id} />
           <InfoRow label="Guild Name" value={botInfo?.guild_name} />
-          <InfoRow label="Uptime" value={botInfo?.uptime_seconds != null ? formatUptime(botInfo.uptime_seconds) : null} />
-          <InfoRow label="Latency" value={botInfo?.latency_ms != null ? `${botInfo.latency_ms} ms` : null} />
+          <InfoRow
+            label="Uptime"
+            value={botInfo?.uptime_seconds != null ? formatUptime(botInfo.uptime_seconds) : null}
+          />
+          <InfoRow
+            label="Latency"
+            value={botInfo?.latency_ms != null ? `${botInfo.latency_ms} ms` : null}
+          />
         </Panel>
 
         <Panel title="Режим отладки">
@@ -156,7 +182,9 @@ export default function Settings() {
 
         <Panel title="Доступ к панели" description={allowedUsers?.note}>
           {allowedIds.length === 0 ? (
-            <Typography sx={{ color: 'text.secondary', fontSize: '0.85rem' }}>Нет разрешённых пользователей</Typography>
+            <Typography sx={{ color: 'text.secondary', fontSize: '0.85rem' }}>
+              Нет разрешённых пользователей
+            </Typography>
           ) : (
             <TableContainer sx={{ border: '1px solid var(--color-border)', borderRadius: 1.5 }}>
               <Table size="small" aria-label="Доступ к панели">
@@ -169,8 +197,12 @@ export default function Settings() {
                 <TableBody>
                   {allowedIds.map((id, i) => (
                     <TableRow key={i}>
-                      <TableCell><MemberCell id={String(id)} memberData={getMember(String(id))} showId /></TableCell>
-                      <TableCell><StatusBadge tone="success">Разрешён</StatusBadge></TableCell>
+                      <TableCell>
+                        <MemberCell id={String(id)} memberData={getMember(String(id))} showId />
+                      </TableCell>
+                      <TableCell>
+                        <StatusBadge tone="success">Разрешён</StatusBadge>
+                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>

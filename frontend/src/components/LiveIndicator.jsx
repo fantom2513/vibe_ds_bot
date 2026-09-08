@@ -23,7 +23,7 @@ export default function LiveIndicator() {
           timeout = setTimeout(connect, 5000)
         }
         ws.onerror = () => ws?.close()
-      } catch (_) {
+      } catch {
         setConnected(false)
       }
     }
@@ -35,7 +35,14 @@ export default function LiveIndicator() {
   }, [])
 
   return (
-    <span className={`live-badge ${connected ? '' : 'off'}`} title={connected ? 'WebSocket подключён' : 'WebSocket не подключён (эндпоинт может быть не реализован)'}>
+    <span
+      className={`live-badge ${connected ? '' : 'off'}`}
+      title={
+        connected
+          ? 'WebSocket подключён'
+          : 'WebSocket не подключён (эндпоинт может быть не реализован)'
+      }
+    >
       <span className="live-dot" />
       {connected ? 'Live' : 'Offline'}
     </span>

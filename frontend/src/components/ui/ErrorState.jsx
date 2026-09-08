@@ -7,11 +7,13 @@ export const ErrorState = ({ message, onRetry }) => (
   <Alert
     severity="error"
     sx={{ my: 2 }}
-    action={onRetry && (
-      <Button color="inherit" variant="outlined" size="small" onClick={onRetry}>
-        Повторить
-      </Button>
-    )}
+    action={
+      onRetry && (
+        <Button color="inherit" variant="outlined" size="small" onClick={onRetry}>
+          Повторить
+        </Button>
+      )
+    }
   >
     {message}
   </Alert>

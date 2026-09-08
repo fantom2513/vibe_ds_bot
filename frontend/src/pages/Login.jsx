@@ -14,13 +14,15 @@ export default function Login() {
   }, [user, navigate])
 
   return (
-    <Box sx={{
-      display: 'flex',
-      justifyContent: 'center',
-      alignItems: 'center',
-      height: '100vh',
-      px: 2,
-    }}>
+    <Box
+      sx={{
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center',
+        height: '100vh',
+        px: 2,
+      }}
+    >
       <Panel sx={{ width: 360, maxWidth: '100%' }}>
         <Box sx={{ textAlign: 'center' }}>
           <Box sx={{ display: 'flex', justifyContent: 'center', mb: 3 }}>
@@ -36,7 +38,9 @@ export default function Login() {
             variant="contained"
             fullWidth
             size="large"
-            onClick={() => { window.location.href = '/auth/discord/login' }}
+            onClick={() => {
+              window.location.href = '/auth/discord/login'
+            }}
             sx={{ py: 1.2 }}
           >
             Войти через Discord

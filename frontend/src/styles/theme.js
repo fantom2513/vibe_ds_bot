@@ -97,7 +97,6 @@ export const theme = createTheme({
   ],
 
   components: {
-
     // Cross-cutting base styles (box-sizing, body background/font, the
     // Google Fonts import, scrollbar appearance) live exclusively in
     // frontend/src/styles/global.css — see typography.css for the font
@@ -155,7 +154,8 @@ export const theme = createTheme({
           borderRadius: 8,
           padding: '7px 16px',
           fontSize: '0.82rem',
-          transition: 'background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease, transform 0.2s ease',
+          transition:
+            'background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease, transform 0.2s ease',
         },
         // Default/large buttons are primary calls to action (e.g. Dashboard's
         // "Создать правило", Rules' "Новое правило") and must clear the 44px
@@ -376,6 +376,5 @@ export const theme = createTheme({
         },
       },
     },
-
   },
 })

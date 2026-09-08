@@ -8,7 +8,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "test:e2e": "playwright test",
-    "lint": "eslint .",
+    "lint": "eslint . --max-warnings 7",
     "format:check": "prettier --check ."
   },
   "dependencies": {

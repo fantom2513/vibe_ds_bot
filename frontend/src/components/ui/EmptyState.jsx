@@ -6,8 +6,6 @@ import { Box, Typography } from '@mui/material'
 export const EmptyState = ({ text = 'Нет данных', icon: Icon }) => (
   <Box sx={{ py: 8, textAlign: 'center' }}>
     {Icon && <Icon sx={{ fontSize: '2rem', color: 'text.secondary', mb: 1 }} />}
-    <Typography sx={{ color: 'text.secondary', fontSize: '0.85rem' }}>
-      {text}
-    </Typography>
+    <Typography sx={{ color: 'text.secondary', fontSize: '0.85rem' }}>{text}</Typography>
   </Box>
 )

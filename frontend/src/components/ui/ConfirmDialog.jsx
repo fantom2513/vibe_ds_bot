@@ -1,5 +1,13 @@
 import { useRef } from 'react'
-import { Button, CircularProgress, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle } from '@mui/material'
+import {
+  Button,
+  CircularProgress,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogContentText,
+  DialogTitle,
+} from '@mui/material'
 
 let idCounter = 0
 
@@ -48,11 +56,13 @@ export const ConfirmDialog = ({
         <Button
           variant="contained"
           color="error"
-          onClick={() => { if (!busy) onConfirm?.() }}
+          onClick={() => {
+            if (!busy) onConfirm?.()
+          }}
           disabled={busy}
           startIcon={busy ? <CircularProgress size={16} color="inherit" /> : null}
         >
-          {busy ? (busyLabel || `${confirmLabel}…`) : confirmLabel}
+          {busy ? busyLabel || `${confirmLabel}…` : confirmLabel}
         </Button>
       </DialogActions>
     </Dialog>

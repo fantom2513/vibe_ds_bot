@@ -1,16 +1,41 @@
 import { useState, useEffect } from 'react'
 import {
-  Box, Button, Switch,
-  Table, TableBody, TableCell, TableHead, TableRow, TableContainer,
-  Paper, IconButton, TextField, Typography, Tooltip, Snackbar, Alert,
+  Box,
+  Button,
+  Switch,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableRow,
+  TableContainer,
+  Paper,
+  IconButton,
+  TextField,
+  Typography,
+  Tooltip,
+  Snackbar,
+  Alert,
   useMediaQuery,
 } from '@mui/material'
 import { useTheme } from '@mui/material/styles'
 import { AddOutlined, DeleteOutlined, PeopleOutlineOutlined } from '@mui/icons-material'
-import { getStackingPairs, createStackingPair, toggleStackingPair, deleteStackingPair } from '../api/stackingPairs'
 import {
-  MemberCell, MemberAutocomplete, PageHeader, LoadingState, ErrorState, EmptyState,
-  StatusBadge, FormDrawer, ConfirmDialog,
+  getStackingPairs,
+  createStackingPair,
+  toggleStackingPair,
+  deleteStackingPair,
+} from '../api/stackingPairs'
+import {
+  MemberCell,
+  MemberAutocomplete,
+  PageHeader,
+  LoadingState,
+  ErrorState,
+  EmptyState,
+  StatusBadge,
+  FormDrawer,
+  ConfirmDialog,
 } from '../components/ui'
 import { useMemberResolver } from '../hooks/useMemberResolver'
 import { PageWrapper } from '../styles/motion'
@@ -52,7 +77,13 @@ function PairStatusToggle({ pair, pending, onToggle }) {
 function PairRowActions({ pair, pending, onDelete }) {
   return (
     <Tooltip title={`Удалить: пара #${pair.id}`}>
-      <IconButton size="small" color="error" aria-label={`Удалить: пара #${pair.id}`} onClick={() => onDelete(pair)} disabled={pending}>
+      <IconButton
+        size="small"
+        color="error"
+        aria-label={`Удалить: пара #${pair.id}`}
+        onClick={() => onDelete(pair)}
+        disabled={pending}
+      >
         <DeleteOutlined sx={{ fontSize: 15 }} />
       </IconButton>
     </Tooltip>
@@ -62,7 +93,15 @@ function PairRowActions({ pair, pending, onDelete }) {
 function PairRecord({ pair, getMember, pending, onDelete, onToggle }) {
   return (
     <Box sx={{ border: '1px solid var(--color-border)', borderRadius: 2, p: 1.75 }}>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 1, mb: 1 }}>
+      <Box
+        sx={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'flex-start',
+          gap: 1,
+          mb: 1,
+        }}
+      >
         <PairMembersRow pair={pair} getMember={getMember} />
         <PairRowActions pair={pair} pending={pending} onDelete={onDelete} />
       </Box>
@@ -104,7 +143,9 @@ export default function StackingPairs() {
     }
   }
 
-  useEffect(() => { load() }, [])
+  useEffect(() => {
+    load()
+  }, [])
 
   const showSnack = (msg, severity = 'success') => setSnack({ msg, severity })
 
@@ -151,7 +192,7 @@ export default function StackingPairs() {
     }
   }
 
-  const handleToggle = async (pair) => {
+  const handleToggle = async pair => {
     if (pendingPairIds.has(pair.id)) return
     setPendingPairIds(prev => new Set(prev).add(pair.id))
     try {
@@ -199,7 +240,10 @@ export default function StackingPairs() {
       />
 
       {pairs.length === 0 ? (
-        <EmptyState text="Нет пар стакинга. Добавьте пару через кнопку выше." icon={PeopleOutlineOutlined} />
+        <EmptyState
+          text="Нет пар стакинга. Добавьте пару через кнопку выше."
+          icon={PeopleOutlineOutlined}
+        />
       ) : isCompact ? (
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
           {pairs.map(p => (
@@ -240,7 +284,9 @@ export default function StackingPairs() {
                       <MemberCell id={String(p.user_id_2)} memberData={get(String(p.user_id_2))} />
                     </TableCell>
                     <TableCell sx={MONO}>{p.target_channel_id}</TableCell>
-                    <TableCell><Timestamp iso={p.created_at} /></TableCell>
+                    <TableCell>
+                      <Timestamp iso={p.created_at} />
+                    </TableCell>
                     <TableCell>
                       <PairStatusToggle pair={p} pending={pending} onToggle={handleToggle} />
                     </TableCell>
@@ -276,7 +322,9 @@ export default function StackingPairs() {
           value={form.user_id_2}
           onChange={id => setForm(f => ({ ...f, user_id_2: id }))}
           error={!!errors.user_id_2 || !!sameUserError}
-          helperText={errors.user_id_2 || (sameUserError ? 'Выберите двух разных участников' : undefined)}
+          helperText={
+            errors.user_id_2 || (sameUserError ? 'Выберите двух разных участников' : undefined)
+          }
         />
         <TextField
           label="Целевой голосовой канал"

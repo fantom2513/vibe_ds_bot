@@ -84,6 +84,25 @@ A mutable tag can be repointed by anyone who controls the action repository, and
 
 This runs first because it is the only piece of these phases with real logic, so it is the only piece that can be genuinely test-driven.
 
+> **Amended after code review (commit `dcaa5a5`).** The implementation below is
+> incomplete as originally written: `ET.parse` has no error handling, so a
+> missing, empty, or truncated JUnit file raises before `print()` ever runs and
+> **nothing is appended to the step summary at all**. That is exactly backwards
+> from the intent — Task 5 puts `if: always()` on this step precisely so it
+> survives a catastrophic pytest failure, and a catastrophic failure is what
+> produces a broken XML file in the first place.
+>
+> `summarize()` therefore catches `FileNotFoundError` and `ET.ParseError` and
+> returns a readable markdown block instead of raising, and the process exits 0:
+> the pytest step has already failed and turned the job red, so a second red
+> step adds noise without adding information. The catch is narrow on purpose —
+> a bug in our own formatting logic must still surface as a traceback.
+>
+> Four tests were added alongside it: one for a suite containing real skips
+> (`skipped` participates in the `passed = total - failed - skipped` arithmetic
+> and had no coverage), and one each for a missing file, an empty file, and
+> truncated XML. Final count: 8 tests in this file, 85 in the suite.
+
 **Files:**
 - Create: `scripts/ci/junit_summary.py`
 - Create: `tests/test_scripts/__init__.py` (empty)
@@ -288,7 +307,7 @@ if __name__ == "__main__":
 .\.venv\Scripts\python.exe -m pytest tests/test_scripts/test_junit_summary.py -v
 ```
 
-Expected: 4 passed.
+Expected: 4 passed (8 after the review amendment above).
 
 - [ ] **Step 7: Verify the whole suite still passes**
 
@@ -296,7 +315,7 @@ Expected: 4 passed.
 .\.venv\Scripts\python.exe -m pytest -q
 ```
 
-Expected: `81 passed` (77 existing + 4 new).
+Expected: `81 passed` (77 existing + 4 new); `85 passed` after the review amendment.
 
 - [ ] **Step 8: Commit**
 

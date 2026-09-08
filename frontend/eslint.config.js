@@ -1,10 +1,23 @@
+// Потолок предупреждений задан в package.json: `eslint . --max-warnings 7`.
+// Семь — это текущее число react-hooks/exhaustive-deps в коде. Чинить их
+// оптом нельзя: дописывание зависимостей в useEffect умеет порождать
+// бесконечные перерисовки, каждый случай требует разбора. Потолок не даёт
+// им расти. Починил один — опусти число, обратно оно уже не поднимется.
 import js from '@eslint/js'
 import react from 'eslint-plugin-react'
 import reactHooks from 'eslint-plugin-react-hooks'
 import globals from 'globals'
 
 export default [
-  { ignores: ['dist/**', 'node_modules/**', 'playwright-report/**', 'test-results/**', 'blob-report/**'] },
+  {
+    ignores: [
+      'dist/**',
+      'node_modules/**',
+      'playwright-report/**',
+      'test-results/**',
+      'blob-report/**',
+    ],
+  },
 
   js.configs.recommended,
 

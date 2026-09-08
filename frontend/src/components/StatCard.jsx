@@ -2,10 +2,7 @@ import { Card } from 'antd'
 
 export default function StatCard({ title, value, icon, color = 'var(--accent)' }) {
   return (
-    <Card
-      style={{ borderColor: 'var(--border-base)' }}
-      styles={{ body: { padding: '16px 20px' } }}
-    >
+    <Card style={{ borderColor: 'var(--border-base)' }} styles={{ body: { padding: '16px 20px' } }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <div>
           <div

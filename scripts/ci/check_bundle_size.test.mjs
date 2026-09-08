@@ -56,3 +56,26 @@ test('checkBudget treats a measurement exactly at budget as passing', () => {
 
   assert.equal(outcome.ok, true)
 })
+
+// bundle-budget.json несёт ключ _comment с пояснением, зачем нужны пороги.
+// Сам по себе он проверку не ломал, но лишь потому, что `0 > "строка"`
+// приводится к false — то есть работало по случайности приведения типов,
+// а не по замыслу. Эти два теста фиксируют поведение явно, чтобы правка
+// сравнения в checkBudget не сломала разбор бюджета молча.
+test('checkBudget ignores non-numeric budget entries such as comments', () => {
+  const outcome = checkBudget(
+    { js: 100 },
+    { _comment: 'пороги подобраны на 15% выше факта', js: 200 }
+  )
+
+  assert.equal(outcome.ok, true)
+  assert.equal(outcome.violations.length, 0)
+})
+
+test('checkBudget still flags a real overage alongside a comment key', () => {
+  const outcome = checkBudget({ js: 300 }, { _comment: 'что угодно', js: 200 })
+
+  assert.equal(outcome.ok, false)
+  assert.equal(outcome.violations.length, 1)
+  assert.match(outcome.violations[0], /js/)
+})

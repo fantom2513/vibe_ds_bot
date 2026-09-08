@@ -32,7 +32,9 @@ test.use({ launchOptions: { channel: 'msedge' } })
 // instead of racing a real network response.
 const deferred = () => {
   let resolve
-  const promise = new Promise(done => { resolve = done })
+  const promise = new Promise(done => {
+    resolve = done
+  })
   return { promise, resolve }
 }
 
@@ -66,9 +68,11 @@ async function mockRules(page, initialRules, { saveGate, deleteGate } = {}) {
     deletedId: null,
   }
 
-  await page.route('**/auth/me', route => route.fulfill({
-    json: { id: '1', username: 'Admin', avatar: null },
-  }))
+  await page.route('**/auth/me', route =>
+    route.fulfill({
+      json: { id: '1', username: 'Admin', avatar: null },
+    })
+  )
 
   // Anchored to the end of the URL (optionally followed by a query string)
   // so this only matches the real `/api/rules...` endpoints — a loose
@@ -104,7 +108,9 @@ async function mockRules(page, initialRules, { saveGate, deleteGate } = {}) {
       const body = await request.postDataJSON()
       state.updatedPayload = body
       if (saveGate) await saveGate.promise
-      state.rules = state.rules.map(r => (r.id === id ? { ...r, ...body, updated_at: '2026-09-06T12:05:00Z' } : r))
+      state.rules = state.rules.map(r =>
+        r.id === id ? { ...r, ...body, updated_at: '2026-09-06T12:05:00Z' } : r
+      )
       return route.fulfill({ json: state.rules.find(r => r.id === id) })
     }
     if (method === 'PATCH' && id !== null && isToggle) {
@@ -192,7 +198,9 @@ test('rules page uses Russian labels for the page title and table headers', asyn
   await expect(table.getByRole('columnheader', { name: 'Статус' })).toBeVisible()
 })
 
-test('rules shows semantic StatusBadge text for active state and blacklist target', async ({ page }) => {
+test('rules shows semantic StatusBadge text for active state and blacklist target', async ({
+  page,
+}) => {
   await mockRules(page, [ruleFixture]) // is_active: true, target_list: 'blacklist'
   await page.goto(`${BASE_URL}/rules`)
 
@@ -200,7 +208,9 @@ test('rules shows semantic StatusBadge text for active state and blacklist targe
   await expect(page.getByText('Чёрный список', { exact: true })).toBeVisible()
 })
 
-test('rules shows semantic StatusBadge text for inactive state and whitelist target', async ({ page }) => {
+test('rules shows semantic StatusBadge text for inactive state and whitelist target', async ({
+  page,
+}) => {
   await mockRules(page, [{ ...ruleFixture, is_active: false, target_list: 'whitelist' }])
   await page.goto(`${BASE_URL}/rules`)
 
@@ -239,7 +249,9 @@ test('rules reports invalid action params JSON beside the field', async ({ page 
 test('rules cannot toggle the same rule twice while a toggle is pending', async ({ page }) => {
   const toggleGate = deferred()
   let toggleCalls = 0
-  await page.route('**/auth/me', route => route.fulfill({ json: { id: '1', username: 'Admin', avatar: null } }))
+  await page.route('**/auth/me', route =>
+    route.fulfill({ json: { id: '1', username: 'Admin', avatar: null } })
+  )
   await page.route(/\/api\/rules(?:\/(\d+))?(?:\/(toggle))?\/?(?:\?.*)?$/, async route => {
     const request = route.request()
     const method = request.method()
@@ -271,7 +283,9 @@ test('rules has no document overflow at 390x844', async ({ page }) => {
   await page.goto(`${BASE_URL}/rules`)
 
   await expect(page.getByRole('heading', { name: 'Правила' })).toBeVisible()
-  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)
+  const overflow = await page.evaluate(
+    () => document.documentElement.scrollWidth - document.documentElement.clientWidth
+  )
   expect(overflow).toBeLessThanOrEqual(0)
 })
 
@@ -280,16 +294,25 @@ test('rules has no document overflow at 390x844', async ({ page }) => {
 // ---------------------------------------------------------------------------
 
 const listedUser = {
-  discord_id: '42', list_type: 'whitelist', username: 'Ada',
-  reason: null, created_at: '2026-09-06T10:00:00Z',
+  discord_id: '42',
+  list_type: 'whitelist',
+  username: 'Ada',
+  reason: null,
+  created_at: '2026-09-06T10:00:00Z',
 }
 const kickTargetFixture = {
-  discord_id: '42', username: 'Ada', timeout_sec: 1800,
-  max_timeout_sec: 3600, is_active: true,
+  discord_id: '42',
+  username: 'Ada',
+  timeout_sec: 1800,
+  max_timeout_sec: 3600,
+  is_active: true,
 }
 const stackingPairFixture = {
-  id: 4, user_id_1: '42', user_id_2: '84',
-  target_channel_id: '100', is_active: true,
+  id: 4,
+  user_id_1: '42',
+  user_id_2: '84',
+  target_channel_id: '100',
+  is_active: true,
   created_at: '2026-09-06T10:00:00Z',
 }
 
@@ -297,8 +320,8 @@ const stackingPairFixture = {
 // returned by the real /api/members search/batch/single routes, keyed by
 // discord_id so route handlers below can look members up directly.
 const memberFixtures = {
-  '42': { id: '42', username: 'Ada', display_name: 'Ada', label: 'Ada', avatar: null },
-  '84': { id: '84', username: 'Boris', display_name: 'Boris', label: 'Boris', avatar: null },
+  42: { id: '42', username: 'Ada', display_name: 'Ada', label: 'Ada', avatar: null },
+  84: { id: '84', username: 'Boris', display_name: 'Boris', label: 'Boris', avatar: null },
 }
 
 // Mocks the authenticated admin identity plus the full /api/users,
@@ -308,12 +331,15 @@ const memberFixtures = {
 // so tests can assert pending-state UI deterministically; each gated route
 // also increments a `*Calls` counter so tests can assert a blocked duplicate
 // request never reached the mock a second time.
-async function mockMemberManagement(page, {
-  users = [listedUser],
-  kickTargets = [kickTargetFixture],
-  pairs = [stackingPairFixture],
-  gates = {},
-} = {}) {
+async function mockMemberManagement(
+  page,
+  {
+    users = [listedUser],
+    kickTargets = [kickTargetFixture],
+    pairs = [stackingPairFixture],
+    gates = {},
+  } = {}
+) {
   const state = {
     users: users.map(u => ({ ...u })),
     kickTargets: kickTargets.map(t => ({ ...t })),
@@ -329,9 +355,11 @@ async function mockMemberManagement(page, {
     pairToggleCalls: 0,
   }
 
-  await page.route('**/auth/me', route => route.fulfill({
-    json: { id: '1', username: 'Admin', avatar: null },
-  }))
+  await page.route('**/auth/me', route =>
+    route.fulfill({
+      json: { id: '1', username: 'Admin', avatar: null },
+    })
+  )
 
   // Anchored the same way as mockRules' /api/rules route so this only
   // matches the real endpoint and never Vite's dev-server module URL for
@@ -345,8 +373,8 @@ async function mockMemberManagement(page, {
 
     if (method === 'GET' && segment === null) {
       const q = (url.searchParams.get('q') || '').toLowerCase()
-      const results = Object.values(memberFixtures).filter(m =>
-        !q || m.display_name.toLowerCase().includes(q) || m.username.toLowerCase().includes(q)
+      const results = Object.values(memberFixtures).filter(
+        m => !q || m.display_name.toLowerCase().includes(q) || m.username.toLowerCase().includes(q)
       )
       return route.fulfill({ json: results })
     }
@@ -355,7 +383,11 @@ async function mockMemberManagement(page, {
       const result = {}
       ids.forEach(id => {
         result[id] = memberFixtures[id] || {
-          id, username: id, display_name: 'Unknown', avatar: null, label: `Unknown (@${id})`,
+          id,
+          username: id,
+          display_name: 'Unknown',
+          avatar: null,
+          label: `Unknown (@${id})`,
         }
       })
       return route.fulfill({ json: result })
@@ -383,14 +415,21 @@ async function mockMemberManagement(page, {
       const body = await request.postDataJSON()
       state.createdUserPayload = body
       if (gates.userSave) await gates.userSave.promise
-      const created = { reason: null, created_at: '2026-09-06T12:00:00Z', ...body, discord_id: String(body.discord_id) }
+      const created = {
+        reason: null,
+        created_at: '2026-09-06T12:00:00Z',
+        ...body,
+        discord_id: String(body.discord_id),
+      }
       state.users = [...state.users, created]
       return route.fulfill({ json: created })
     }
     if (method === 'DELETE' && id !== null) {
       state.deletedUserId = id
       if (gates.userDelete) await gates.userDelete.promise
-      state.users = state.users.filter(u => !(String(u.discord_id) === id && u.list_type === listType))
+      state.users = state.users.filter(
+        u => !(String(u.discord_id) === id && u.list_type === listType)
+      )
       return route.fulfill({ status: 204 })
     }
     return route.fulfill({ status: 404, json: { detail: 'not found' } })
@@ -424,7 +463,9 @@ async function mockMemberManagement(page, {
         state.updatedKickPayload = body
         if (gates.kickSave) await gates.kickSave.promise
       }
-      state.kickTargets = state.kickTargets.map(t => (String(t.discord_id) === id ? { ...t, ...body } : t))
+      state.kickTargets = state.kickTargets.map(t =>
+        String(t.discord_id) === id ? { ...t, ...body } : t
+      )
       return route.fulfill({ json: state.kickTargets.find(t => String(t.discord_id) === id) })
     }
     if (method === 'DELETE' && id !== null) {
@@ -452,7 +493,12 @@ async function mockMemberManagement(page, {
       state.createdPairPayload = body
       if (gates.pairSave) await gates.pairSave.promise
       const now = '2026-09-06T12:00:00Z'
-      const created = { id: Math.max(0, ...state.pairs.map(p => p.id)) + 1, is_active: true, created_at: now, ...body }
+      const created = {
+        id: Math.max(0, ...state.pairs.map(p => p.id)) + 1,
+        is_active: true,
+        created_at: now,
+        ...body,
+      }
       state.pairs = [...state.pairs, created]
       return route.fulfill({ json: created })
     }
@@ -510,9 +556,11 @@ test('users requires selecting a member before saving', async ({ page }) => {
 
 test('users shows an error state when the initial list fetch fails', async ({ page }) => {
   let usersCalls = 0
-  await page.route('**/auth/me', route => route.fulfill({
-    json: { id: '1', username: 'Admin', avatar: null },
-  }))
+  await page.route('**/auth/me', route =>
+    route.fulfill({
+      json: { id: '1', username: 'Admin', avatar: null },
+    })
+  )
   await page.route(/\/api\/users(?:\/([^/?]+))?\/?(?:\?.*)?$/, async route => {
     usersCalls += 1
     return route.fulfill({ status: 500, json: { detail: 'Internal error' } })
@@ -527,7 +575,9 @@ test('users shows an error state when the initial list fetch fails', async ({ pa
   expect(usersCalls).toBe(1)
 })
 
-test('users keeps its drawer open and disables the submit button while saving', async ({ page }) => {
+test('users keeps its drawer open and disables the submit button while saving', async ({
+  page,
+}) => {
   const userSave = deferred()
   await mockMemberManagement(page, { users: [], gates: { userSave } })
   await page.goto(`${BASE_URL}/users`)
@@ -570,7 +620,9 @@ test('users has no document overflow at 390x844', async ({ page }) => {
   await page.goto(`${BASE_URL}/users`)
 
   await expect(page.getByRole('heading', { name: 'Участники' })).toBeVisible()
-  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)
+  const overflow = await page.evaluate(
+    () => document.documentElement.scrollWidth - document.documentElement.clientWidth
+  )
   expect(overflow).toBeLessThanOrEqual(0)
 })
 
@@ -587,7 +639,9 @@ test('kick targets converts minute-based fields into second-based payload', asyn
   expect(state.createdKickPayload.max_timeout_sec).toBe(1200)
 })
 
-test('kick targets validates a positive minimum and a maximum not below minimum', async ({ page }) => {
+test('kick targets validates a positive minimum and a maximum not below minimum', async ({
+  page,
+}) => {
   await mockMemberManagement(page, { kickTargets: [] })
   await page.goto(`${BASE_URL}/kick-targets`)
   await page.getByRole('button', { name: 'Добавить' }).click()
@@ -609,9 +663,14 @@ test('kick targets shows explicit Включено status text', async ({ page }
   await expect(page.getByText('Включено', { exact: true })).toBeVisible()
 })
 
-test('kick targets cannot toggle the same target twice while a toggle is pending', async ({ page }) => {
+test('kick targets cannot toggle the same target twice while a toggle is pending', async ({
+  page,
+}) => {
   const kickToggle = deferred()
-  const state = await mockMemberManagement(page, { kickTargets: [kickTargetFixture], gates: { kickToggle } })
+  const state = await mockMemberManagement(page, {
+    kickTargets: [kickTargetFixture],
+    gates: { kickToggle },
+  })
   await page.goto(`${BASE_URL}/kick-targets`)
 
   const toggle = page.getByRole('switch').first()
@@ -642,7 +701,9 @@ test('kick targets has no document overflow at 390x844', async ({ page }) => {
   await page.goto(`${BASE_URL}/kick-targets`)
 
   await expect(page.getByRole('heading', { name: 'Кик-цели' })).toBeVisible()
-  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)
+  const overflow = await page.evaluate(
+    () => document.documentElement.scrollWidth - document.documentElement.clientWidth
+  )
   expect(overflow).toBeLessThanOrEqual(0)
 })
 
@@ -666,7 +727,9 @@ test('stacking pairs prevents choosing the same member twice', async ({ page }) 
   expect(state.createdPairPayload).toBeNull()
 })
 
-test('stacking pairs creates a pair with two distinct members and a target channel', async ({ page }) => {
+test('stacking pairs creates a pair with two distinct members and a target channel', async ({
+  page,
+}) => {
   const state = await mockMemberManagement(page, { pairs: [] })
   await page.goto(`${BASE_URL}/stacking-pairs`)
   await page.getByRole('button', { name: 'Добавить пару' }).click()
@@ -680,9 +743,14 @@ test('stacking pairs creates a pair with two distinct members and a target chann
   expect(state.createdPairPayload.user_id_2).toBe('84')
 })
 
-test('stacking pairs cannot toggle the same pair twice while a toggle is pending', async ({ page }) => {
+test('stacking pairs cannot toggle the same pair twice while a toggle is pending', async ({
+  page,
+}) => {
   const pairToggle = deferred()
-  const state = await mockMemberManagement(page, { pairs: [stackingPairFixture], gates: { pairToggle } })
+  const state = await mockMemberManagement(page, {
+    pairs: [stackingPairFixture],
+    gates: { pairToggle },
+  })
   await page.goto(`${BASE_URL}/stacking-pairs`)
 
   const toggle = page.getByRole('switch').first()
@@ -713,7 +781,9 @@ test('stacking pairs has no document overflow at 390x844', async ({ page }) => {
   await page.goto(`${BASE_URL}/stacking-pairs`)
 
   await expect(page.getByRole('heading', { name: 'Стаки' })).toBeVisible()
-  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)
+  const overflow = await page.evaluate(
+    () => document.documentElement.scrollWidth - document.documentElement.clientWidth
+  )
   expect(overflow).toBeLessThanOrEqual(0)
 })
 
@@ -743,11 +813,10 @@ const scheduleFixture = {
 // and/or forces the next non-toggle save to fail with `saveError` so tests
 // can assert pending-state UI and inline drawer error handling
 // deterministically instead of racing a real network response.
-async function mockSchedules(page, {
-  schedules = [scheduleFixture],
-  rules = [ruleFixture],
-  gates = {},
-} = {}) {
+async function mockSchedules(
+  page,
+  { schedules = [scheduleFixture], rules = [ruleFixture], gates = {} } = {}
+) {
   const state = {
     schedules: schedules.map(s => ({ ...s })),
     createdPayload: null,
@@ -756,9 +825,11 @@ async function mockSchedules(page, {
     toggleCalls: 0,
   }
 
-  await page.route('**/auth/me', route => route.fulfill({
-    json: { id: '1', username: 'Admin', avatar: null },
-  }))
+  await page.route('**/auth/me', route =>
+    route.fulfill({
+      json: { id: '1', username: 'Admin', avatar: null },
+    })
+  )
 
   // Read-only: anchored the same way as mockRules' /api/rules route so this
   // only matches the real endpoint and never Vite's dev-server module URL
@@ -788,7 +859,12 @@ async function mockSchedules(page, {
       if (gates.save) await gates.save.promise
       if (gates.saveError) return route.fulfill({ status: 400, json: { detail: gates.saveError } })
       const now = '2026-09-06T12:00:00Z'
-      const created = { id: Math.max(0, ...state.schedules.map(s => s.id)) + 1, created_at: now, updated_at: now, ...body }
+      const created = {
+        id: Math.max(0, ...state.schedules.map(s => s.id)) + 1,
+        created_at: now,
+        updated_at: now,
+        ...body,
+      }
       state.schedules = [...state.schedules, created]
       return route.fulfill({ json: created })
     }
@@ -801,9 +877,12 @@ async function mockSchedules(page, {
       } else {
         state.updatedPayload = body
         if (gates.save) await gates.save.promise
-        if (gates.saveError) return route.fulfill({ status: 400, json: { detail: gates.saveError } })
+        if (gates.saveError)
+          return route.fulfill({ status: 400, json: { detail: gates.saveError } })
       }
-      state.schedules = state.schedules.map(s => (s.id === id ? { ...s, ...body, updated_at: '2026-09-06T12:05:00Z' } : s))
+      state.schedules = state.schedules.map(s =>
+        s.id === id ? { ...s, ...body, updated_at: '2026-09-06T12:05:00Z' } : s
+      )
       return route.fulfill({ json: state.schedules.find(s => s.id === id) })
     }
     if (method === 'DELETE' && id !== null) {
@@ -832,7 +911,9 @@ test('schedules resolves the related rule name and uses Russian labels', async (
   await expect(page.getByText(ruleFixture.name)).toBeVisible()
 })
 
-test('schedules shows the cron expression in mono with a plain-language preview', async ({ page }) => {
+test('schedules shows the cron expression in mono with a plain-language preview', async ({
+  page,
+}) => {
   await mockSchedules(page)
   await page.goto(`${BASE_URL}/schedules`)
 
@@ -841,7 +922,9 @@ test('schedules shows the cron expression in mono with a plain-language preview'
   await expect(page.getByText(expectedPreview)).toBeVisible()
 })
 
-test('schedules shows semantic badge text for the enable action and active status', async ({ page }) => {
+test('schedules shows semantic badge text for the enable action and active status', async ({
+  page,
+}) => {
   await mockSchedules(page, { schedules: [scheduleFixture] }) // action: 'enable', is_active: true
   await page.goto(`${BASE_URL}/schedules`)
 
@@ -849,8 +932,12 @@ test('schedules shows semantic badge text for the enable action and active statu
   await expect(page.getByText('Активно', { exact: true })).toBeVisible()
 })
 
-test('schedules shows semantic badge text for the disable action and inactive status', async ({ page }) => {
-  await mockSchedules(page, { schedules: [{ ...scheduleFixture, action: 'disable', is_active: false }] })
+test('schedules shows semantic badge text for the disable action and inactive status', async ({
+  page,
+}) => {
+  await mockSchedules(page, {
+    schedules: [{ ...scheduleFixture, action: 'disable', is_active: false }],
+  })
   await page.goto(`${BASE_URL}/schedules`)
 
   await expect(page.getByText('Отключить правило', { exact: true })).toBeVisible()
@@ -912,7 +999,9 @@ test('schedules has no document overflow at 390x844', async ({ page }) => {
   await page.goto(`${BASE_URL}/schedules`)
 
   await expect(page.getByRole('heading', { name: 'Расписания' })).toBeVisible()
-  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)
+  const overflow = await page.evaluate(
+    () => document.documentElement.scrollWidth - document.documentElement.clientWidth
+  )
   expect(overflow).toBeLessThanOrEqual(0)
 })
 
@@ -944,22 +1033,24 @@ const dailyWorkHoursFixture = {
     { discord_id: '84', username: 'Boris' },
   ],
   days: [
-    { date: '2026-08-25', '42': 10800, '84': 7200 },
-    { date: '2026-08-26', '42': 9000, '84': 5400 },
+    { date: '2026-08-25', 42: 10800, 84: 7200 },
+    { date: '2026-08-26', 42: 9000, 84: 5400 },
   ],
 }
 
 const trackingReportFixture = (username = 'Ada', overrides = {}) => ({
   period_start: '2026-08-28T00:00:00Z',
   period_end: '2026-08-28T12:00:00Z',
-  members: [{
-    discord_id: '42',
-    username,
-    total_seconds: 3600,
-    session_count: 1,
-    work_seconds: 1800,
-    ...overrides,
-  }],
+  members: [
+    {
+      discord_id: '42',
+      username,
+      total_seconds: 3600,
+      session_count: 1,
+      work_seconds: 1800,
+      ...overrides,
+    },
+  ],
   overlaps: [],
 })
 
@@ -968,11 +1059,10 @@ const trackingReportFixture = (username = 'Ada', overrides = {}) => ({
 // hours) reused against the same /api/members fixtures as
 // mockMemberManagement above. `gates` optionally defers a specific
 // mutation's response so tests can assert pending-state UI deterministically.
-async function mockTracking(page, {
-  initialMembers = [],
-  daily = dailyWorkHoursFixture,
-  gates = {},
-} = {}) {
+async function mockTracking(
+  page,
+  { initialMembers = [], daily = dailyWorkHoursFixture, gates = {} } = {}
+) {
   const state = {
     members: initialMembers.map(m => ({ ...m })),
     reportChannelId: null,
@@ -981,9 +1071,11 @@ async function mockTracking(page, {
     deletedId: null,
   }
 
-  await page.route('**/auth/me', route => route.fulfill({
-    json: { id: '1', username: 'Admin', avatar: null },
-  }))
+  await page.route('**/auth/me', route =>
+    route.fulfill({
+      json: { id: '1', username: 'Admin', avatar: null },
+    })
+  )
 
   await page.route(/\/api\/members(?:\/([^/?]+))?\/?(?:\?.*)?$/, async route => {
     const request = route.request()
@@ -994,15 +1086,23 @@ async function mockTracking(page, {
 
     if (method === 'GET' && segment === null) {
       const q = (url.searchParams.get('q') || '').toLowerCase()
-      const results = Object.values(memberFixtures).filter(m =>
-        !q || m.display_name.toLowerCase().includes(q) || m.username.toLowerCase().includes(q)
+      const results = Object.values(memberFixtures).filter(
+        m => !q || m.display_name.toLowerCase().includes(q) || m.username.toLowerCase().includes(q)
       )
       return route.fulfill({ json: results })
     }
     if (method === 'POST' && segment === 'batch') {
       const ids = await request.postDataJSON()
       const result = {}
-      ids.forEach(id => { result[id] = memberFixtures[id] || { id, username: id, display_name: 'Unknown', avatar: null, label: `Unknown (@${id})` } })
+      ids.forEach(id => {
+        result[id] = memberFixtures[id] || {
+          id,
+          username: id,
+          display_name: 'Unknown',
+          avatar: null,
+          label: `Unknown (@${id})`,
+        }
+      })
       return route.fulfill({ json: result })
     }
     if (method === 'GET' && segment !== null) {
@@ -1037,8 +1137,12 @@ async function mockTracking(page, {
       const body = await request.postDataJSON()
       state.updatedPayload = body
       if (gates.schedule) await gates.schedule.promise
-      state.members = state.members.map(m => (String(m.discord_id) === memberMatch[1] ? { ...m, ...body } : m))
-      return route.fulfill({ json: state.members.find(m => String(m.discord_id) === memberMatch[1]) })
+      state.members = state.members.map(m =>
+        String(m.discord_id) === memberMatch[1] ? { ...m, ...body } : m
+      )
+      return route.fulfill({
+        json: state.members.find(m => String(m.discord_id) === memberMatch[1]),
+      })
     }
     if (memberMatch && method === 'DELETE') {
       state.deletedId = memberMatch[1]
@@ -1083,12 +1187,19 @@ async function mockTracking(page, {
   return state
 }
 
-test('tracking groups its workspace into four Russian-labelled Panel sections', async ({ page }) => {
+test('tracking groups its workspace into four Russian-labelled Panel sections', async ({
+  page,
+}) => {
   await mockTracking(page, { initialMembers: [trackedMemberFixture()] })
   await page.goto(`${BASE_URL}/tracking`)
 
   await expect(page.getByRole('heading', { name: 'Отслеживание' })).toBeVisible()
-  for (const title of ['Канал отчётов', 'Отслеживаемые участники', 'Предпросмотр отчёта', 'Рабочие часы — последние 14 дней']) {
+  for (const title of [
+    'Канал отчётов',
+    'Отслеживаемые участники',
+    'Предпросмотр отчёта',
+    'Рабочие часы — последние 14 дней',
+  ]) {
     const heading = page.getByRole('heading', { name: title })
     await expect(heading).toBeVisible()
     // A Panel boundary is a bordered/surfaced container, not an arbitrary
@@ -1115,9 +1226,9 @@ test('tracking chart uses the dedicated non-semantic series palette', async ({ p
   // first paint — wait for all 4 (2 members x 2 days) before sampling fills.
   const bars = page.locator('.recharts-bar-rectangle path')
   await expect(bars).toHaveCount(4)
-  const fills = await bars.evaluateAll(paths =>
-    [...new Set(paths.map(path => getComputedStyle(path).fill))]
-  )
+  const fills = await bars.evaluateAll(paths => [
+    ...new Set(paths.map(path => getComputedStyle(path).fill)),
+  ])
   expect(fills).not.toContain('rgb(88, 101, 242)')
   expect(fills).not.toContain('rgb(139, 92, 246)')
   expect(fills.length).toBeGreaterThan(1)
@@ -1129,15 +1240,21 @@ test('tracking chart uses the dedicated non-semantic series palette', async ({ p
   expect(fills).toContain('rgb(103, 185, 222)')
 })
 
-test('tracking chart grid and axis text consume the border and secondary-text tokens', async ({ page }) => {
+test('tracking chart grid and axis text consume the border and secondary-text tokens', async ({
+  page,
+}) => {
   await mockTracking(page, { daily: dailyWorkHoursFixture })
   await page.goto(`${BASE_URL}/tracking`)
 
-  const gridStroke = await page.locator('.recharts-cartesian-grid line').first()
+  const gridStroke = await page
+    .locator('.recharts-cartesian-grid line')
+    .first()
     .evaluate(el => getComputedStyle(el).stroke)
   expect(gridStroke).toBe('rgb(37, 50, 57)') // --color-border (graphite-700)
 
-  const axisFill = await page.locator('.recharts-xAxis-tick-labels .recharts-cartesian-axis-tick-value').first()
+  const axisFill = await page
+    .locator('.recharts-xAxis-tick-labels .recharts-cartesian-axis-tick-value')
+    .first()
     .evaluate(el => getComputedStyle(el).fill)
   expect(axisFill).toBe('rgb(168, 181, 176)') // --color-text-secondary (neutral-300)
 })
@@ -1167,7 +1284,9 @@ test('tracking chart legend text uses the secondary-text token', async ({ page }
   expect(color).toBe('rgb(168, 181, 176)') // --color-text-secondary (neutral-300)
 })
 
-test('tracking still saves the report channel and adds a tracked member after the redesign', async ({ page }) => {
+test('tracking still saves the report channel and adds a tracked member after the redesign', async ({
+  page,
+}) => {
   const state = await mockTracking(page)
   await page.goto(`${BASE_URL}/tracking`)
 
@@ -1186,7 +1305,9 @@ test('tracking still saves the report channel and adds a tracked member after th
   expect(state.createdPayload?.discord_id).toBe('42')
 })
 
-test('tracking protects a pending member deletion through the shared confirm dialog', async ({ page }) => {
+test('tracking protects a pending member deletion through the shared confirm dialog', async ({
+  page,
+}) => {
   const del = deferred()
   await mockTracking(page, { initialMembers: [trackedMemberFixture()], gates: { delete: del } })
   await page.goto(`${BASE_URL}/tracking`)
@@ -1199,9 +1320,14 @@ test('tracking protects a pending member deletion through the shared confirm dia
   del.resolve()
 })
 
-test('tracking blocks escape while a schedule save is pending in the shared form drawer', async ({ page }) => {
+test('tracking blocks escape while a schedule save is pending in the shared form drawer', async ({
+  page,
+}) => {
   const scheduleGate = deferred()
-  await mockTracking(page, { initialMembers: [trackedMemberFixture()], gates: { schedule: scheduleGate } })
+  await mockTracking(page, {
+    initialMembers: [trackedMemberFixture()],
+    gates: { schedule: scheduleGate },
+  })
   await page.goto(`${BASE_URL}/tracking`)
   await page.getByRole('button', { name: 'Редактировать график: Ada' }).click()
   await page.getByRole('button', { name: 'Сохранить', exact: true }).click()
@@ -1212,7 +1338,9 @@ test('tracking blocks escape while a schedule save is pending in the shared form
   scheduleGate.resolve()
 })
 
-test('tracking still changes the preview period and refreshes the preview on demand', async ({ page }) => {
+test('tracking still changes the preview period and refreshes the preview on demand', async ({
+  page,
+}) => {
   await mockTracking(page, { initialMembers: [trackedMemberFixture()] })
   await page.goto(`${BASE_URL}/tracking`)
 
@@ -1230,7 +1358,9 @@ test('tracking configuration and preview remain usable at 390 px', async ({ page
   await page.goto(`${BASE_URL}/tracking`)
 
   await expect(page.getByRole('heading', { name: 'Отслеживание' })).toBeVisible()
-  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)
+  const overflow = await page.evaluate(
+    () => document.documentElement.scrollWidth - document.documentElement.clientWidth
+  )
   expect(overflow).toBeLessThanOrEqual(0)
 })
 
@@ -1256,9 +1386,11 @@ const logFixture = {
 async function mockLogs(page, { logs = [logFixture] } = {}) {
   const state = { logs: logs.map(l => ({ ...l })), lastQuery: null, exportQuery: null }
 
-  await page.route('**/auth/me', route => route.fulfill({
-    json: { id: '1', username: 'Admin', avatar: null },
-  }))
+  await page.route('**/auth/me', route =>
+    route.fulfill({
+      json: { id: '1', username: 'Admin', avatar: null },
+    })
+  )
 
   await page.route(/\/api\/logs\/export\/?(?:\?.*)?$/, route => {
     const url = new URL(route.request().url())
@@ -1268,7 +1400,8 @@ async function mockLogs(page, { logs = [logFixture] } = {}) {
 
   await page.route(/\/api\/logs\/?(?:\?.*)?$/, route => {
     const request = route.request()
-    if (request.method() !== 'GET') return route.fulfill({ status: 404, json: { detail: 'not found' } })
+    if (request.method() !== 'GET')
+      return route.fulfill({ status: 404, json: { detail: 'not found' } })
     const url = new URL(request.url())
     state.lastQuery = Object.fromEntries(url.searchParams)
     return route.fulfill({ json: state.logs })
@@ -1307,7 +1440,10 @@ test('logs export preserves the active filters', async ({ page }) => {
   await mockLogs(page)
   await page.addInitScript(() => {
     window.__exportUrls = []
-    window.open = url => { window.__exportUrls.push(url); return null }
+    window.open = url => {
+      window.__exportUrls.push(url)
+      return null
+    }
   })
   await page.goto(`${BASE_URL}/logs`)
 
@@ -1330,17 +1466,23 @@ test('logs date filter inputs keep persistent labels', async ({ page }) => {
   await expect(page.getByLabel('Дата с')).toHaveValue('2026-09-01T00:00')
 })
 
-test('logs grid stays contained at 390 px while important columns remain reachable', async ({ page }) => {
+test('logs grid stays contained at 390 px while important columns remain reachable', async ({
+  page,
+}) => {
   await mockLogs(page)
   await page.setViewportSize({ width: 390, height: 844 })
   await page.goto(`${BASE_URL}/logs`)
 
   await expect(page.getByRole('heading', { name: 'Журнал' })).toBeVisible()
-  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)
+  const overflow = await page.evaluate(
+    () => document.documentElement.scrollWidth - document.documentElement.clientWidth
+  )
   expect(overflow).toBeLessThanOrEqual(0)
 
   const scroller = page.locator('.MuiDataGrid-virtualScroller')
-  await scroller.evaluate(el => { el.scrollLeft = el.scrollWidth })
+  await scroller.evaluate(el => {
+    el.scrollLeft = el.scrollWidth
+  })
   await expect(page.getByRole('columnheader', { name: 'Канал' })).toBeVisible()
 })
 
@@ -1363,44 +1505,53 @@ const allowedUsersFixture = {
 // forces the PATCH response to fail so tests can assert the revert-on-
 // failure behavior; `gates.patch` optionally defers that PATCH response so
 // tests can assert the switch's disabled-while-pending state deterministically.
-async function mockSettings(page, {
-  debugMode = false,
-  patchStatus = 200,
-  botInfo = botInfoFixture,
-  allowedUsers = allowedUsersFixture,
-  gates = {},
-} = {}) {
+async function mockSettings(
+  page,
+  {
+    debugMode = false,
+    patchStatus = 200,
+    botInfo = botInfoFixture,
+    allowedUsers = allowedUsersFixture,
+    gates = {},
+  } = {}
+) {
   const state = { debugMode, patchPayload: null }
 
-  await page.route('**/auth/me', route => route.fulfill({
-    json: { id: '1', username: 'Admin', avatar: null },
-  }))
+  await page.route('**/auth/me', route =>
+    route.fulfill({
+      json: { id: '1', username: 'Admin', avatar: null },
+    })
+  )
 
   await page.route('**/api/members/batch', route => route.fulfill({ json: memberFixtures }))
 
-  await page.route(/\/api\/settings\/(bot-info|allowed-users|debug-mode)\/?(?:\?.*)?$/, async route => {
-    const request = route.request()
-    const method = request.method()
-    const url = new URL(request.url())
+  await page.route(
+    /\/api\/settings\/(bot-info|allowed-users|debug-mode)\/?(?:\?.*)?$/,
+    async route => {
+      const request = route.request()
+      const method = request.method()
+      const url = new URL(request.url())
 
-    if (url.pathname === '/api/settings/bot-info' && method === 'GET') {
-      return route.fulfill({ json: botInfo })
+      if (url.pathname === '/api/settings/bot-info' && method === 'GET') {
+        return route.fulfill({ json: botInfo })
+      }
+      if (url.pathname === '/api/settings/allowed-users' && method === 'GET') {
+        return route.fulfill({ json: allowedUsers })
+      }
+      if (url.pathname === '/api/settings/debug-mode' && method === 'GET') {
+        return route.fulfill({ json: { debug_mode: state.debugMode } })
+      }
+      if (url.pathname === '/api/settings/debug-mode' && method === 'PATCH') {
+        state.patchPayload = await request.postDataJSON()
+        if (gates.patch) await gates.patch.promise
+        if (patchStatus >= 400)
+          return route.fulfill({ status: patchStatus, json: { detail: 'Ошибка' } })
+        state.debugMode = state.patchPayload.enabled
+        return route.fulfill({ json: { debug_mode: state.debugMode } })
+      }
+      return route.fulfill({ status: 404, json: { detail: 'not found' } })
     }
-    if (url.pathname === '/api/settings/allowed-users' && method === 'GET') {
-      return route.fulfill({ json: allowedUsers })
-    }
-    if (url.pathname === '/api/settings/debug-mode' && method === 'GET') {
-      return route.fulfill({ json: { debug_mode: state.debugMode } })
-    }
-    if (url.pathname === '/api/settings/debug-mode' && method === 'PATCH') {
-      state.patchPayload = await request.postDataJSON()
-      if (gates.patch) await gates.patch.promise
-      if (patchStatus >= 400) return route.fulfill({ status: patchStatus, json: { detail: 'Ошибка' } })
-      state.debugMode = state.patchPayload.enabled
-      return route.fulfill({ json: { debug_mode: state.debugMode } })
-    }
-    return route.fulfill({ status: 404, json: { detail: 'not found' } })
-  })
+  )
 
   return state
 }
@@ -1458,7 +1609,9 @@ test('settings and login panel contain no legacy glow or shadow treatment', asyn
   await page.goto(`${BASE_URL}/settings`)
   await expect(page.locator('.MuiCard-root')).toHaveCount(0)
 
-  await page.route('**/auth/me', route => route.fulfill({ status: 401, json: { detail: 'unauthorized' } }))
+  await page.route('**/auth/me', route =>
+    route.fulfill({ status: 401, json: { detail: 'unauthorized' } })
+  )
   await page.goto(`${BASE_URL}/login`)
   await expect(page.getByText('Войти через Discord')).toBeVisible()
   await expect(page.locator('.MuiCard-root')).toHaveCount(0)
@@ -1480,17 +1633,23 @@ test('settings has no document overflow at 390x844', async ({ page }) => {
   await page.goto(`${BASE_URL}/settings`)
 
   await expect(page.getByRole('heading', { name: 'Настройки' })).toBeVisible()
-  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)
+  const overflow = await page.evaluate(
+    () => document.documentElement.scrollWidth - document.documentElement.clientWidth
+  )
   expect(overflow).toBeLessThanOrEqual(0)
 })
 
 test('login has no document overflow at 390x844', async ({ page }) => {
-  await page.route('**/auth/me', route => route.fulfill({ status: 401, json: { detail: 'unauthorized' } }))
+  await page.route('**/auth/me', route =>
+    route.fulfill({ status: 401, json: { detail: 'unauthorized' } })
+  )
   await page.setViewportSize({ width: 390, height: 844 })
   await page.goto(`${BASE_URL}/login`)
 
   await expect(page.getByRole('heading', { name: 'Bot Dashboard' })).toBeVisible()
-  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)
+  const overflow = await page.evaluate(
+    () => document.documentElement.scrollWidth - document.documentElement.clientWidth
+  )
   expect(overflow).toBeLessThanOrEqual(0)
 })
 
@@ -1530,12 +1689,15 @@ function decimalColorToRgb(color) {
 // Mocks the authenticated admin identity plus the full /api/mute-levels CRUD
 // surface, the read-only /api/mute-xp/leaderboard and /api/guild/roles
 // endpoints, and /api/members/batch for leaderboard member resolution.
-async function mockMuteLevels(page, {
-  levels = [muteLevelFixture],
-  leaderboard = [muteXpFixture],
-  roles = [guildRoleFixture],
-  gates = {},
-} = {}) {
+async function mockMuteLevels(
+  page,
+  {
+    levels = [muteLevelFixture],
+    leaderboard = [muteXpFixture],
+    roles = [guildRoleFixture],
+    gates = {},
+  } = {}
+) {
   const state = {
     levels: levels.map(l => ({ ...l })),
     createdPayload: null,
@@ -1543,9 +1705,11 @@ async function mockMuteLevels(page, {
     deletedLevel: null,
   }
 
-  await page.route('**/auth/me', route => route.fulfill({
-    json: { id: '1', username: 'Admin', avatar: null },
-  }))
+  await page.route('**/auth/me', route =>
+    route.fulfill({
+      json: { id: '1', username: 'Admin', avatar: null },
+    })
+  )
 
   await page.route('**/api/members/batch', route => route.fulfill({ json: memberFixtures }))
 
@@ -1586,7 +1750,9 @@ async function mockMuteLevels(page, {
     return route.fulfill({ status: 404, json: { detail: 'not found' } })
   })
 
-  await page.route(/\/api\/mute-xp\/leaderboard\/?(?:\?.*)?$/, route => route.fulfill({ json: leaderboard }))
+  await page.route(/\/api\/mute-xp\/leaderboard\/?(?:\?.*)?$/, route =>
+    route.fulfill({ json: leaderboard })
+  )
   await page.route(/\/api\/guild\/roles\/?(?:\?.*)?$/, route => route.fulfill({ json: roles }))
 
   return state
@@ -1601,7 +1767,9 @@ test('mute levels renders under the protected admin shell', async ({ page }) => 
   await expect(page.getByRole('heading', { name: 'Рейтинг участников' })).toBeVisible()
 })
 
-test('expanded navigation groups routes under Мониторинг and Управление and lists Уровни', async ({ page }) => {
+test('expanded navigation groups routes under Мониторинг and Управление and lists Уровни', async ({
+  page,
+}) => {
   await mockMuteLevels(page)
   await page.setViewportSize({ width: 1440, height: 900 })
   await page.goto(`${BASE_URL}/mute-levels`)
@@ -1612,7 +1780,9 @@ test('expanded navigation groups routes under Мониторинг and Упра�
   await expect(nav.getByRole('link', { name: 'Уровни' })).toBeVisible()
 })
 
-test('collapsed navigation groups hide their labels but keep accessible link names', async ({ page }) => {
+test('collapsed navigation groups hide their labels but keep accessible link names', async ({
+  page,
+}) => {
   await mockMuteLevels(page)
   await page.setViewportSize({ width: 1440, height: 900 })
   await page.goto(`${BASE_URL}/mute-levels`)
@@ -1624,7 +1794,9 @@ test('collapsed navigation groups hide their labels but keep accessible link nam
   await expect(nav.getByRole('link', { name: 'Уровни' })).toBeVisible()
 })
 
-test('mute levels validates level, name, XP threshold, and role before saving', async ({ page }) => {
+test('mute levels validates level, name, XP threshold, and role before saving', async ({
+  page,
+}) => {
   await mockMuteLevels(page)
   await page.goto(`${BASE_URL}/mute-levels`)
 
@@ -1661,18 +1833,25 @@ test('mute levels shows the guild role color only inside the role selector', asy
   const roleRgb = decimalColorToRgb(guildRoleFixture.color)
 
   await expect(page.getByText('Тихий')).toBeVisible()
-  const rowHasRoleColor = await page.locator('table').first().evaluate((table, rgb) => (
-    [...table.querySelectorAll('*')].some(el => getComputedStyle(el).backgroundColor === rgb)
-  ), roleRgb)
+  const rowHasRoleColor = await page
+    .locator('table')
+    .first()
+    .evaluate(
+      (table, rgb) =>
+        [...table.querySelectorAll('*')].some(el => getComputedStyle(el).backgroundColor === rgb),
+      roleRgb
+    )
   expect(rowHasRoleColor).toBe(false)
 
   await page.getByRole('button', { name: 'Добавить уровень' }).click()
   await page.getByRole('switch', { name: 'Выдавать роль при достижении' }).click()
   await page.getByLabel('Роль', { exact: true }).click()
   const option = page.getByRole('option', { name: 'Тихий' })
-  const optionHasRoleColor = await option.evaluate((el, rgb) => (
-    [...el.querySelectorAll('*')].some(node => getComputedStyle(node).backgroundColor === rgb)
-  ), roleRgb)
+  const optionHasRoleColor = await option.evaluate(
+    (el, rgb) =>
+      [...el.querySelectorAll('*')].some(node => getComputedStyle(node).backgroundColor === rgb),
+    roleRgb
+  )
   expect(optionHasRoleColor).toBe(true)
 })
 
@@ -1689,7 +1868,9 @@ test('mute levels protects a pending destructive confirmation', async ({ page })
   deleteGate.resolve()
 })
 
-test('mute levels leaderboard renders rank as a mono ordinal with an accessible place label', async ({ page }) => {
+test('mute levels leaderboard renders rank as a mono ordinal with an accessible place label', async ({
+  page,
+}) => {
   await mockMuteLevels(page)
   await page.goto(`${BASE_URL}/mute-levels`)
 
@@ -1705,7 +1886,9 @@ test('mute levels has no document overflow at 390x844', async ({ page }) => {
   await page.goto(`${BASE_URL}/mute-levels`)
 
   await expect(page.getByRole('heading', { name: 'Уровни тишины' })).toBeVisible()
-  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)
+  const overflow = await page.evaluate(
+    () => document.documentElement.scrollWidth - document.documentElement.clientWidth
+  )
   expect(overflow).toBeLessThanOrEqual(0)
 })
 
@@ -1738,21 +1921,35 @@ async function neutralizeEventSource(page) {
 }
 
 async function mockDashboardRoute(page) {
-  await page.route('**/auth/me', route => route.fulfill({
-    json: { id: '1', username: 'Admin', avatar: null },
-  }))
-  await page.route('**/api/dashboard', route => route.fulfill({
-    json: { active_rules: [], voice_online_count: 0, online_users: [], recent_logs: [] },
-  }))
-  await page.route('**/api/stats/overview', route => route.fulfill({
-    json: { total_actions: 0 },
-  }))
+  await page.route('**/auth/me', route =>
+    route.fulfill({
+      json: { id: '1', username: 'Admin', avatar: null },
+    })
+  )
+  await page.route('**/api/dashboard', route =>
+    route.fulfill({
+      json: { active_rules: [], voice_online_count: 0, online_users: [], recent_logs: [] },
+    })
+  )
+  await page.route('**/api/stats/overview', route =>
+    route.fulfill({
+      json: { total_actions: 0 },
+    })
+  )
   await neutralizeEventSource(page)
 }
 
 const adminRoutes = [
-  '/', '/rules', '/users', '/kick-targets', '/stacking-pairs',
-  '/tracking', '/schedules', '/logs', '/settings', '/mute-levels',
+  '/',
+  '/rules',
+  '/users',
+  '/kick-targets',
+  '/stacking-pairs',
+  '/tracking',
+  '/schedules',
+  '/logs',
+  '/settings',
+  '/mute-levels',
 ]
 
 // Each route's exact major-heading text, matching what this route's own
@@ -1789,7 +1986,7 @@ const routeSetups = {
 const LEGACY_COLORS = ['rgb(88, 101, 242)', 'rgb(139, 92, 246)']
 
 async function hasLegacyColor(page) {
-  return page.evaluate((forbidden) => {
+  return page.evaluate(forbidden => {
     const props = ['color', 'backgroundColor', 'borderColor', 'borderTopColor', 'fill', 'stroke']
     for (const el of document.querySelectorAll('*')) {
       const cs = getComputedStyle(el)
@@ -1800,7 +1997,9 @@ async function hasLegacyColor(page) {
 }
 
 for (const route of adminRoutes) {
-  test(`route matrix: ${route} shows one heading, fits 390px, and carries no emoji or legacy palette`, async ({ page }) => {
+  test(`route matrix: ${route} shows one heading, fits 390px, and carries no emoji or legacy palette`, async ({
+    page,
+  }) => {
     await routeSetups[route](page)
     await page.setViewportSize({ width: 390, height: 844 })
     await page.goto(`${BASE_URL}${route}`)
@@ -1809,7 +2008,9 @@ for (const route of adminRoutes) {
     await expect(heading).toBeVisible()
     await expect(heading).toHaveCount(1)
 
-    const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)
+    const overflow = await page.evaluate(
+      () => document.documentElement.scrollWidth - document.documentElement.clientWidth
+    )
     expect(overflow).toBeLessThanOrEqual(0)
 
     const bodyText = await page.locator('body').innerText()
@@ -1847,14 +2048,18 @@ async function assertVisibleFocus(page) {
     if (!el || el === document.body) return false
     try {
       if (el.matches(':focus-visible')) return true
-    } catch { /* engines without :focus-visible support fall through */ }
+    } catch {
+      /* engines without :focus-visible support fall through */
+    }
     const cs = getComputedStyle(el)
     return cs.outlineStyle !== 'none' && cs.outlineWidth !== '0px'
   })
   expect(visible).toBe(true)
 }
 
-test('keyboard matrix: drawer is keyboard reachable, blocks Escape while saving, and restores row-action focus on close', async ({ page }) => {
+test('keyboard matrix: drawer is keyboard reachable, blocks Escape while saving, and restores row-action focus on close', async ({
+  page,
+}) => {
   const saveGate = deferred()
   await mockRules(page, [ruleFixture], { saveGate })
   await page.goto(`${BASE_URL}/rules`)
@@ -1881,7 +2086,9 @@ test('keyboard matrix: drawer is keyboard reachable, blocks Escape while saving,
   await expect(trigger).toBeFocused()
 })
 
-test('keyboard matrix: dialog is keyboard reachable, Escape closes and restores focus when idle, but is blocked while a delete is pending', async ({ page }) => {
+test('keyboard matrix: dialog is keyboard reachable, Escape closes and restores focus when idle, but is blocked while a delete is pending', async ({
+  page,
+}) => {
   const deleteGate = deferred()
   await mockRules(page, [ruleFixture], { deleteGate })
   await page.goto(`${BASE_URL}/rules`)
@@ -1914,7 +2121,9 @@ test('keyboard matrix: dialog is keyboard reachable, Escape closes and restores 
   deleteGate.resolve()
 })
 
-test('keyboard matrix: tab set is keyboard reachable and shows visible focus while switching lists', async ({ page }) => {
+test('keyboard matrix: tab set is keyboard reachable and shows visible focus while switching lists', async ({
+  page,
+}) => {
   await mockMemberManagement(page, { users: [] })
   await page.goto(`${BASE_URL}/users`)
 
@@ -1935,7 +2144,9 @@ test('keyboard matrix: tab set is keyboard reachable and shows visible focus whi
   await expect(blacklistTab).toHaveAttribute('aria-selected', 'true')
 })
 
-test('keyboard matrix: switch is keyboard reachable, toggles via Space, and cannot repeat its pending request', async ({ page }) => {
+test('keyboard matrix: switch is keyboard reachable, toggles via Space, and cannot repeat its pending request', async ({
+  page,
+}) => {
   const patch = deferred()
   await mockSettings(page, { gates: { patch } })
   await page.goto(`${BASE_URL}/settings`)
@@ -1951,7 +2162,9 @@ test('keyboard matrix: switch is keyboard reachable, toggles via Space, and cann
   await expect(toggle).toBeEnabled()
 })
 
-test('keyboard matrix: filter toolbar is keyboard reachable and applies its filter via keyboard', async ({ page }) => {
+test('keyboard matrix: filter toolbar is keyboard reachable and applies its filter via keyboard', async ({
+  page,
+}) => {
   const state = await mockLogs(page)
   await page.goto(`${BASE_URL}/logs`)
 
@@ -1968,22 +2181,29 @@ test('keyboard matrix: filter toolbar is keyboard reachable and applies its filt
   await expect.poll(() => state.lastQuery?.discord_id).toBe('42')
 })
 
-test('keyboard matrix: data grid is keyboard reachable, shows visible cell focus, and moves focus with arrow keys', async ({ page }) => {
+test('keyboard matrix: data grid is keyboard reachable, shows visible cell focus, and moves focus with arrow keys', async ({
+  page,
+}) => {
   await mockLogs(page, { logs: [logFixture] })
   await page.goto(`${BASE_URL}/logs`)
 
   await expect(page.locator('.MuiDataGrid-root')).toBeVisible()
 
-  const isInsideGrid = () => page.evaluate(() => !!document.activeElement?.closest('.MuiDataGrid-root'))
+  const isInsideGrid = () =>
+    page.evaluate(() => !!document.activeElement?.closest('.MuiDataGrid-root'))
   for (let i = 0; i < 60 && !(await isInsideGrid()); i++) {
     await page.keyboard.press('Tab')
   }
   expect(await isInsideGrid()).toBe(true)
   await assertVisibleFocus(page)
 
-  const before = await page.evaluate(() => document.activeElement?.getAttribute('data-field') ?? document.activeElement?.textContent)
+  const before = await page.evaluate(
+    () => document.activeElement?.getAttribute('data-field') ?? document.activeElement?.textContent
+  )
   await page.keyboard.press('ArrowRight')
-  const after = await page.evaluate(() => document.activeElement?.getAttribute('data-field') ?? document.activeElement?.textContent)
+  const after = await page.evaluate(
+    () => document.activeElement?.getAttribute('data-field') ?? document.activeElement?.textContent
+  )
 
   expect(await isInsideGrid()).toBe(true)
   expect(after).not.toBe(before)

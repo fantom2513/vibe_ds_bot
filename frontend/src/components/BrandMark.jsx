@@ -17,10 +17,34 @@ export default function BrandMark({ showLabel = true, size = 24 }) {
         focusable="false"
         sx={{ width: size, height: size, flexShrink: 0, display: 'block' }}
       >
-        <rect x="1" y="9" width="3" height="6" rx="1.5" fill="var(--color-action-primary)" opacity="0.5" />
-        <rect x="6.5" y="5" width="3" height="14" rx="1.5" fill="var(--color-action-primary)" opacity="0.75" />
+        <rect
+          x="1"
+          y="9"
+          width="3"
+          height="6"
+          rx="1.5"
+          fill="var(--color-action-primary)"
+          opacity="0.5"
+        />
+        <rect
+          x="6.5"
+          y="5"
+          width="3"
+          height="14"
+          rx="1.5"
+          fill="var(--color-action-primary)"
+          opacity="0.75"
+        />
         <rect x="12" y="1.5" width="3" height="21" rx="1.5" fill="var(--color-action-primary)" />
-        <rect x="17.5" y="6" width="3" height="12" rx="1.5" fill="var(--color-action-primary)" opacity="0.75" />
+        <rect
+          x="17.5"
+          y="6"
+          width="3"
+          height="12"
+          rx="1.5"
+          fill="var(--color-action-primary)"
+          opacity="0.75"
+        />
       </Box>
       {showLabel && (
         <Typography

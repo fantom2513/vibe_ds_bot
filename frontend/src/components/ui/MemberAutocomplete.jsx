@@ -23,7 +23,7 @@ export function MemberAutocomplete({ value, onChange, label, error, helperText, 
   const [loading, setLoading] = useState(false)
   const debounceTimer = useRef(null)
 
-  const fetchOptions = useCallback((q) => {
+  const fetchOptions = useCallback(q => {
     if (debounceTimer.current) clearTimeout(debounceTimer.current)
     debounceTimer.current = setTimeout(async () => {
       setLoading(true)
@@ -40,9 +40,7 @@ export function MemberAutocomplete({ value, onChange, label, error, helperText, 
 
   const selectedOption = options.find(o => o.id === value) ?? null
 
-  const displayHelperText = value
-    ? (helperText || `ID: ${value}`)
-    : helperText
+  const displayHelperText = value ? helperText || `ID: ${value}` : helperText
 
   return (
     <Autocomplete
@@ -63,19 +61,31 @@ export function MemberAutocomplete({ value, onChange, label, error, helperText, 
         onChange(newValue?.id ?? null, newValue ?? null)
       }}
       renderOption={(props, opt) => (
-        <Box component="li" {...props} key={opt.id} sx={{ display: 'flex', alignItems: 'center', gap: 1.5, py: '6px !important' }}>
-          <Avatar src={opt.avatar} sx={{ width: 28, height: 28, fontSize: '0.7rem', flexShrink: 0 }}>
+        <Box
+          component="li"
+          {...props}
+          key={opt.id}
+          sx={{ display: 'flex', alignItems: 'center', gap: 1.5, py: '6px !important' }}
+        >
+          <Avatar
+            src={opt.avatar}
+            sx={{ width: 28, height: 28, fontSize: '0.7rem', flexShrink: 0 }}
+          >
             {opt.display_name?.[0]?.toUpperCase()}
           </Avatar>
           <Box>
-            <Typography sx={{ fontSize: '0.85rem', lineHeight: 1.3 }}>{opt.display_name}</Typography>
+            <Typography sx={{ fontSize: '0.85rem', lineHeight: 1.3 }}>
+              {opt.display_name}
+            </Typography>
             {opt.username !== opt.display_name && (
-              <Typography sx={{ ...MONO, color: 'text.secondary', lineHeight: 1.2 }}>@{opt.username}</Typography>
+              <Typography sx={{ ...MONO, color: 'text.secondary', lineHeight: 1.2 }}>
+                @{opt.username}
+              </Typography>
             )}
           </Box>
         </Box>
       )}
-      renderInput={(params) => (
+      renderInput={params => (
         <TextField
           {...params}
           label={label}

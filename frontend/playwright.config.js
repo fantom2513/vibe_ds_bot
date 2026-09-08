@@ -24,10 +24,10 @@ export default defineConfig({
   workers: 1,
 
   reporter: process.env.CI
-    // blob-репортеры со всех шардов сливаются в один HTML-отчёт
-    // отдельной джобой — иначе на каждый шард свой кусок и общей
-    // картины нет.
-    ? [['blob'], ['github']]
+    ? // blob-репортеры со всех шардов сливаются в один HTML-отчёт
+      // отдельной джобой — иначе на каждый шард свой кусок и общей
+      // картины нет.
+      [['blob'], ['github']]
     : [['html', { open: 'never' }]],
 
   use: {
@@ -38,7 +38,5 @@ export default defineConfig({
     video: 'retain-on-failure',
   },
 
-  projects: [
-    { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
-  ],
+  projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
 })

@@ -34,6 +34,11 @@ export function checkBudget(measured, budget) {
   const violations = []
 
   for (const [category, limit] of Object.entries(budget)) {
+    // Пропускаем нечисловые значения: в bundle-budget.json лежит ключ
+    // _comment с пояснением. Без этой строчки он всё равно не срабатывал бы,
+    // но только из-за приведения типов в `>`, а опираться на такое не стоит.
+    if (typeof limit !== 'number') continue
+
     const actual = measured[category] ?? 0
     if (actual > limit) {
       violations.push(

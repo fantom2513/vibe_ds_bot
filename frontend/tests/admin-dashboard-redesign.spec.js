@@ -32,10 +32,12 @@ const statsOverviewFixture = {
 }
 
 test('login uses the Vibe brand mark without emoji', async ({ page }) => {
-  await page.route('**/auth/me', route => route.fulfill({
-    status: 401,
-    json: { detail: 'Not authenticated' },
-  }))
+  await page.route('**/auth/me', route =>
+    route.fulfill({
+      status: 401,
+      json: { detail: 'Not authenticated' },
+    })
+  )
 
   await page.goto(`${BASE_URL}/login`)
 
@@ -45,15 +47,21 @@ test('login uses the Vibe brand mark without emoji', async ({ page }) => {
 })
 
 test('copied Discord IDs use text feedback without pictographic symbols', async ({ page }) => {
-  await page.route('**/auth/me', route => route.fulfill({
-    json: { id: '1', username: 'Admin', avatar: null },
-  }))
-  await page.route('**/api/dashboard', route => route.fulfill({
-    json: populatedDashboardFixture,
-  }))
-  await page.route('**/api/stats/overview', route => route.fulfill({
-    json: { total_actions: 1 },
-  }))
+  await page.route('**/auth/me', route =>
+    route.fulfill({
+      json: { id: '1', username: 'Admin', avatar: null },
+    })
+  )
+  await page.route('**/api/dashboard', route =>
+    route.fulfill({
+      json: populatedDashboardFixture,
+    })
+  )
+  await page.route('**/api/stats/overview', route =>
+    route.fulfill({
+      json: { total_actions: 1 },
+    })
+  )
   await neutralizeEventSource(page)
   await page.goto(`${BASE_URL}/`)
 
@@ -66,18 +74,32 @@ test('copied Discord IDs use text feedback without pictographic symbols', async 
 })
 
 test('debug warning uses accessible text without pictographic symbols', async ({ page }) => {
-  await page.route('**/auth/me', route => route.fulfill({
-    json: { id: '1', username: 'Admin', avatar: null },
-  }))
-  await page.route('**/api/settings/bot-info', route => route.fulfill({
-    json: { bot_name: 'Vibe', guild_id: '1', guild_name: 'Guild', uptime_seconds: 1, latency_ms: 1 },
-  }))
-  await page.route('**/api/settings/allowed-users', route => route.fulfill({
-    json: { allowed_discord_ids: [] },
-  }))
-  await page.route('**/api/settings/debug-mode', route => route.fulfill({
-    json: { debug_mode: true },
-  }))
+  await page.route('**/auth/me', route =>
+    route.fulfill({
+      json: { id: '1', username: 'Admin', avatar: null },
+    })
+  )
+  await page.route('**/api/settings/bot-info', route =>
+    route.fulfill({
+      json: {
+        bot_name: 'Vibe',
+        guild_id: '1',
+        guild_name: 'Guild',
+        uptime_seconds: 1,
+        latency_ms: 1,
+      },
+    })
+  )
+  await page.route('**/api/settings/allowed-users', route =>
+    route.fulfill({
+      json: { allowed_discord_ids: [] },
+    })
+  )
+  await page.route('**/api/settings/debug-mode', route =>
+    route.fulfill({
+      json: { debug_mode: true },
+    })
+  )
 
   await page.goto(`${BASE_URL}/settings`)
 
@@ -121,7 +143,7 @@ async function neutralizeEventSource(page) {
 // connection would — exercises Dashboard.jsx's real parsing/dispatch logic,
 // including the malformed-JSON try/catch guard when `data` isn't valid JSON.
 async function dispatchSSEMessage(page, data) {
-  await page.evaluate((data) => {
+  await page.evaluate(data => {
     if (!window.__testEventSource?.onmessage) {
       throw new Error('no EventSource.onmessage handler registered yet')
     }
@@ -138,22 +160,30 @@ async function dispatchSSEError(page) {
 }
 
 async function mockDashboard(page) {
-  await page.route('**/auth/me', route => route.fulfill({
-    json: { id: '1', username: 'Admin', avatar: null },
-  }))
-  await page.route('**/api/dashboard', route => route.fulfill({
-    json: dashboardFixture,
-  }))
-  await page.route('**/api/stats/overview', route => route.fulfill({
-    json: statsOverviewFixture,
-  }))
+  await page.route('**/auth/me', route =>
+    route.fulfill({
+      json: { id: '1', username: 'Admin', avatar: null },
+    })
+  )
+  await page.route('**/api/dashboard', route =>
+    route.fulfill({
+      json: dashboardFixture,
+    })
+  )
+  await page.route('**/api/stats/overview', route =>
+    route.fulfill({
+      json: statsOverviewFixture,
+    })
+  )
 
   await neutralizeEventSource(page)
 }
 
 const deferred = () => {
   let resolve
-  const promise = new Promise(done => { resolve = done })
+  const promise = new Promise(done => {
+    resolve = done
+  })
   return { promise, resolve }
 }
 
@@ -161,10 +191,24 @@ const populatedDashboardFixture = {
   active_rules: [{ id: 1 }, { id: 2 }],
   voice_online_count: 3,
   online_users: [
-    { user_id: '1', username: 'Ada Lovelace', avatar: null, channel_name: 'General', joined_at: '2026-09-05T10:00:00Z' },
+    {
+      user_id: '1',
+      username: 'Ada Lovelace',
+      avatar: null,
+      channel_name: 'General',
+      joined_at: '2026-09-05T10:00:00Z',
+    },
   ],
   recent_logs: [
-    { id: 1, executed_at: '2026-09-05T10:05:00Z', discord_id: '123', action_type: 'mute', rule_id: 7, is_dry_run: false, channel_id: null },
+    {
+      id: 1,
+      executed_at: '2026-09-05T10:05:00Z',
+      discord_id: '123',
+      action_type: 'mute',
+      rule_id: 7,
+      is_dry_run: false,
+      channel_id: null,
+    },
   ],
 }
 
@@ -178,28 +222,31 @@ const populatedDashboardFixture = {
 // test harness within the spec file" the plan calls out as the alternative
 // to inventing Dashboard markup.
 async function renderPrimitive(page, modulePath, exportName, props, childText) {
-  return await page.evaluate(async ([modulePath, exportName, props, childText]) => {
-    const mod = await import(modulePath)
-    const Comp = mod[exportName]
-    const harness = await import('/tests/harness/renderStatic.js')
-    const container = document.createElement('div')
-    container.setAttribute('data-harness-root', '')
-    document.body.appendChild(container)
-    const unmount = await harness.mountElement(container, Comp, props, childText)
-    const el = container.firstElementChild
-    const cs = getComputedStyle(el)
-    const result = {
-      text: el.textContent,
-      borderWidth: cs.borderWidth,
-      borderColor: cs.borderColor,
-      boxShadow: cs.boxShadow,
-      backgroundColor: cs.backgroundColor,
-      color: cs.color,
-    }
-    unmount()
-    container.remove()
-    return result
-  }, [modulePath, exportName, props, childText])
+  return await page.evaluate(
+    async ([modulePath, exportName, props, childText]) => {
+      const mod = await import(modulePath)
+      const Comp = mod[exportName]
+      const harness = await import('/tests/harness/renderStatic.js')
+      const container = document.createElement('div')
+      container.setAttribute('data-harness-root', '')
+      document.body.appendChild(container)
+      const unmount = await harness.mountElement(container, Comp, props, childText)
+      const el = container.firstElementChild
+      const cs = getComputedStyle(el)
+      const result = {
+        text: el.textContent,
+        borderWidth: cs.borderWidth,
+        borderColor: cs.borderColor,
+        boxShadow: cs.boxShadow,
+        backgroundColor: cs.backgroundColor,
+        color: cs.color,
+      }
+      unmount()
+      container.remove()
+      return result
+    },
+    [modulePath, exportName, props, childText]
+  )
 }
 
 test('applies the approved graphite and mint foundation', async ({ page }) => {
@@ -231,8 +278,10 @@ test('applies the approved graphite and mint foundation', async ({ page }) => {
   // real Dashboard heading exists (the h1-h3/Unbounded contract is also
   // locked at the theme-module level below, see "locks Unbounded for h1-h3
   // only" — this is the live-route confirmation of that same contract).
-  await expect(page.getByRole('heading', { name: 'Обзор сервера' }))
-    .toHaveCSS('font-family', /Unbounded/)
+  await expect(page.getByRole('heading', { name: 'Обзор сервера' })).toHaveCSS(
+    'font-family',
+    /Unbounded/
+  )
 })
 
 test('locks Unbounded for h1-h3 only, IBM Plex Sans elsewhere', () => {
@@ -258,8 +307,7 @@ test('collapses the labelled desktop navigation into an accessible icon rail', a
   await page.setViewportSize({ width: 1440, height: 900 })
   await page.goto(`${BASE_URL}/`)
 
-  await expect(page.getByRole('navigation', { name: 'Основная навигация' }))
-    .toContainText('Обзор')
+  await expect(page.getByRole('navigation', { name: 'Основная навигация' })).toContainText('Обзор')
   await page.getByRole('button', { name: 'Свернуть меню' }).click()
   await expect(page.getByRole('button', { name: 'Развернуть меню' })).toBeVisible()
   await expect(page.getByRole('link', { name: 'Обзор' })).toHaveAttribute('aria-current', 'page')
@@ -273,7 +321,9 @@ test('persists the collapsed sidebar rail across a reload', async ({ page }) => 
   await page.getByRole('button', { name: 'Свернуть меню' }).click()
   await expect(page.getByRole('button', { name: 'Развернуть меню' })).toBeVisible()
 
-  const stored = await page.evaluate(() => window.localStorage.getItem('vibe.admin.sidebarCollapsed'))
+  const stored = await page.evaluate(() =>
+    window.localStorage.getItem('vibe.admin.sidebarCollapsed')
+  )
   expect(stored).toBe('true')
 
   await page.reload()
@@ -300,8 +350,12 @@ test('uses a modal navigation drawer on mobile', async ({ page }) => {
 // EmptyState, ErrorState, LoadingState) that back them.
 // ---------------------------------------------------------------------------
 
-test('dashboard state: renders populated stats and events with no decorative brand color', async ({ page }) => {
-  await page.route('**/auth/me', route => route.fulfill({ json: { id: '1', username: 'Admin', avatar: null } }))
+test('dashboard state: renders populated stats and events with no decorative brand color', async ({
+  page,
+}) => {
+  await page.route('**/auth/me', route =>
+    route.fulfill({ json: { id: '1', username: 'Admin', avatar: null } })
+  )
   await page.route('**/api/dashboard', route => route.fulfill({ json: populatedDashboardFixture }))
   await page.route('**/api/stats/overview', route => route.fulfill({ json: { total_actions: 12 } }))
   await neutralizeEventSource(page)
@@ -351,7 +405,9 @@ test('dashboard state: shows text-only empty messages without emoji', async ({ p
 
 test('dashboard state: shows a secondary retry control on error and recovers', async ({ page }) => {
   let dashboardCalls = 0
-  await page.route('**/auth/me', route => route.fulfill({ json: { id: '1', username: 'Admin', avatar: null } }))
+  await page.route('**/auth/me', route =>
+    route.fulfill({ json: { id: '1', username: 'Admin', avatar: null } })
+  )
   await page.route('**/api/dashboard', route => {
     dashboardCalls += 1
     if (dashboardCalls === 1) {
@@ -378,7 +434,9 @@ test('dashboard state: shows a secondary retry control on error and recovers', a
 
 test('dashboard state: exposes role=status while loading', async ({ page }) => {
   const gate = deferred()
-  await page.route('**/auth/me', route => route.fulfill({ json: { id: '1', username: 'Admin', avatar: null } }))
+  await page.route('**/auth/me', route =>
+    route.fulfill({ json: { id: '1', username: 'Admin', avatar: null } })
+  )
   await page.route('**/api/dashboard', async route => {
     await gate.promise
     return route.fulfill({ json: dashboardFixture })
@@ -405,7 +463,9 @@ test('keeps primary hover distinct without changing secondary nav semantics', as
   // plan's original reference test, now that Task 4 has built the real
   // markup — Dashboard's own "Создать правило" primary action and "Все
   // правила" secondary link.
-  await page.route('**/auth/me', route => route.fulfill({ json: { id: '1', username: 'Admin', avatar: null } }))
+  await page.route('**/auth/me', route =>
+    route.fulfill({ json: { id: '1', username: 'Admin', avatar: null } })
+  )
   await page.route('**/api/rules', route => route.fulfill({ json: [] }))
   await page.setViewportSize({ width: 1440, height: 900 })
   await page.goto(`${BASE_URL}/rules`)
@@ -415,7 +475,8 @@ test('keeps primary hover distinct without changing secondary nav semantics', as
 
   const before = await primary.evaluate(el => getComputedStyle(el).backgroundColor)
   await primary.hover()
-  await expect.poll(() => primary.evaluate(el => getComputedStyle(el).backgroundColor))
+  await expect
+    .poll(() => primary.evaluate(el => getComputedStyle(el).backgroundColor))
     .not.toBe(before)
 
   await expect(secondary).not.toHaveCSS('background-color', 'rgb(101, 198, 156)')
@@ -433,7 +494,8 @@ test('keeps primary hover distinct without changing secondary nav semantics', as
 
   const dashBefore = await dashPrimary.evaluate(el => getComputedStyle(el).backgroundColor)
   await dashPrimary.hover()
-  await expect.poll(() => dashPrimary.evaluate(el => getComputedStyle(el).backgroundColor))
+  await expect
+    .poll(() => dashPrimary.evaluate(el => getComputedStyle(el).backgroundColor))
     .not.toBe(dashBefore)
 
   await expect(dashSecondary).not.toHaveCSS('background-color', 'rgb(101, 198, 156)')
@@ -450,24 +512,34 @@ test('Panel primitive state: neutral bordered surface with no hover shadow', asy
     '/src/components/ui/Panel.jsx',
     'Panel',
     { title: 'Harness Panel', description: 'desc' },
-    'Body content',
+    'Body content'
   )
 
   expect(styles.borderWidth).toBe('1px')
   expect(styles.boxShadow).toBe('none')
 })
 
-test('StatusBadge primitive state: semantic tone maps to approved tokens, not arbitrary colors', async ({ page }) => {
+test('StatusBadge primitive state: semantic tone maps to approved tokens, not arbitrary colors', async ({
+  page,
+}) => {
   await mockDashboard(page)
   await page.goto(`${BASE_URL}/`)
 
   const success = await renderPrimitive(
-    page, '/src/components/ui/StatusBadge.jsx', 'StatusBadge', { tone: 'success' }, 'ok',
+    page,
+    '/src/components/ui/StatusBadge.jsx',
+    'StatusBadge',
+    { tone: 'success' },
+    'ok'
   )
   expect(success.color).toBe('rgb(101, 198, 156)') // --color-status-success
 
   const danger = await renderPrimitive(
-    page, '/src/components/ui/StatusBadge.jsx', 'StatusBadge', { tone: 'danger' }, 'bad',
+    page,
+    '/src/components/ui/StatusBadge.jsx',
+    'StatusBadge',
+    { tone: 'danger' },
+    'bad'
   )
   expect(danger.color).toBe('rgb(229, 138, 148)') // --color-status-danger
 })
@@ -516,14 +588,50 @@ const commandCenterRules = [
 ]
 
 const commandCenterVoiceMembers = [
-  { user_id: '111', username: 'Ada Lovelace', avatar: null, channel_name: 'General', joined_at: '2026-09-05T09:40:00Z' },
-  { user_id: '222', username: 'Grace Hopper', avatar: null, channel_name: 'Штаб', joined_at: '2026-09-05T09:55:00Z' },
+  {
+    user_id: '111',
+    username: 'Ada Lovelace',
+    avatar: null,
+    channel_name: 'General',
+    joined_at: '2026-09-05T09:40:00Z',
+  },
+  {
+    user_id: '222',
+    username: 'Grace Hopper',
+    avatar: null,
+    channel_name: 'Штаб',
+    joined_at: '2026-09-05T09:55:00Z',
+  },
 ]
 
 const commandCenterEvents = [
-  { id: 301, executed_at: '2026-09-05T10:05:00Z', discord_id: '111', action_type: 'mute', rule_id: 5, is_dry_run: false, channel_id: null },
-  { id: 300, executed_at: '2026-09-05T10:00:00Z', discord_id: '222', action_type: 'kick', rule_id: 8, is_dry_run: true, channel_id: 333 },
-  { id: 299, executed_at: '2026-09-05T09:55:00Z', discord_id: '111', action_type: 'unmute', rule_id: null, is_dry_run: false, channel_id: null },
+  {
+    id: 301,
+    executed_at: '2026-09-05T10:05:00Z',
+    discord_id: '111',
+    action_type: 'mute',
+    rule_id: 5,
+    is_dry_run: false,
+    channel_id: null,
+  },
+  {
+    id: 300,
+    executed_at: '2026-09-05T10:00:00Z',
+    discord_id: '222',
+    action_type: 'kick',
+    rule_id: 8,
+    is_dry_run: true,
+    channel_id: 333,
+  },
+  {
+    id: 299,
+    executed_at: '2026-09-05T09:55:00Z',
+    discord_id: '111',
+    action_type: 'unmute',
+    rule_id: null,
+    is_dry_run: false,
+    channel_id: null,
+  },
 ]
 
 const commandCenterDashboardFixture = {
@@ -533,9 +641,15 @@ const commandCenterDashboardFixture = {
   online_users: commandCenterVoiceMembers,
 }
 
-test('command center: presents the server overview hierarchy with realistic fixtures', async ({ page }) => {
-  await page.route('**/auth/me', route => route.fulfill({ json: { id: '1', username: 'Admin', avatar: null } }))
-  await page.route('**/api/dashboard', route => route.fulfill({ json: commandCenterDashboardFixture }))
+test('command center: presents the server overview hierarchy with realistic fixtures', async ({
+  page,
+}) => {
+  await page.route('**/auth/me', route =>
+    route.fulfill({ json: { id: '1', username: 'Admin', avatar: null } })
+  )
+  await page.route('**/api/dashboard', route =>
+    route.fulfill({ json: commandCenterDashboardFixture })
+  )
   await page.route('**/api/stats/overview', route => route.fulfill({ json: { total_actions: 42 } }))
   await neutralizeEventSource(page)
   await page.goto(`${BASE_URL}/`)
@@ -570,7 +684,11 @@ test('command center: presents the server overview hierarchy with realistic fixt
   await expect(voiceTable.getByText('General')).toBeVisible()
   await expect(voiceTable.getByText('Grace Hopper')).toBeVisible()
   await expect(voiceTable.getByText('Штаб')).toBeVisible()
-  const firstVoiceRowCells = await voiceTable.getByRole('row').nth(1).getByRole('cell').allInnerTexts()
+  const firstVoiceRowCells = await voiceTable
+    .getByRole('row')
+    .nth(1)
+    .getByRole('cell')
+    .allInnerTexts()
   expect(firstVoiceRowCells[firstVoiceRowCells.length - 1].trim()).not.toBe('')
   expect(firstVoiceRowCells[firstVoiceRowCells.length - 1].trim()).not.toBe('—')
 
@@ -605,8 +723,12 @@ test('command center: presents the server overview hierarchy with realistic fixt
 // ---------------------------------------------------------------------------
 
 test('responsive: no horizontal overflow and all sections visible at 390x844', async ({ page }) => {
-  await page.route('**/auth/me', route => route.fulfill({ json: { id: '1', username: 'Admin', avatar: null } }))
-  await page.route('**/api/dashboard', route => route.fulfill({ json: commandCenterDashboardFixture }))
+  await page.route('**/auth/me', route =>
+    route.fulfill({ json: { id: '1', username: 'Admin', avatar: null } })
+  )
+  await page.route('**/api/dashboard', route =>
+    route.fulfill({ json: commandCenterDashboardFixture })
+  )
   await page.route('**/api/stats/overview', route => route.fulfill({ json: { total_actions: 42 } }))
   await neutralizeEventSource(page)
   await page.setViewportSize({ width: 390, height: 844 })
@@ -614,7 +736,9 @@ test('responsive: no horizontal overflow and all sections visible at 390x844', a
 
   await expect(page.getByRole('heading', { name: 'Обзор сервера' })).toBeVisible()
 
-  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)
+  const overflow = await page.evaluate(
+    () => document.documentElement.scrollWidth - document.documentElement.clientWidth
+  )
   expect(overflow).toBeLessThanOrEqual(0)
 
   // All three named panels stay reachable/visible on a narrow screen.
@@ -665,8 +789,12 @@ async function tabToAndReadOutline(page, target, maxPresses = 30) {
 }
 
 test('keyboard: tabbing reaches Создать правило with a visible focus outline', async ({ page }) => {
-  await page.route('**/auth/me', route => route.fulfill({ json: { id: '1', username: 'Admin', avatar: null } }))
-  await page.route('**/api/dashboard', route => route.fulfill({ json: commandCenterDashboardFixture }))
+  await page.route('**/auth/me', route =>
+    route.fulfill({ json: { id: '1', username: 'Admin', avatar: null } })
+  )
+  await page.route('**/api/dashboard', route =>
+    route.fulfill({ json: commandCenterDashboardFixture })
+  )
   await page.route('**/api/stats/overview', route => route.fulfill({ json: { total_actions: 42 } }))
   await neutralizeEventSource(page)
   await page.setViewportSize({ width: 1440, height: 900 })
@@ -680,8 +808,12 @@ test('keyboard: tabbing reaches Создать правило with a visible foc
 })
 
 test('keyboard: the focus outline survives emulated reduced motion', async ({ page }) => {
-  await page.route('**/auth/me', route => route.fulfill({ json: { id: '1', username: 'Admin', avatar: null } }))
-  await page.route('**/api/dashboard', route => route.fulfill({ json: commandCenterDashboardFixture }))
+  await page.route('**/auth/me', route =>
+    route.fulfill({ json: { id: '1', username: 'Admin', avatar: null } })
+  )
+  await page.route('**/api/dashboard', route =>
+    route.fulfill({ json: commandCenterDashboardFixture })
+  )
   await page.route('**/api/stats/overview', route => route.fulfill({ json: { total_actions: 42 } }))
   await neutralizeEventSource(page)
   await page.emulateMedia({ reducedMotion: 'reduce' })
@@ -722,8 +854,12 @@ test('SSE: a malformed message payload is ignored without crashing the page', as
 })
 
 test('SSE: an action_log event is prepended to the activity stream', async ({ page }) => {
-  await page.route('**/auth/me', route => route.fulfill({ json: { id: '1', username: 'Admin', avatar: null } }))
-  await page.route('**/api/dashboard', route => route.fulfill({ json: commandCenterDashboardFixture }))
+  await page.route('**/auth/me', route =>
+    route.fulfill({ json: { id: '1', username: 'Admin', avatar: null } })
+  )
+  await page.route('**/api/dashboard', route =>
+    route.fulfill({ json: commandCenterDashboardFixture })
+  )
   await page.route('**/api/stats/overview', route => route.fulfill({ json: { total_actions: 42 } }))
   await neutralizeEventSource(page)
   await page.goto(`${BASE_URL}/`)
@@ -731,14 +867,17 @@ test('SSE: an action_log event is prepended to the activity stream', async ({ pa
   const activityList = page.getByRole('list', { name: 'Что происходит' })
   await expect(activityList.getByRole('listitem')).toHaveCount(3) // commandCenterEvents
 
-  await dispatchSSEMessage(page, JSON.stringify({
-    type: 'action_log',
-    timestamp: '2026-09-05T10:10:00Z',
-    discord_id: '999999',
-    action_type: 'move',
-    rule_id: null,
-    is_dry_run: false,
-  }))
+  await dispatchSSEMessage(
+    page,
+    JSON.stringify({
+      type: 'action_log',
+      timestamp: '2026-09-05T10:10:00Z',
+      discord_id: '999999',
+      action_type: 'move',
+      rule_id: null,
+      is_dry_run: false,
+    })
+  )
 
   const items = activityList.getByRole('listitem')
   await expect(items).toHaveCount(4)
@@ -747,8 +886,12 @@ test('SSE: an action_log event is prepended to the activity stream', async ({ pa
 })
 
 test('SSE: the activity stream stays capped at 20 entries', async ({ page }) => {
-  await page.route('**/auth/me', route => route.fulfill({ json: { id: '1', username: 'Admin', avatar: null } }))
-  await page.route('**/api/dashboard', route => route.fulfill({ json: commandCenterDashboardFixture }))
+  await page.route('**/auth/me', route =>
+    route.fulfill({ json: { id: '1', username: 'Admin', avatar: null } })
+  )
+  await page.route('**/api/dashboard', route =>
+    route.fulfill({ json: commandCenterDashboardFixture })
+  )
   await page.route('**/api/stats/overview', route => route.fulfill({ json: { total_actions: 42 } }))
   await neutralizeEventSource(page)
   await page.goto(`${BASE_URL}/`)
@@ -759,14 +902,17 @@ test('SSE: the activity stream stays capped at 20 entries', async ({ page }) => 
   // Fixture already has 3 logs; dispatching 20 more would total 23 without
   // the cap. Send them sequentially so each setState commits before the next.
   for (let i = 0; i < 20; i += 1) {
-    await dispatchSSEMessage(page, JSON.stringify({
-      type: 'action_log',
-      timestamp: `2026-09-05T10:${String(i).padStart(2, '0')}:00Z`,
-      discord_id: `cap-${i}`,
-      action_type: 'move',
-      rule_id: null,
-      is_dry_run: false,
-    }))
+    await dispatchSSEMessage(
+      page,
+      JSON.stringify({
+        type: 'action_log',
+        timestamp: `2026-09-05T10:${String(i).padStart(2, '0')}:00Z`,
+        discord_id: `cap-${i}`,
+        action_type: 'move',
+        rule_id: null,
+        is_dry_run: false,
+      })
+    )
   }
 
   const items = activityList.getByRole('listitem')
@@ -777,7 +923,9 @@ test('SSE: the activity stream stays capped at 20 entries', async ({ page }) => 
 
 test('SSE: a voice_update event triggers a dashboard refetch', async ({ page }) => {
   let dashboardCalls = 0
-  await page.route('**/auth/me', route => route.fulfill({ json: { id: '1', username: 'Admin', avatar: null } }))
+  await page.route('**/auth/me', route =>
+    route.fulfill({ json: { id: '1', username: 'Admin', avatar: null } })
+  )
   await page.route('**/api/dashboard', route => {
     dashboardCalls += 1
     return route.fulfill({ json: dashboardFixture })

@@ -47,39 +47,43 @@ test.use({ launchOptions: { channel: 'msedge' } })
 
 const deferred = () => {
   let resolve
-  const promise = new Promise(done => { resolve = done })
+  const promise = new Promise(done => {
+    resolve = done
+  })
   return { promise, resolve }
 }
 
 const reportFixture = (username = 'Ada Lovelace', overrides = {}) => ({
   period_start: '2026-08-28T00:00:00Z',
   period_end: '2026-08-28T12:00:00Z',
-  members: [{
-    discord_id: '42',
-    username,
-    total_seconds: 3600,
-    session_count: 1,
-    work_seconds: 1800,
-    ...overrides,
-  }],
+  members: [
+    {
+      discord_id: '42',
+      username,
+      total_seconds: 3600,
+      session_count: 1,
+      work_seconds: 1800,
+      ...overrides,
+    },
+  ],
   overlaps: [],
 })
 
-async function mockApp(page, {
-  member = memberFixture,
-  initialMembers = [],
-  gates = {},
-  handlers = {},
-} = {}) {
+async function mockApp(
+  page,
+  { member = memberFixture, initialMembers = [], gates = {}, handlers = {} } = {}
+) {
   const state = {
     members: [...initialMembers],
     reportChannelId: null,
     createdPayload: null,
   }
 
-  await page.route('**/auth/me', route => route.fulfill({
-    json: { id: '1', username: 'Admin', avatar: null },
-  }))
+  await page.route('**/auth/me', route =>
+    route.fulfill({
+      json: { id: '1', username: 'Admin', avatar: null },
+    })
+  )
   await page.route(/\/api\/members(?:\/(?:42|batch))?(?:\?.*)?$/, route => {
     const path = new URL(route.request().url()).pathname
     if (path === '/api/members/42') return route.fulfill({ json: member })
@@ -109,7 +113,13 @@ async function mockApp(page, {
       return route.fulfill({ json: created })
     }
     if (url.pathname === '/api/tracking/members/42' && method === 'PATCH') {
-      state.members = [{ ...state.members[0], ...(await request.postDataJSON()), updated_at: '2026-08-28T10:00:00Z' }]
+      state.members = [
+        {
+          ...state.members[0],
+          ...(await request.postDataJSON()),
+          updated_at: '2026-08-28T10:00:00Z',
+        },
+      ]
       return route.fulfill({ json: state.members[0] })
     }
     if (url.pathname === '/api/tracking/members/42' && method === 'DELETE') {
@@ -127,16 +137,18 @@ async function mockApp(page, {
       return route.fulfill({ json: [{ id: '99', name: 'reports' }] })
     }
     if (url.pathname === '/api/tracking/preview') {
-      return route.fulfill({ json: {
-        ...reportFixture(),
-        members: state.members.map(tracked => ({
-          discord_id: tracked.discord_id,
-          username: tracked.username,
-          total_seconds: 3600,
-          session_count: 1,
-          work_seconds: 1800,
-        })),
-      } })
+      return route.fulfill({
+        json: {
+          ...reportFixture(),
+          members: state.members.map(tracked => ({
+            discord_id: tracked.discord_id,
+            username: tracked.username,
+            total_seconds: 3600,
+            session_count: 1,
+            work_seconds: 1800,
+          })),
+        },
+      })
     }
 
     return route.fulfill({ status: 404, json: { detail: 'Unhandled test route' } })
@@ -196,10 +208,11 @@ test('reports add progress', async ({ page }) => {
 test('keeps administration available when the initial preview fails', async ({ page }) => {
   await mockApp(page, {
     handlers: {
-      'GET /api/tracking/preview': ({ route }) => route.fulfill({
-        status: 503,
-        json: { detail: 'Предпросмотр временно недоступен' },
-      }),
+      'GET /api/tracking/preview': ({ route }) =>
+        route.fulfill({
+          status: 503,
+          json: { detail: 'Предпросмотр временно недоступен' },
+        }),
     },
   })
 
@@ -307,10 +320,12 @@ test('mobile schedule drawer exposes cancel and protects a pending save', async 
   const save = page.getByRole('button', { name: 'Сохранить', exact: true })
   await expect(cancel).toBeVisible()
   await expect(save).toBeVisible()
-  await expect.poll(async () => {
-    const saveBox = await save.boundingBox()
-    return saveBox.x + saveBox.width
-  }).toBeLessThanOrEqual(360)
+  await expect
+    .poll(async () => {
+      const saveBox = await save.boundingBox()
+      return saveBox.x + saveBox.width
+    })
+    .toBeLessThanOrEqual(360)
   await expect(page.getByText(longName).last()).toBeVisible()
 
   await page.getByLabel('Начало рабочего дня').fill('10:00')
