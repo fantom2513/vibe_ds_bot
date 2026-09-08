@@ -140,20 +140,40 @@ jobs:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
 
       - uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5
+        with:
+          # Версия зафиксирована намеренно. Резолвер uv между версиями
+          # может выбрать другой набор пакетов, и тогда эта джоба покраснеет
+          # не потому, что кто-то забыл перегенерировать лок, а потому что
+          # на раннере приехал более свежий uv. Ложное срабатывание в
+          # проверке герметичности — худший вид ложного срабатывания.
+          version: "0.11.17"
 
       # Ловит «поправил requirements.in, забыл перегенерировать лок».
       # Без этой проверки лок-файл тихо расходится с источником и
       # перестаёт что-либо гарантировать.
+      #
+      # Компилируем во временном каталоге с теми же относительными именами,
+      # а не в /tmp/*.check. Причина: uv записывает в шапку лока ту самую
+      # команду, которой его породили, вместе с путём из `-o`. Сравнение
+      # с файлом под другим именем расходилось бы в шапке всегда — такой
+      # чек не смог бы пройти в принципе.
       - name: Verify lock files are in sync with their sources
         run: |
           set -euo pipefail
+          check_dir=$(mktemp -d)
+          cp requirements.in requirements-dev.in "$check_dir/"
+          (
+            cd "$check_dir"
+            for name in requirements requirements-dev; do
+              uv pip compile "$name.in" -o "$name.lock" \
+                --generate-hashes \
+                --python-version 3.11 \
+                --python-platform x86_64-unknown-linux-gnu \
+                --quiet
+            done
+          )
           for name in requirements requirements-dev; do
-            uv pip compile "$name.in" -o "/tmp/$name.check" \
-              --generate-hashes \
-              --python-version 3.11 \
-              --python-platform x86_64-unknown-linux-gnu \
-              --quiet
-            if ! diff -u "$name.lock" "/tmp/$name.check"; then
+            if ! diff -u "$name.lock" "$check_dir/$name.lock"; then
               echo "::error file=$name.lock::$name.lock is stale. Re-run: uv pip compile $name.in -o $name.lock --generate-hashes --python-version 3.11 --python-platform x86_64-unknown-linux-gnu"
               exit 1
             fi
