@@ -1,9 +1,6 @@
-import { createRequire } from 'node:module'
+import { test, expect } from '@playwright/test'
 import { createServer } from 'vite'
 import cronstrue from 'cronstrue/i18n.js'
-
-const requireFromRunner = createRequire(process.argv[1])
-const { test, expect } = requireFromRunner('playwright/test')
 
 // A distinct port from admin-dashboard-redesign.spec.js (5173) and
 // tracking.spec.js (5174) — each spec file spins up its own `vite` instance
