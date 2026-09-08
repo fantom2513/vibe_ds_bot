@@ -17,11 +17,27 @@ MAX_LISTED_FAILURES = 20
 
 
 def summarize(path: Path, label: str) -> str:
-    """Собрать markdown-сводку по JUnit-отчёту `path` с заголовком `label`."""
-    root = ET.parse(path).getroot()
+    """Собрать markdown-сводку по JUnit-отчёту `path` с заголовком `label`.
+
+    Если файл отсутствует или не парсится как XML — это не баг скрипта,
+    а обычный симптом того, что pytest упал до записи отчёта (крэш, OOM,
+    таймаут). В таком случае возвращаем читаемую сводку вместо traceback:
+    шаг с рендером сводки помечен `if: always()` именно для того, чтобы
+    отработать и в этой ситуации, а джоба уже красная из-за упавшего шага
+    с тестами.
+    """
+    try:
+        root = ET.parse(path).getroot()
+    except (FileNotFoundError, ET.ParseError) as exc:
+        return (
+            f"### Backend tests — {label}\n\n"
+            f"**Не удалось прочитать JUnit-отчёт** ({exc}). "
+            f"Скорее всего pytest упал до того, как записал файл — "
+            f"смотри лог шага с тестами."
+        )
     suites = root.iter("testsuite")
 
-    total = passed = failed = skipped = 0
+    total = skipped = 0
     duration = 0.0
     failures: list[tuple[str, str]] = []
 
