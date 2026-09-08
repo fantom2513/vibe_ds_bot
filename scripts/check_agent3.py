@@ -19,7 +19,7 @@ def main() -> None:
     print("load_config_yaml:", list(yaml_cfg.keys()))
 
     # 2) get_settings / Settings — требуют .env; только импорт
-    from src.config import Settings, get_settings
+    from src.config import get_settings
 
     try:
         s = get_settings()
