@@ -1,6 +1,8 @@
 """Тесты расчёта статистики отслеживаемых участников."""
 from datetime import datetime, time, timezone
 
+import pytest
+
 from src.engine.tracking_report import (
     MemberSchedule,
     Session,
@@ -9,6 +11,7 @@ from src.engine.tracking_report import (
     calculate_member_totals,
     calculate_pair_overlaps,
     daily_boundaries,
+    period_bounds,
 )
 
 
@@ -63,8 +66,27 @@ def test_pair_overlap_counts_only_same_channel_intersection() -> None:
         period_end=dt("2026-08-04T00:00:00Z"),
     )
 
-    assert [(item.member_ids, item.channel_id, item.seconds) for item in overlaps] == [
-        ((1, 2), 10, 1800),
+    assert [(item.member_ids, item.seconds) for item in overlaps] == [
+        ((1, 2), 1800),
+    ]
+
+
+def test_pair_overlap_sums_seconds_across_multiple_channels_for_same_pair() -> None:
+    """Одна и та же пара пересеклась в двух разных каналах — одна строка, секунды суммируются."""
+    overlaps = calculate_pair_overlaps(
+        sessions=[
+            Session(1, 10, dt("2026-08-03T09:00:00Z"), dt("2026-08-03T09:30:00Z")),
+            Session(2, 10, dt("2026-08-03T09:00:00Z"), dt("2026-08-03T09:30:00Z")),
+            Session(1, 11, dt("2026-08-03T14:00:00Z"), dt("2026-08-03T14:20:00Z")),
+            Session(2, 11, dt("2026-08-03T14:00:00Z"), dt("2026-08-03T14:20:00Z")),
+        ],
+        tracked_member_ids={1, 2},
+        period_start=dt("2026-08-03T00:00:00Z"),
+        period_end=dt("2026-08-04T00:00:00Z"),
+    )
+
+    assert [(item.member_ids, item.seconds) for item in overlaps] == [
+        ((1, 2), 1800 + 1200),
     ]
 
 
@@ -180,6 +202,39 @@ def test_daily_boundaries_respects_timezone_for_day_cutoff() -> None:
     boundaries = daily_boundaries(1, now, "Europe/Moscow")
 
     assert boundaries == [dt("2026-08-29T21:00:00Z")]  # 00:00 30.08 МСК = 21:00 29.08 UTC
+
+
+def test_period_bounds_today_starts_at_local_midnight() -> None:
+    """"today" остаётся календарным — с полуночи по указанному TZ до `now`."""
+    now = dt("2026-09-08T18:30:00Z")  # 21:30 по Москве, всё ещё 8 сентября
+    start, end = period_bounds("today", now, "Europe/Moscow")
+
+    assert start == dt("2026-09-07T21:00:00Z")  # 00:00 08.09 МСК = 21:00 07.09 UTC
+    assert end == now
+
+
+def test_period_bounds_week_is_rolling_seven_days() -> None:
+    """"week" — плавающее окно последних 7×24ч, а не с понедельника этой недели."""
+    now = dt("2026-09-08T18:30:00Z")
+    start, end = period_bounds("week", now, "Europe/Moscow")
+
+    assert start == dt("2026-09-01T18:30:00Z")
+    assert end == now
+
+
+def test_period_bounds_month_is_rolling_thirty_days() -> None:
+    """"month" — плавающее окно последних 30×24ч, а не с 1-го числа календарного месяца."""
+    now = dt("2026-09-08T18:30:00Z")
+    start, end = period_bounds("month", now, "Europe/Moscow")
+
+    assert start == dt("2026-08-09T18:30:00Z")
+    assert end == now
+
+
+def test_period_bounds_rejects_unknown_period() -> None:
+    """Неизвестный период — явная ошибка, а не тихий фолбэк."""
+    with pytest.raises(ValueError):
+        period_bounds("year", dt("2026-09-08T18:30:00Z"))
 
 
 def test_all_together_returns_zero_for_empty_tracked_set() -> None:
