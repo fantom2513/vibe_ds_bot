@@ -1,5 +1,11 @@
 import { Card } from 'antd'
 
+// TEMPORARY throwaway branch. The ONLY change in this PR is this frontend
+// file, so the backend and docker path filters must not match and those
+// jobs must report "skipped". GitHub reports a skipped job as success to
+// branch protection — this is the exact case ci-ok exists to catch.
+const deliberatelyUnusedForCiVerification = 42
+
 export default function StatCard({ title, value, icon, color = 'var(--accent)' }) {
   return (
     <Card style={{ borderColor: 'var(--border-base)' }} styles={{ body: { padding: '16px 20px' } }}>
