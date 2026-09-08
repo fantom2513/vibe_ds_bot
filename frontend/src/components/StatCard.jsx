@@ -1,5 +1,9 @@
 import { Card } from 'antd'
 
+// TEMPORARY: deliberate lint error to prove ci-ok goes red while the
+// backend jobs are path-filtered to skipped. Reverted immediately.
+const deliberatelyUnusedForCiVerification = 42
+
 export default function StatCard({ title, value, icon, color = 'var(--accent)' }) {
   return (
     <Card style={{ borderColor: 'var(--border-base)' }} styles={{ body: { padding: '16px 20px' } }}>
