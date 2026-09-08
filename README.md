@@ -46,7 +46,7 @@
    python -m venv .venv
    .venv\Scripts\activate   # Windows
    # source .venv/bin/activate  # Linux/macOS
-   pip install -r requirements.txt
+   pip install -r requirements-dev.lock
    ```
 
 3. **Файл `.env`** — для локального запуска укажите подключение к локальной БД:
