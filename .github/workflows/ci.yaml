@@ -246,6 +246,10 @@ jobs:
     needs: changes
     if: needs.changes.outputs.frontend == 'true'
     runs-on: ubuntu-latest
+    # Браузерные тесты не должны сжигать раннер бесконечно при зависшем
+    # dev-server или неверном маршруте. Нормальный прогон укладывается
+    # примерно в четыре минуты; десяти минут достаточно с запасом.
+    timeout-minutes: 10
     strategy:
       fail-fast: false
       matrix:

@@ -2,7 +2,8 @@ import { test, expect } from '@playwright/test'
 import { createServer } from 'vite'
 import { theme } from '../src/styles/theme.js'
 
-const BASE_URL = 'http://127.0.0.1:5173'
+// Дашборд после появления публичного лендинга живёт под /admin.
+const BASE_URL = 'http://127.0.0.1:5173/admin'
 
 let devServer
 

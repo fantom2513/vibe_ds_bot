@@ -8,7 +8,8 @@ import cronstrue from 'cronstrue/i18n.js'
 // by default, so a shared port would let whichever file finishes first tear
 // down the server the other file's still-running tests are navigating
 // against (ERR_CONNECTION_REFUSED).
-const BASE_URL = 'http://127.0.0.1:5175'
+// Дашборд после появления публичного лендинга живёт под /admin.
+const BASE_URL = 'http://127.0.0.1:5175/admin'
 
 let devServer
 

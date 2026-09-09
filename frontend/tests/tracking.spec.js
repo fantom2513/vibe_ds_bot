@@ -6,7 +6,8 @@ import { createServer } from 'vite'
 // Playwright runs spec files in parallel workers by default, so sharing a
 // port lets whichever file finishes first tear down the server the other
 // file's still-running tests are navigating against (ERR_CONNECTION_REFUSED).
-const BASE_URL = 'http://127.0.0.1:5174'
+// Дашборд после появления публичного лендинга живёт под /admin.
+const BASE_URL = 'http://127.0.0.1:5174/admin'
 
 const memberFixture = {
   id: '42',
