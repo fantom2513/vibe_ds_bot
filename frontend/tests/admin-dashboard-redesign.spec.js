@@ -306,7 +306,7 @@ test('carries IBM Plex Mono for technical captions', () => {
 test('collapses the labelled desktop navigation into an accessible icon rail', async ({ page }) => {
   await mockDashboard(page)
   await page.setViewportSize({ width: 1440, height: 900 })
-  await page.goto(`${BASE_URL}/`)
+  await page.goto(BASE_URL)
 
   await expect(page.getByRole('navigation', { name: 'Основная навигация' })).toContainText('Обзор')
   await page.getByRole('button', { name: 'Свернуть меню' }).click()
@@ -317,7 +317,7 @@ test('collapses the labelled desktop navigation into an accessible icon rail', a
 test('persists the collapsed sidebar rail across a reload', async ({ page }) => {
   await mockDashboard(page)
   await page.setViewportSize({ width: 1440, height: 900 })
-  await page.goto(`${BASE_URL}/`)
+  await page.goto(BASE_URL)
 
   await page.getByRole('button', { name: 'Свернуть меню' }).click()
   await expect(page.getByRole('button', { name: 'Развернуть меню' })).toBeVisible()
