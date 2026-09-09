@@ -149,19 +149,16 @@ jobs:
           version: "0.11.17"
 
       # Ловит «поправил requirements.in, забыл перегенерировать лок».
-      # Без этой проверки лок-файл тихо расходится с источником и
-      # перестаёт что-либо гарантировать.
-      #
-      # Компилируем во временном каталоге с теми же относительными именами,
-      # а не в /tmp/*.check. Причина: uv записывает в шапку лока ту самую
-      # команду, которой его породили, вместе с путём из `-o`. Сравнение
-      # с файлом под другим именем расходилось бы в шапке всегда — такой
-      # чек не смог бы пройти в принципе.
+      # Важно: существующий lock копируется в temp-каталог до compile.
+      # uv штатно предпочитает уже зафиксированные версии, пока не передан
+      # --upgrade. Перерезолвить пустой output означало бы каждый PR
+      # спрашивать PyPI о новейших транзитивных версиях — то есть получать
+      # флейк от публикации чужого пакета, а не от изменения этого репо.
       - name: Verify lock files are in sync with their sources
         run: |
           set -euo pipefail
           check_dir=$(mktemp -d)
-          cp requirements.in requirements-dev.in "$check_dir/"
+          cp requirements.in requirements-dev.in requirements.lock requirements-dev.lock "$check_dir/"
           (
             cd "$check_dir"
             for name in requirements requirements-dev; do
@@ -261,9 +258,13 @@ jobs:
       # Только chromium: три браузера утроили бы время ради покрытия,
       # которого этому дашборду не требуется — он открывается с одной
       # машины одним человеком. Расширять есть куда, если появится повод.
+      # GitHub-hosted Ubuntu уже содержит системные библиотеки браузера.
+      # Не используем --with-deps: он запускает apt и делает тесты зависимыми
+      # от стороннего Chrome-репозитория, который может временно публиковать
+      # несовместимые индексы. Здесь нужен только закреплённый Chromium.
       - name: Install Chromium
         working-directory: frontend
-        run: npx playwright install --with-deps chromium
+        run: npx playwright install chromium
 
       - name: Run Playwright shard
         working-directory: frontend
