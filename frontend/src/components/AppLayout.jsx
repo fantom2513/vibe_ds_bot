@@ -43,21 +43,21 @@ const navGroups = [
   {
     label: 'Мониторинг',
     items: [
-      { path: '/', label: 'Обзор', Icon: DashboardOutlined },
-      { path: '/tracking', label: 'Отслеживание', Icon: QueryStatsOutlined },
-      { path: '/logs', label: 'Журнал', Icon: ArticleOutlined },
+      { path: '/admin', label: 'Обзор', Icon: DashboardOutlined },
+      { path: '/admin/tracking', label: 'Отслеживание', Icon: QueryStatsOutlined },
+      { path: '/admin/logs', label: 'Журнал', Icon: ArticleOutlined },
     ],
   },
   {
     label: 'Управление',
     items: [
-      { path: '/rules', label: 'Правила', Icon: ListAltOutlined },
-      { path: '/schedules', label: 'Расписания', Icon: AccessTimeOutlined },
-      { path: '/users', label: 'Участники', Icon: GroupOutlined },
-      { path: '/kick-targets', label: 'Кик-цели', Icon: FlashOnOutlined },
-      { path: '/stacking-pairs', label: 'Стаки', Icon: PeopleOutlined },
-      { path: '/mute-levels', label: 'Уровни', Icon: MilitaryTechOutlined },
-      { path: '/settings', label: 'Настройки', Icon: SettingsOutlined },
+      { path: '/admin/rules', label: 'Правила', Icon: ListAltOutlined },
+      { path: '/admin/schedules', label: 'Расписания', Icon: AccessTimeOutlined },
+      { path: '/admin/users', label: 'Участники', Icon: GroupOutlined },
+      { path: '/admin/kick-targets', label: 'Кик-цели', Icon: FlashOnOutlined },
+      { path: '/admin/stacking-pairs', label: 'Стаки', Icon: PeopleOutlined },
+      { path: '/admin/mute-levels', label: 'Уровни', Icon: MilitaryTechOutlined },
+      { path: '/admin/settings', label: 'Настройки', Icon: SettingsOutlined },
     ],
   },
 ]
@@ -109,7 +109,7 @@ function NavList({ collapsed }) {
               <ListItemButton
                 component={NavLink}
                 to={path}
-                end={path === '/'}
+                end={path === '/admin'}
                 aria-label={collapsed ? label : undefined}
                 sx={{
                   borderRadius: 2,

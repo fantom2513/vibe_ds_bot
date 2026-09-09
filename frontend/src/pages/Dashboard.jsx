@@ -290,7 +290,7 @@ export default function Dashboard() {
         <Button
           variant="contained"
           startIcon={<AddOutlined />}
-          onClick={() => navigate('/rules')}
+          onClick={() => navigate('/admin/rules')}
           sx={{ alignSelf: { xs: 'stretch', sm: 'auto' } }}
         >
           Создать правило
@@ -440,7 +440,7 @@ export default function Dashboard() {
         action={
           <Button
             component={RouterLink}
-            to="/rules"
+            to="/admin/rules"
             variant="text"
             size="small"
             endIcon={<ArrowForwardOutlined sx={{ fontSize: 16 }} />}

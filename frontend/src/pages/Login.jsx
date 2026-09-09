@@ -10,7 +10,7 @@ export default function Login() {
   const navigate = useNavigate()
 
   useEffect(() => {
-    if (user) navigate('/')
+    if (user) navigate('/admin')
   }, [user, navigate])
 
   return (

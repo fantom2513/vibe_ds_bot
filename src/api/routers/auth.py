@@ -88,8 +88,8 @@ async def discord_callback(code: str) -> RedirectResponse:
     }
     token = jwt.encode(payload, settings.JWT_SECRET, algorithm="HS256")
 
-    # 6. Set httpOnly cookie → redirect to dashboard
-    response = RedirectResponse(url="/", status_code=302)
+    # 6. Set httpOnly cookie → redirect to the protected dashboard namespace.
+    response = RedirectResponse(url="/admin", status_code=302)
     response.set_cookie(
         key="access_token",
         value=token,

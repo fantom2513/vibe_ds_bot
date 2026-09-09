@@ -15,7 +15,7 @@ export function AuthProvider({ children }) {
   const logout = async () => {
     await fetch('/auth/logout', { method: 'POST' })
     setUser(null)
-    window.location.href = '/login'
+    window.location.href = '/admin/login'
   }
 
   return <AuthContext.Provider value={{ user, logout }}>{children}</AuthContext.Provider>
