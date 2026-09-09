@@ -16,6 +16,9 @@ export default [
       'playwright-report/**',
       'test-results/**',
       'blob-report/**',
+      // Third-party browser bundles are copied verbatim for the standalone
+      // public landing and are not project source code.
+      'public/landing/*.min.js',
     ],
   },
 
