@@ -258,13 +258,24 @@ jobs:
       # Только chromium: три браузера утроили бы время ради покрытия,
       # которого этому дашборду не требуется — он открывается с одной
       # машины одним человеком. Расширять есть куда, если появится повод.
-      # GitHub-hosted Ubuntu уже содержит системные библиотеки браузера.
-      # Не используем --with-deps: он запускает apt и делает тесты зависимыми
-      # от стороннего Chrome-репозитория, который может временно публиковать
-      # несовместимые индексы. Здесь нужен только закреплённый Chromium.
+      # --with-deps обязателен: без системных библиотек Chromium может
+      # зависнуть при старте вместо понятной ошибки. Иногда сторонний
+      # Chrome-репозиторий в apt публикует индекс с задержкой и apt ловит
+      # Hash Sum mismatch. Это внешний кратковременный сбой, поэтому даём
+      # ему два ограниченных повтора, а не делаем E2E бесконечно флейковым.
       - name: Install Chromium
         working-directory: frontend
-        run: npx playwright install chromium
+        run: |
+          for attempt in 1 2 3; do
+            if npx playwright install --with-deps chromium; then
+              exit 0
+            fi
+            if [ "$attempt" -lt 3 ]; then
+              echo "Chromium dependencies install failed; retrying in 30 seconds..." >&2
+              sleep 30
+            fi
+          done
+          exit 1
 
       - name: Run Playwright shard
         working-directory: frontend
