@@ -1826,6 +1826,58 @@ Step 4, since those determine how phase 4 begins.
 
 ---
 
+## Outcome
+
+Executed on branch `feat/ci-hardening`, PR #8. Full pipeline green in
+**3 min 48 s** across 13 jobs.
+
+**The three things that could not be verified locally, and how they turned out:**
+
+| Unknown | Result |
+|---|---|
+| `Dockerfile.bot` rewritten blind — no Docker on the dev machine | **Builds and runs.** `uv pip install --target` did not break the compiled extensions; `pydantic_core`, `asyncpg` and `matplotlib` all import, and the container is non-root |
+| `playwright.config.js` never executed — Playwright hangs on the dev machine | **Works.** All three shards pass and the blob reports merge |
+| Suite never run against the locked versions (fastapi 0.141, discord.py 2.7, structlog 26) | **85 tests pass on both 3.11 and 3.12** |
+
+**Defects found by running the tooling rather than reasoning about it:**
+
+1. `ruff` scope widened to `scripts/` surfaced a real unused import in
+   `check_agent3.py` — `lint-backend` would have been red on arrival.
+2. `actionlint` rejected `deploy.yaml` over the self-hosted label
+   `lastelle`; since `hermeticity` lints every workflow, it would have been
+   red on arrival. Fixed by declaring the label in `.github/actionlint.yaml`
+   rather than suppressing the rule, which catches genuine `runs-on` typos.
+3. **The lock drift check could never have passed.** `uv` records its own
+   invocation — including the `-o` path — in the lock header, and the check
+   compiled to `/tmp/*.check` and diffed that against the committed file. It
+   now compiles in a temp directory using identical relative filenames. The
+   resolution itself matched byte-for-byte between the Windows checkout and
+   the Linux runner, which is what actually mattered.
+4. Both `uv` and `actionlint` were unpinned, so a new upstream release would
+   have turned CI red with no change to this repository — the same defect,
+   twice, inside the job whose entire purpose is hermeticity. Both pinned.
+5. `shellcheck` (run by `actionlint` only when installed, and absent on the
+   Windows dev machine) flagged SC2086 on `deploy.yaml:76`. Quoting fixed;
+   the deeper defect on that line is D8 and stays for phase 8, now recorded
+   in a comment above it so it is not mistaken for a working check.
+
+**`ci-ok` was verified to actually fail, not assumed:**
+
+- Red when `hermeticity` failed while every other job passed.
+- Red when `lint-frontend` failed while `lint-backend`, `test-backend` and
+  `docker-build` were **skipped** by path filters (throwaway PR #9, since a
+  PR's filters evaluate against the base branch, so the whole-diff of PR #8
+  matches every filter). This is the case the job exists for: GitHub reports
+  a skipped job to branch protection as success.
+
+**Deviation from the plan:** a `docker-build` job was added, giving the
+`docker` path filter the consumer it previously lacked. Without it the
+rewritten image would have shipped unbuilt.
+
+**Left open by design:** D2, D8, D12, D13, D14, D15 — the phase 4–9 plan.
+Branch protection and the merge queue are not yet configured, so `ci-ok` is
+not yet required.
+
 ## Definition of Done
 
 - [ ] `ci.yaml` runs on every pull request and gates on a single `ci-ok` check
