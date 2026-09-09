@@ -2,6 +2,7 @@ import { test, expect } from '@playwright/test'
 import { createServer } from 'vite'
 
 const BASE_URL = 'http://127.0.0.1:5176'
+const LANDING_URL = `${BASE_URL}/landing/index.html`
 
 let devServer
 
@@ -18,7 +19,7 @@ test.afterAll(async () => {
 })
 
 test('ships the standalone landing with local assets', async ({ page }) => {
-  await page.goto(`${BASE_URL}/landing/`)
+  await page.goto(LANDING_URL)
 
   await expect(page).toHaveTitle(/Vibe/)
   await expect(
@@ -27,17 +28,11 @@ test('ships the standalone landing with local assets', async ({ page }) => {
   await expect(page.getByRole('link', { name: 'Админка' })).toHaveAttribute('href', '/admin')
 })
 
-test('keeps in-page anchors on the canonical root instead of the <base href> path', async ({
-  page,
-}) => {
-  // nginx serves this same file at bare "/" (the canonical public URL) via an
-  // internal rewrite, while <base href="/landing/"> keeps fonts/scripts/images
-  // scoped to their real folder. A bare href="#section" resolves against that
-  // base, not the page's actual URL — per URL resolution rules a fragment-only
-  // reference inherits the *base's* path, so on "/" it would jump to
-  // "/landing/#section" instead of staying on "/". Root-relative hrefs
-  // ("/#section") carry their own path and aren't affected by <base>.
-  await page.goto(`${BASE_URL}/landing/`)
+test('ships root-relative in-page anchors in the standalone landing artifact', async ({ page }) => {
+  // nginx serves this file at bare "/" in production, while the <base>
+  // keeps fonts/scripts/images scoped to /landing/. Fragment-only links would
+  // inherit that base path, so the artifact must use root-relative anchors.
+  await page.goto(LANDING_URL)
 
   await expect(page.getByRole('link', { name: 'Vibe, наверх' })).toHaveAttribute('href', '/#top')
   await expect(page.getByRole('link', { name: 'Интерфейс' })).toHaveAttribute('href', '/#interface')

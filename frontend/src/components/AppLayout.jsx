@@ -104,13 +104,18 @@ function NavList({ collapsed }) {
         <Box key={group.label}>
           {!collapsed && <NavGroupLabel>{group.label}</NavGroupLabel>}
           {group.items.map(({ path, label, Icon }) => {
-            const active = location.pathname === path
+            // BrowserRouter сохраняет завершающий slash при прямом заходе
+            // на /admin/. Без нормализации главная ссылка теряет active
+            // state и aria-current, хотя это та же самая страница.
+            const currentPath = location.pathname.replace(/\/+$/, '') || '/'
+            const active = currentPath === path
             const item = (
               <ListItemButton
                 component={NavLink}
                 to={path}
                 end={path === '/admin'}
                 aria-label={collapsed ? label : undefined}
+                aria-current={active ? 'page' : undefined}
                 sx={{
                   borderRadius: 2,
                   mb: 0.5,
