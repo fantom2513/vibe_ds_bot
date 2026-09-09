@@ -259,23 +259,17 @@ jobs:
       # которого этому дашборду не требуется — он открывается с одной
       # машины одним человеком. Расширять есть куда, если появится повод.
       # --with-deps обязателен: без системных библиотек Chromium может
-      # зависнуть при старте вместо понятной ошибки. Иногда сторонний
-      # Chrome-репозиторий в apt публикует индекс с задержкой и apt ловит
-      # Hash Sum mismatch. Это внешний кратковременный сбой, поэтому даём
-      # ему два ограниченных повтора, а не делаем E2E бесконечно флейковым.
+      # зависнуть при старте вместо понятной ошибки. GitHub runner содержит
+      # Google Chrome apt source, но Playwright его не использует — он
+      # скачивает собственный закреплённый Chromium. Когда Google публикует
+      # новый индекс с задержкой, общий apt update падает с Hash Sum mismatch
+      # и валит независимые от Chrome E2E. Убираем только этот лишний source
+      # в одноразовом runner до установки библиотек из Ubuntu-репозиториев.
       - name: Install Chromium
         working-directory: frontend
         run: |
-          for attempt in 1 2 3; do
-            if npx playwright install --with-deps chromium; then
-              exit 0
-            fi
-            if [ "$attempt" -lt 3 ]; then
-              echo "Chromium dependencies install failed; retrying in 30 seconds..." >&2
-              sleep 30
-            fi
-          done
-          exit 1
+          sudo rm -f /etc/apt/sources.list.d/google-chrome.list
+          npx playwright install --with-deps chromium
 
       - name: Run Playwright shard
         working-directory: frontend
