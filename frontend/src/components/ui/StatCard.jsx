@@ -35,38 +35,48 @@ export const StatCard = ({ tone = 'neutral', label, value, meta, icon: Icon, ind
       <Card sx={{ p: 2.5, height: '100%' }}>
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
           <Box sx={{ minWidth: 0 }}>
-            <Typography variant="overline" sx={{ color: 'text.secondary', display: 'block', mb: 1 }}>
+            <Typography
+              variant="overline"
+              sx={{ color: 'text.secondary', display: 'block', mb: 1 }}
+            >
               {label}
             </Typography>
-            <Typography sx={{
-              fontFamily: "'IBM Plex Mono', monospace",
-              fontSize: '2rem',
-              fontWeight: 500,
-              lineHeight: 1,
-              color: 'text.primary',
-              letterSpacing: '-0.02em',
-            }}>
+            <Typography
+              sx={{
+                fontFamily: "'IBM Plex Mono', monospace",
+                fontSize: '2rem',
+                fontWeight: 500,
+                lineHeight: 1,
+                color: 'text.primary',
+                letterSpacing: '-0.02em',
+              }}
+            >
               {value ?? '—'}
             </Typography>
             {meta != null && (
-              <Typography variant="caption" sx={{ color: 'text.secondary', mt: 0.5, display: 'block' }}>
+              <Typography
+                variant="caption"
+                sx={{ color: 'text.secondary', mt: 0.5, display: 'block' }}
+              >
                 {meta}
               </Typography>
             )}
           </Box>
           {Icon && (
-            <Box sx={{
-              width: 40,
-              height: 40,
-              borderRadius: 2,
-              backgroundColor: 'var(--color-bg-elevated)',
-              border: '1px solid var(--color-border)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: accent,
-              flexShrink: 0,
-            }}>
+            <Box
+              sx={{
+                width: 40,
+                height: 40,
+                borderRadius: 2,
+                backgroundColor: 'var(--color-bg-elevated)',
+                border: '1px solid var(--color-border)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: accent,
+                flexShrink: 0,
+              }}
+            >
               <Icon sx={{ fontSize: 18 }} />
             </Box>
           )}

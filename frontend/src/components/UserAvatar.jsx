@@ -15,9 +15,7 @@ export default function UserAvatar({ user, onLogout }) {
     <Dropdown menu={{ items }} placement="bottomRight">
       <Space style={{ cursor: 'pointer', color: 'var(--text-primary)' }}>
         <Avatar src={user?.avatar} icon={<UserOutlined />} size="small" />
-        <Typography.Text style={{ color: 'var(--text-primary)' }}>
-          {user?.username}
-        </Typography.Text>
+        <Typography.Text style={{ color: 'var(--text-primary)' }}>{user?.username}</Typography.Text>
       </Space>
     </Dropdown>
   )

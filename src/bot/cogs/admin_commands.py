@@ -7,7 +7,7 @@ Cog: slash-команды для администраторов.
 import io
 
 import discord
-from datetime import datetime, time, timedelta, timezone
+from datetime import datetime, time, timezone
 from discord import app_commands
 from discord.ext import commands
 from typing import Literal
@@ -21,6 +21,7 @@ from src.engine.tracking_report import (
     calculate_member_totals,
     calculate_pair_overlaps,
     daily_boundaries,
+    period_bounds,
 )
 from src.utils.logging import get_logger
 
@@ -38,18 +39,6 @@ def _fmt_seconds(seconds: int) -> str:
     if h:
         return f"{h}h {m}m"
     return f"{m}m"
-
-
-def _tracking_period_bounds(period: str, now: datetime) -> tuple[datetime, datetime]:
-    msk = ZoneInfo("Europe/Moscow")
-    local_now = now.astimezone(msk)
-    if period == "today":
-        start = local_now.date()
-    elif period == "week":
-        start = local_now.date() - timedelta(days=local_now.weekday())
-    else:
-        start = local_now.date().replace(day=1)
-    return datetime.combine(start, time.min, msk).astimezone(timezone.utc), now
 
 
 def _as_time(value: str | time) -> time:
@@ -412,7 +401,7 @@ class TrackingGroup(app_commands.Group):
                 return
 
             now = datetime.now(timezone.utc)
-            period_start, period_end = _tracking_period_bounds(period, now)
+            period_start, period_end = period_bounds(period, now)
             schedules = {
                 row["discord_id"]: MemberSchedule(
                     set(row["work_days"]),
@@ -456,7 +445,7 @@ class TrackingGroup(app_commands.Group):
             overlaps = calculate_pair_overlaps(sessions, set(schedules), period_start, period_end)
             stack_lines = [
                 f"{names.get(first, str(first))} + {names.get(second, str(second))} · "
-                f"<#{overlap.channel_id}> · {_fmt_seconds(overlap.seconds)}"
+                f"{_fmt_seconds(overlap.seconds)}"
                 for overlap in overlaps
                 for first, second in [overlap.member_ids]
             ]

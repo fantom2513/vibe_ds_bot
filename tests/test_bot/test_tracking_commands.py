@@ -203,7 +203,7 @@ async def test_tracking_report_uses_discord_id_when_stored_username_is_missing(
     embed = sendable_channel.send.await_args.kwargs["embed"]
     fields = {field.name: field.value for field in embed.fields}
     assert fields["42"] == "Всего: 1h 0m\nСессий: 1\nРабочее: 1h 0m"
-    assert fields["Стаки"] == "42 + Bob · <#10> · 1h 0m"
+    assert fields["Стаки"] == "42 + Bob · 1h 0m"
 
 
 @pytest.mark.asyncio

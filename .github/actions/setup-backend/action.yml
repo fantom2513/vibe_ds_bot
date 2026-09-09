@@ -1,0 +1,50 @@
+name: Setup backend
+description: >
+  Устанавливает Python нужной версии и зависимости через uv.
+  Вынесено в composite action, чтобы lint- и test-джобы не расходились
+  в способе установки — расхождение здесь означает, что линтер и тесты
+  видят разные зависимости.
+
+inputs:
+  python-version:
+    description: Версия Python
+    required: true
+  groups:
+    description: >
+      Что ставить: `app` (только requirements.lock),
+      `dev` (только requirements-dev.lock) или `all` (оба).
+    required: false
+    default: all
+
+runs:
+  using: composite
+  steps:
+    - name: Install uv
+      uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5
+      with:
+        # Та же версия, что в джобе hermeticity: там она принципиальна для
+        # воспроизводимости резолюции, а здесь пусть совпадает, чтобы в
+        # проекте была одна версия uv, а не две.
+        version: "0.11.17"
+        enable-cache: true
+        # Ключ кэша завязан на лок-файлы: меняется лок — греется заново,
+        # не меняется — переиспользуется между джобами и запусками.
+        cache-dependency-glob: "requirements*.lock"
+
+    - name: Set up Python ${{ inputs.python-version }}
+      uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+      with:
+        python-version: ${{ inputs.python-version }}
+
+    - name: Install application dependencies
+      if: inputs.groups == 'app' || inputs.groups == 'all'
+      shell: bash
+      # --require-hashes: отказаться ставить пакет, чей хэш не совпал
+      # с зафиксированным. Без этого флага лок-файл — просто список версий,
+      # а не гарантия того, что приехал тот же самый код.
+      run: uv pip install --system --require-hashes -r requirements.lock
+
+    - name: Install development dependencies
+      if: inputs.groups == 'dev' || inputs.groups == 'all'
+      shell: bash
+      run: uv pip install --system --require-hashes -r requirements-dev.lock

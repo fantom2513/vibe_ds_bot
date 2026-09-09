@@ -3,8 +3,8 @@ import { motion } from 'framer-motion'
 
 const GLOW = {
   accent: 'rgba(88,101,242,0.20)',
-  green:  'rgba(34,211,165,0.15)',
-  red:    'rgba(244,63,94,0.15)',
+  green: 'rgba(34,211,165,0.15)',
+  red: 'rgba(244,63,94,0.15)',
   purple: 'rgba(139,92,246,0.15)',
 }
 

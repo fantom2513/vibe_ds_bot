@@ -14,17 +14,17 @@ export function useMemberResolver() {
   const cache = useRef({})
   const [, forceUpdate] = useState(0)
 
-  const resolveMany = useCallback(async (ids) => {
+  const resolveMany = useCallback(async ids => {
     if (!ids || ids.length === 0) return
 
-    const missing = ids
-      .map(String)
-      .filter(id => id && !(id in cache.current))
+    const missing = ids.map(String).filter(id => id && !(id in cache.current))
 
     if (missing.length === 0) return
 
     // Optimistically mark as loading (null sentinel)
-    missing.forEach(id => { cache.current[id] = null })
+    missing.forEach(id => {
+      cache.current[id] = null
+    })
 
     try {
       const result = await membersApi.batch(missing)
@@ -45,7 +45,7 @@ export function useMemberResolver() {
     forceUpdate(n => n + 1)
   }, [])
 
-  const get = useCallback((id) => {
+  const get = useCallback(id => {
     return cache.current[String(id)] ?? null
   }, [])
 

@@ -7,11 +7,13 @@ export default function ProtectedRoute() {
 
   if (user === undefined) {
     return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
+      <Box
+        sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}
+      >
         <LinearProgress sx={{ width: 200, borderRadius: 2 }} />
       </Box>
     )
   }
 
-  return user ? <Outlet /> : <Navigate to="/login" replace />
+  return user ? <Outlet /> : <Navigate to="/admin/login" replace />
 }

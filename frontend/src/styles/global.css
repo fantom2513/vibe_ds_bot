@@ -1,7 +1,9 @@
 @import './tokens.css';
 @import './typography.css';
 
-* { box-sizing: border-box; }
+* {
+  box-sizing: border-box;
+}
 
 html {
   scroll-behavior: smooth;
@@ -11,7 +13,11 @@ body {
   margin: 0;
   background: var(--color-bg-canvas);
   color: var(--color-text-primary);
-  font-family: 'IBM Plex Sans', -apple-system, 'Segoe UI', sans-serif;
+  font-family:
+    'IBM Plex Sans',
+    -apple-system,
+    'Segoe UI',
+    sans-serif;
   -webkit-font-smoothing: antialiased;
 }
 
@@ -28,7 +34,9 @@ body {
     scroll-behavior: auto;
   }
 
-  *, *::before, *::after {
+  *,
+  *::before,
+  *::after {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
@@ -37,19 +45,25 @@ body {
 }
 
 /* Scrollbar */
-::-webkit-scrollbar { width: 6px; height: 6px; }
-::-webkit-scrollbar-track { background: var(--color-bg-canvas); }
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: var(--color-bg-canvas);
+}
 ::-webkit-scrollbar-thumb {
   background: var(--color-border);
   border-radius: 3px;
 }
-::-webkit-scrollbar-thumb:hover { background: var(--neutral-300); }
+::-webkit-scrollbar-thumb:hover {
+  background: var(--neutral-300);
+}
 
 /* Tables */
 .table-row:hover td {
   background: var(--color-bg-elevated) !important;
 }
-
 
 /* JSON in expandable rows */
 .json-preview {

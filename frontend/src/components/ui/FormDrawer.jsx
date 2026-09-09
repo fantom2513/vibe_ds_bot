@@ -44,7 +44,7 @@ export const FormDrawer = ({
     onClose?.()
   }
 
-  const handleSubmit = (event) => {
+  const handleSubmit = event => {
     event.preventDefault()
     if (!submitting) onSubmit?.()
   }
@@ -69,14 +69,27 @@ export const FormDrawer = ({
         sx={{ minHeight: '100%', display: 'flex', flexDirection: 'column' }}
       >
         <Box sx={{ px: 3, pt: 3, pb: 1 }}>
-          <Typography id={titleId} component="h2" variant="h6" sx={{ fontSize: '1rem', color: 'text.primary' }}>
+          <Typography
+            id={titleId}
+            component="h2"
+            variant="h6"
+            sx={{ fontSize: '1rem', color: 'text.primary' }}
+          >
             {title}
           </Typography>
         </Box>
         <Box sx={{ px: 3, pb: 3, flex: 1, display: 'flex', flexDirection: 'column', gap: 2 }}>
           {children}
         </Box>
-        <Box sx={{ p: 2, borderTop: '1px solid var(--color-border)', display: 'flex', justifyContent: 'flex-end', gap: 1 }}>
+        <Box
+          sx={{
+            p: 2,
+            borderTop: '1px solid var(--color-border)',
+            display: 'flex',
+            justifyContent: 'flex-end',
+            gap: 1,
+          }}
+        >
           <Button variant="text" onClick={handleDismiss} disabled={submitting}>
             Отмена
           </Button>

@@ -1,0 +1,395 @@
+name: CI
+
+# Триггеров `push: main` здесь намеренно нет. Пока deploy.yaml содержит
+# собственную джобу quality, добавление push:main гоняло бы одни и те же
+# тесты дважды на каждый мерж. push:main появится в фазе 7, когда
+# build-images начнёт пушить образы в GHCR — тогда же quality уедет
+# из deploy.yaml.
+on:
+  pull_request:
+  merge_group:
+
+# Дефолтные права GITHUB_TOKEN шире, чем нужно любой из этих джоб.
+# Задаём на уровне workflow — джоба, которой нужно больше, поднимает
+# себе права явно и это видно в ревью.
+permissions:
+  contents: read
+
+# Новый пуш в ту же ветку отменяет предыдущий прогон: держать в очереди
+# проверку заведомо устаревшего коммита незачем.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  changes:
+    name: Detect changed areas
+    runs-on: ubuntu-latest
+    outputs:
+      backend: ${{ steps.filter.outputs.backend }}
+      frontend: ${{ steps.filter.outputs.frontend }}
+      docker: ${{ steps.filter.outputs.docker }}
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+
+      - uses: dorny/paths-filter@0e4a8c6effa4802afeda77dc8d303f8176d7dfad # v3
+        id: filter
+        with:
+          filters: |
+            backend:
+              - 'src/**'
+              - 'tests/**'
+              - 'scripts/**'
+              - 'alembic/**'
+              - 'requirements*.in'
+              - 'requirements*.lock'
+              - 'pytest.ini'
+              - 'ruff.toml'
+              - '.github/**'
+            frontend:
+              - 'frontend/**'
+              - 'scripts/ci/check_bundle_size.mjs'
+              - 'scripts/ci/bundle-budget.json'
+              - '.github/**'
+            docker:
+              - 'Dockerfile*'
+              - 'frontend/Dockerfile*'
+              - 'docker-compose.yml'
+              - 'requirements*.lock'
+              - '.github/**'
+
+  lint-backend:
+    name: Lint backend
+    needs: changes
+    if: needs.changes.outputs.backend == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+
+      - uses: ./.github/actions/setup-backend
+        with:
+          python-version: '3.12'
+          groups: dev
+
+      # Набор правил пока прежний (E,F из ruff.toml). Ужесточение с
+      # ratchet-базлайном — фаза 4; смешивать его с переездом на новый
+      # workflow значит не понять, что именно сломалось.
+      - name: ruff check
+        run: ruff check src tests scripts
+
+  test-backend:
+    name: Test backend (py${{ matrix.python-version }})
+    needs: changes
+    if: needs.changes.outputs.backend == 'true'
+    runs-on: ubuntu-latest
+    strategy:
+      # Падение на одной версии не должно прятать результат по другой:
+      # знать, что баг именно version-specific, важнее, чем сэкономить
+      # минуту раннера.
+      fail-fast: false
+      matrix:
+        python-version: ['3.11', '3.12']
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+
+      - uses: ./.github/actions/setup-backend
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      # Это первый прогон тестов против зафиксированного набора версий:
+      # лок подтянул fastapi 0.141, discord.py 2.7 и structlog 26, а
+      # локально suite гонялся на заметно более старых. Прод при этом уже
+      # сегодня получает свежак — requirements.txt был весь на `>=`, —
+      # так что лок ничего не сломал, он сделал видимым то, что и так было.
+      #
+      # --timeout: зависший тест иначе съедает шестичасовой лимит джобы.
+      # 60 с с запасом: весь прогон занимает около четырёх секунд.
+      - name: pytest
+        run: >
+          pytest
+          --timeout=60
+          --junitxml=junit-${{ matrix.python-version }}.xml
+          --cov=src
+          --cov-report=term-missing
+          --cov-report=xml:coverage-${{ matrix.python-version }}.xml
+
+      - name: Render test summary
+        # if: always() — сводка нужна именно тогда, когда тесты упали.
+        # Скрипт переживает отсутствующий и битый XML и сам выходит с 0.
+        if: always()
+        run: |
+          python scripts/ci/junit_summary.py \
+            junit-${{ matrix.python-version }}.xml \
+            "py${{ matrix.python-version }}" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload test artifacts
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: backend-test-results-py${{ matrix.python-version }}
+          path: |
+            junit-${{ matrix.python-version }}.xml
+            coverage-${{ matrix.python-version }}.xml
+          retention-days: 7
+
+  hermeticity:
+    name: Hermeticity
+    needs: changes
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+
+      - uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5
+        with:
+          # Версия зафиксирована намеренно. Резолвер uv между версиями
+          # может выбрать другой набор пакетов, и тогда эта джоба покраснеет
+          # не потому, что кто-то забыл перегенерировать лок, а потому что
+          # на раннере приехал более свежий uv. Ложное срабатывание в
+          # проверке герметичности — худший вид ложного срабатывания.
+          version: "0.11.17"
+
+      # Ловит «поправил requirements.in, забыл перегенерировать лок».
+      # Важно: существующий lock копируется в temp-каталог до compile.
+      # uv штатно предпочитает уже зафиксированные версии, пока не передан
+      # --upgrade. Перерезолвить пустой output означало бы каждый PR
+      # спрашивать PyPI о новейших транзитивных версиях — то есть получать
+      # флейк от публикации чужого пакета, а не от изменения этого репо.
+      - name: Verify lock files are in sync with their sources
+        run: |
+          set -euo pipefail
+          check_dir=$(mktemp -d)
+          cp requirements.in requirements-dev.in requirements.lock requirements-dev.lock "$check_dir/"
+          (
+            cd "$check_dir"
+            for name in requirements requirements-dev; do
+              uv pip compile "$name.in" -o "$name.lock" \
+                --generate-hashes \
+                --python-version 3.11 \
+                --python-platform x86_64-unknown-linux-gnu \
+                --quiet
+            done
+          )
+          for name in requirements requirements-dev; do
+            if ! diff -u "$name.lock" "$check_dir/$name.lock"; then
+              echo "::error file=$name.lock::$name.lock is stale. Re-run: uv pip compile $name.in -o $name.lock --generate-hashes --python-version 3.11 --python-platform x86_64-unknown-linux-gnu"
+              exit 1
+            fi
+          done
+
+      - name: Verify frontend lock is in sync
+        working-directory: frontend
+        # `npm ci` отказывается работать, если package-lock.json разошёлся
+        # с package.json — то есть сама команда и есть проверка.
+        run: npm ci --ignore-scripts
+
+      # Версия зафиксирована по той же причине, что и версия uv выше:
+      # скрипт установки по умолчанию тянет последний релиз, а новый
+      # actionlint с новым правилом покрасил бы CI без единого изменения
+      # в нашем коде.
+      #
+      # Учти при локальной проверке: actionlint запускает shellcheck только
+      # если тот установлен. На раннере он есть, на машине разработчика под
+      # Windows обычно нет — то есть локальный прогон слабее этого, и часть
+      # замечаний увидишь только здесь.
+      - name: Lint workflow files
+        env:
+          ACTIONLINT_VERSION: '1.7.12'
+        run: |
+          bash <(curl -fsSL https://raw.githubusercontent.com/rhysd/actionlint/main/scripts/download-actionlint.bash) "$ACTIONLINT_VERSION"
+          ./actionlint -color
+
+  lint-frontend:
+    name: Lint frontend
+    needs: changes
+    if: needs.changes.outputs.frontend == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+
+      - uses: ./.github/actions/setup-frontend
+
+      # Блокирующая: ошибок ноль, а семь предупреждений
+      # react-hooks/exhaustive-deps зафиксированы потолком --max-warnings 7
+      # прямо в package.json. Расти им нельзя, чинить оптом — тоже.
+      - name: ESLint
+        working-directory: frontend
+        run: npm run lint
+
+      # Тоже блокирующая: prettier один раз прогнан по всему фронтенду
+      # отдельным коммитом, так что база чистая.
+      - name: Prettier
+        working-directory: frontend
+        run: npm run format:check
+
+  build-frontend:
+    name: Build frontend
+    needs: changes
+    if: needs.changes.outputs.frontend == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+
+      - uses: ./.github/actions/setup-frontend
+
+      - name: Build
+        working-directory: frontend
+        run: npm run build
+
+      - name: Check bundle size budget
+        run: node scripts/ci/check_bundle_size.mjs frontend/dist scripts/ci/bundle-budget.json | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Run bundle script unit tests
+        run: node --test scripts/ci/check_bundle_size.test.mjs
+
+  e2e:
+    name: E2E (shard ${{ matrix.shard }}/3)
+    needs: changes
+    if: needs.changes.outputs.frontend == 'true'
+    runs-on: ubuntu-latest
+    # Браузерные тесты не должны сжигать раннер бесконечно при зависшем
+    # dev-server или неверном маршруте. Нормальный прогон укладывается
+    # примерно в четыре минуты; десяти минут достаточно с запасом.
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3]
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+
+      - uses: ./.github/actions/setup-frontend
+
+      # Только chromium: три браузера утроили бы время ради покрытия,
+      # которого этому дашборду не требуется — он открывается с одной
+      # машины одним человеком. Расширять есть куда, если появится повод.
+      # --with-deps обязателен: без системных библиотек Chromium может
+      # зависнуть при старте вместо понятной ошибки. GitHub runner содержит
+      # Google Chrome apt source, но Playwright его не использует — он
+      # скачивает собственный закреплённый Chromium. Когда Google публикует
+      # новый индекс с задержкой, общий apt update падает с Hash Sum mismatch
+      # и валит независимые от Chrome E2E. Убираем только этот лишний source
+      # в одноразовом runner до установки библиотек из Ubuntu-репозиториев.
+      - name: Install Chromium
+        working-directory: frontend
+        run: |
+          sudo rm -f /etc/apt/sources.list.d/google-chrome.list
+          npx playwright install --with-deps chromium
+
+      - name: Run Playwright shard
+        working-directory: frontend
+        run: npx playwright test --shard=${{ matrix.shard }}/3
+
+      - name: Upload blob report
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: blob-report-${{ matrix.shard }}
+          path: frontend/blob-report
+          retention-days: 7
+
+      - name: Upload failure artifacts
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: e2e-traces-${{ matrix.shard }}
+          path: frontend/test-results
+          retention-days: 7
+
+  e2e-report:
+    name: Merge E2E reports
+    # if: always() — сводный отчёт нужен прежде всего когда шарды упали.
+    # Условие на result отсекает случай, когда e2e была отфильтрована.
+    if: always() && needs.e2e.result != 'skipped'
+    needs: e2e
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+
+      - uses: ./.github/actions/setup-frontend
+
+      - name: Download all blob reports
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          path: frontend/all-blob-reports
+          pattern: blob-report-*
+          merge-multiple: true
+
+      - name: Merge into a single HTML report
+        working-directory: frontend
+        run: npx playwright merge-reports --reporter html ./all-blob-reports
+
+      - name: Upload merged report
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: playwright-report
+          path: frontend/playwright-report
+          retention-days: 14
+
+  docker-build:
+    name: Build bot image
+    needs: changes
+    if: needs.changes.outputs.docker == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+
+      # Образ здесь только собирается и проверяется — пуш в GHCR это
+      # фаза 7. Джоба существует потому, что Dockerfile.bot переписан
+      # (3.11 -> 3.12, multi-stage, non-root, установка через
+      # `uv pip install --target`), а собрать его на машине разработчика
+      # было нечем: Docker там не установлен. Приём с --target умеет
+      # ломаться ровно на пакетах со скомпилированными расширениями,
+      # а здесь это pydantic-core, asyncpg и matplotlib.
+      - name: Build image
+        run: docker build -f Dockerfile.bot -t vibe-bot:ci .
+
+      - name: Verify interpreter version
+        run: docker run --rm vibe-bot:ci python --version
+
+      # Настоящая проверка --target: если пакеты уехали не туда,
+      # ломается именно импорт, а не сборка.
+      - name: Verify compiled dependencies import
+        run: docker run --rm vibe-bot:ci python -c "import discord, fastapi, structlog, matplotlib, pydantic_core, asyncpg; print('deps ok')"
+
+      - name: Verify the container does not run as root
+        run: |
+          USER_NAME=$(docker run --rm vibe-bot:ci whoami)
+          echo "container user: $USER_NAME"
+          if [ "$USER_NAME" = "root" ]; then
+            echo "::error::image runs as root"
+            exit 1
+          fi
+
+  ci-ok:
+    name: CI OK
+    # Единственный required check в branch protection.
+    #
+    # Джоба обязательна, а не декоративна: при условных джобах (`if:` от
+    # path-фильтров) пропущенная джоба отдаёт branch protection статус
+    # success. Если требовать джобы поимённо, отфильтрованная поломка
+    # проедет как зелёная. Поэтому агрегатор смотрит на результаты сам и
+    # трактует skipped как «ок», а failure/cancelled — как «нет».
+    #
+    # `changes` тоже в needs: если упадёт она, все остальные будут
+    # skipped, и без этой строчки прогон стал бы зелёным.
+    if: always()
+    needs:
+      - changes
+      - lint-backend
+      - test-backend
+      - hermeticity
+      - lint-frontend
+      - build-frontend
+      - e2e
+      - e2e-report
+      - docker-build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify no dependency failed
+        if: contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')
+        run: |
+          echo "One or more required jobs did not succeed." >&2
+          exit 1
+
+      - name: Report success
+        run: echo "All required jobs succeeded."

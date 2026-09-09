@@ -1,19 +1,54 @@
 import { useState, useEffect } from 'react'
 import {
-  Box, Button, Switch, FormControlLabel,
-  Table, TableBody, TableCell, TableHead, TableRow, TableContainer,
-  Paper, IconButton, TextField, Typography, Tooltip, Snackbar, Alert,
-  Select, MenuItem, FormControl, InputLabel, FormHelperText, useMediaQuery,
+  Box,
+  Button,
+  Switch,
+  FormControlLabel,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableRow,
+  TableContainer,
+  Paper,
+  IconButton,
+  TextField,
+  Typography,
+  Tooltip,
+  Snackbar,
+  Alert,
+  Select,
+  MenuItem,
+  FormControl,
+  InputLabel,
+  FormHelperText,
+  useMediaQuery,
 } from '@mui/material'
 import { useTheme } from '@mui/material/styles'
-import { AddOutlined, EditOutlined, DeleteOutlined, VolumeOffOutlined, BarChartOutlined } from '@mui/icons-material'
 import {
-  getMuteLevels, createMuteLevel, updateMuteLevel, deleteMuteLevel,
-  getMuteLeaderboard, getGuildRoles,
+  AddOutlined,
+  EditOutlined,
+  DeleteOutlined,
+  VolumeOffOutlined,
+  BarChartOutlined,
+} from '@mui/icons-material'
+import {
+  getMuteLevels,
+  createMuteLevel,
+  updateMuteLevel,
+  deleteMuteLevel,
+  getMuteLeaderboard,
+  getGuildRoles,
 } from '../api/muteLevels'
 import {
-  MemberCell, PageHeader, LoadingState, ErrorState, EmptyState,
-  StatusBadge, FormDrawer, ConfirmDialog,
+  MemberCell,
+  PageHeader,
+  LoadingState,
+  ErrorState,
+  EmptyState,
+  StatusBadge,
+  FormDrawer,
+  ConfirmDialog,
 } from '../components/ui'
 import { useMemberResolver } from '../hooks/useMemberResolver'
 import { PageWrapper } from '../styles/motion'
@@ -43,7 +78,13 @@ function RoleSwatch({ color }) {
   return (
     <Box
       aria-hidden="true"
-      sx={{ width: 10, height: 10, borderRadius: '50%', bgcolor: roleColorHex(color), flexShrink: 0 }}
+      sx={{
+        width: 10,
+        height: 10,
+        borderRadius: '50%',
+        bgcolor: roleColorHex(color),
+        flexShrink: 0,
+      }}
     />
   )
 }
@@ -66,12 +107,21 @@ function LevelRowActions({ level, onEdit, onDelete }) {
   return (
     <Box sx={{ display: 'flex', gap: 0.5 }}>
       <Tooltip title={`Редактировать: ${name}`}>
-        <IconButton size="small" aria-label={`Редактировать: ${name}`} onClick={() => onEdit(level)}>
+        <IconButton
+          size="small"
+          aria-label={`Редактировать: ${name}`}
+          onClick={() => onEdit(level)}
+        >
           <EditOutlined sx={{ fontSize: 15 }} />
         </IconButton>
       </Tooltip>
       <Tooltip title={`Удалить: ${name}`}>
-        <IconButton size="small" color="error" aria-label={`Удалить: ${name}`} onClick={() => onDelete(level)}>
+        <IconButton
+          size="small"
+          color="error"
+          aria-label={`Удалить: ${name}`}
+          onClick={() => onDelete(level)}
+        >
           <DeleteOutlined sx={{ fontSize: 15 }} />
         </IconButton>
       </Tooltip>
@@ -82,7 +132,15 @@ function LevelRowActions({ level, onEdit, onDelete }) {
 function LevelRecord({ level, roleName, onEdit, onDelete }) {
   return (
     <Box sx={{ border: '1px solid var(--color-border)', borderRadius: 2, p: 1.75 }}>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 1, mb: 1 }}>
+      <Box
+        sx={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'flex-start',
+          gap: 1,
+          mb: 1,
+        }}
+      >
         <Box sx={{ minWidth: 0 }}>
           <Typography sx={{ color: 'text.primary', fontWeight: 600, fontSize: '0.85rem' }}>
             {level.label}
@@ -158,11 +216,13 @@ export default function MuteLevels() {
     }
   }
 
-  useEffect(() => { load() }, [])
+  useEffect(() => {
+    load()
+  }, [])
 
   const showSnack = (msg, severity = 'success') => setSnack({ msg, severity })
 
-  const getRoleName = (roleId) => {
+  const getRoleName = roleId => {
     const role = roles.find(r => r.id === String(roleId))
     return role ? role.name : String(roleId)
   }
@@ -174,7 +234,7 @@ export default function MuteLevels() {
     setDrawerOpen(true)
   }
 
-  const openEdit = (lvl) => {
+  const openEdit = lvl => {
     setEditing(lvl)
     setForm({
       level: String(lvl.level),
@@ -195,7 +255,8 @@ export default function MuteLevels() {
     if (!form.level || !(levelNumber > 0)) nextErrors.level = 'Укажите номер уровня'
     if (!form.label.trim()) nextErrors.label = 'Название обязательно'
     const xpNumber = Number(form.xp_required)
-    if (!form.xp_required || !(xpNumber > 0)) nextErrors.xp_required = 'XP порог должен быть больше нуля'
+    if (!form.xp_required || !(xpNumber > 0))
+      nextErrors.xp_required = 'XP порог должен быть больше нуля'
     if (form.has_role && !form.role_id) nextErrors.role_id = 'Выберите роль'
     if (Object.keys(nextErrors).length) {
       setErrors(nextErrors)
@@ -300,7 +361,10 @@ export default function MuteLevels() {
                     <TableCell sx={{ color: 'text.primary' }}>{lvl.label}</TableCell>
                     <TableCell sx={MONO}>{lvl.xp_required.toLocaleString()} XP</TableCell>
                     <TableCell>
-                      <LevelRoleBadge roleId={lvl.role_id} roleName={lvl.role_id ? getRoleName(lvl.role_id) : null} />
+                      <LevelRoleBadge
+                        roleId={lvl.role_id}
+                        roleName={lvl.role_id ? getRoleName(lvl.role_id) : null}
+                      />
                     </TableCell>
                     <TableCell>
                       <LevelRowActions level={lvl} onEdit={openEdit} onDelete={setDeleteTarget} />
@@ -335,9 +399,14 @@ export default function MuteLevels() {
               <TableBody>
                 {leaderboard.map((entry, idx) => (
                   <TableRow key={entry.discord_id}>
-                    <TableCell><RankBadge rank={idx + 1} /></TableCell>
+                    <TableCell>
+                      <RankBadge rank={idx + 1} />
+                    </TableCell>
                     <TableCell sx={{ minWidth: 200 }}>
-                      <MemberCell id={String(entry.discord_id)} memberData={get(String(entry.discord_id))} />
+                      <MemberCell
+                        id={String(entry.discord_id)}
+                        memberData={get(String(entry.discord_id))}
+                      />
                     </TableCell>
                     <TableCell sx={MONO}>{entry.level}</TableCell>
                     <TableCell sx={MONO}>{entry.xp.toLocaleString()}</TableCell>
@@ -386,8 +455,8 @@ export default function MuteLevels() {
           onChange={e => setForm(f => ({ ...f, xp_required: e.target.value }))}
           error={!!errors.xp_required}
           helperText={
-            errors.xp_required
-              || `${XP_PER_MINUTE} XP в минуту — порог ${form.xp_required ? Math.round(form.xp_required / XP_PER_MINUTE) + ' мин' : '?'}`
+            errors.xp_required ||
+            `${XP_PER_MINUTE} XP в минуту — порог ${form.xp_required ? Math.round(form.xp_required / XP_PER_MINUTE) + ' мин' : '?'}`
           }
         />
         <FormControlLabel

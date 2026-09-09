@@ -1,8 +1,17 @@
 import { useEffect, useState } from 'react'
 import { Outlet, NavLink, useLocation } from 'react-router-dom'
 import {
-  Box, Drawer, List, ListItemButton, ListItemIcon, ListItemText,
-  Avatar, IconButton, Tooltip, Typography, useMediaQuery,
+  Box,
+  Drawer,
+  List,
+  ListItemButton,
+  ListItemIcon,
+  ListItemText,
+  Avatar,
+  IconButton,
+  Tooltip,
+  Typography,
+  useMediaQuery,
 } from '@mui/material'
 import { useTheme } from '@mui/material/styles'
 import { AnimatePresence } from 'framer-motion'
@@ -34,21 +43,21 @@ const navGroups = [
   {
     label: 'Мониторинг',
     items: [
-      { path: '/', label: 'Обзор', Icon: DashboardOutlined },
-      { path: '/tracking', label: 'Отслеживание', Icon: QueryStatsOutlined },
-      { path: '/logs', label: 'Журнал', Icon: ArticleOutlined },
+      { path: '/admin', label: 'Обзор', Icon: DashboardOutlined },
+      { path: '/admin/tracking', label: 'Отслеживание', Icon: QueryStatsOutlined },
+      { path: '/admin/logs', label: 'Журнал', Icon: ArticleOutlined },
     ],
   },
   {
     label: 'Управление',
     items: [
-      { path: '/rules', label: 'Правила', Icon: ListAltOutlined },
-      { path: '/schedules', label: 'Расписания', Icon: AccessTimeOutlined },
-      { path: '/users', label: 'Участники', Icon: GroupOutlined },
-      { path: '/kick-targets', label: 'Кик-цели', Icon: FlashOnOutlined },
-      { path: '/stacking-pairs', label: 'Стаки', Icon: PeopleOutlined },
-      { path: '/mute-levels', label: 'Уровни', Icon: MilitaryTechOutlined },
-      { path: '/settings', label: 'Настройки', Icon: SettingsOutlined },
+      { path: '/admin/rules', label: 'Правила', Icon: ListAltOutlined },
+      { path: '/admin/schedules', label: 'Расписания', Icon: AccessTimeOutlined },
+      { path: '/admin/users', label: 'Участники', Icon: GroupOutlined },
+      { path: '/admin/kick-targets', label: 'Кик-цели', Icon: FlashOnOutlined },
+      { path: '/admin/stacking-pairs', label: 'Стаки', Icon: PeopleOutlined },
+      { path: '/admin/mute-levels', label: 'Уровни', Icon: MilitaryTechOutlined },
+      { path: '/admin/settings', label: 'Настройки', Icon: SettingsOutlined },
     ],
   },
 ]
@@ -95,13 +104,18 @@ function NavList({ collapsed }) {
         <Box key={group.label}>
           {!collapsed && <NavGroupLabel>{group.label}</NavGroupLabel>}
           {group.items.map(({ path, label, Icon }) => {
-            const active = location.pathname === path
+            // BrowserRouter сохраняет завершающий slash при прямом заходе
+            // на /admin/. Без нормализации главная ссылка теряет active
+            // state и aria-current, хотя это та же самая страница.
+            const currentPath = location.pathname.replace(/\/+$/, '') || '/'
+            const active = currentPath === path
             const item = (
               <ListItemButton
                 component={NavLink}
                 to={path}
-                end={path === '/'}
+                end={path === '/admin'}
                 aria-label={collapsed ? label : undefined}
+                aria-current={active ? 'page' : undefined}
                 sx={{
                   borderRadius: 2,
                   mb: 0.5,
@@ -111,7 +125,8 @@ function NavList({ collapsed }) {
                   color: 'var(--color-text-secondary)',
                   textDecoration: 'none',
                   border: '1px solid transparent',
-                  transition: 'background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease',
+                  transition:
+                    'background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease',
                   '&:hover': {
                     backgroundColor: 'var(--color-bg-elevated)',
                     color: 'var(--color-text-primary)',
@@ -151,22 +166,27 @@ function NavList({ collapsed }) {
 
 function SidebarHeader({ collapsed, onToggle }) {
   return (
-    <Box sx={{
-      height: TOPBAR_HEIGHT,
-      display: 'flex',
-      alignItems: 'center',
-      px: collapsed ? 0 : 2,
-      justifyContent: collapsed ? 'center' : 'space-between',
-      borderBottom: '1px solid var(--color-border)',
-      flexShrink: 0,
-    }}>
+    <Box
+      sx={{
+        height: TOPBAR_HEIGHT,
+        display: 'flex',
+        alignItems: 'center',
+        px: collapsed ? 0 : 2,
+        justifyContent: collapsed ? 'center' : 'space-between',
+        borderBottom: '1px solid var(--color-border)',
+        flexShrink: 0,
+      }}
+    >
       {!collapsed && <BrandMark />}
       {onToggle && (
         <IconButton
           size="small"
           onClick={onToggle}
           aria-label={collapsed ? 'Развернуть меню' : 'Свернуть меню'}
-          sx={{ color: 'var(--color-text-secondary)', '&:hover': { color: 'var(--color-text-primary)' } }}
+          sx={{
+            color: 'var(--color-text-secondary)',
+            '&:hover': { color: 'var(--color-text-primary)' },
+          }}
         >
           {collapsed ? <MenuOutlined fontSize="small" /> : <ChevronLeftOutlined fontSize="small" />}
         </IconButton>
@@ -184,7 +204,10 @@ function SidebarFooter({ collapsed, user, logout }) {
             onClick={logout}
             size="small"
             aria-label="Выйти"
-            sx={{ color: 'var(--color-text-secondary)', '&:hover': { color: 'var(--color-status-danger)' } }}
+            sx={{
+              color: 'var(--color-text-secondary)',
+              '&:hover': { color: 'var(--color-status-danger)' },
+            }}
           >
             <LogoutOutlined fontSize="small" />
           </IconButton>
@@ -194,23 +217,30 @@ function SidebarFooter({ collapsed, user, logout }) {
   }
 
   return (
-    <Box sx={{
-      p: 1.5,
-      borderTop: '1px solid var(--color-border)',
-      display: 'flex',
-      alignItems: 'center',
-      gap: 1,
-      justifyContent: 'space-between',
-    }}>
+    <Box
+      sx={{
+        p: 1.5,
+        borderTop: '1px solid var(--color-border)',
+        display: 'flex',
+        alignItems: 'center',
+        gap: 1,
+        justifyContent: 'space-between',
+      }}
+    >
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, overflow: 'hidden' }}>
-        <Avatar src={user?.avatar} sx={{ width: 26, height: 26, border: '1px solid var(--color-border)' }} />
-        <Box sx={{
-          fontSize: '0.78rem',
-          color: 'var(--color-text-secondary)',
-          whiteSpace: 'nowrap',
-          overflow: 'hidden',
-          textOverflow: 'ellipsis',
-        }}>
+        <Avatar
+          src={user?.avatar}
+          sx={{ width: 26, height: 26, border: '1px solid var(--color-border)' }}
+        />
+        <Box
+          sx={{
+            fontSize: '0.78rem',
+            color: 'var(--color-text-secondary)',
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+          }}
+        >
           {user?.username}
         </Box>
       </Box>
@@ -219,7 +249,11 @@ function SidebarFooter({ collapsed, user, logout }) {
           size="small"
           onClick={logout}
           aria-label="Выйти"
-          sx={{ color: 'var(--color-text-secondary)', flexShrink: 0, '&:hover': { color: 'var(--color-status-danger)' } }}
+          sx={{
+            color: 'var(--color-text-secondary)',
+            flexShrink: 0,
+            '&:hover': { color: 'var(--color-status-danger)' },
+          }}
         >
           <LogoutOutlined sx={{ fontSize: 15 }} />
         </IconButton>
@@ -240,20 +274,22 @@ function SidebarContent({ collapsed, onToggle, user, logout }) {
 
 function MobileTopBar({ onMenuClick, user }) {
   return (
-    <Box sx={{
-      height: TOPBAR_HEIGHT,
-      flexShrink: 0,
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      px: 2,
-      gap: 1,
-      borderBottom: '1px solid var(--color-border)',
-      backgroundColor: 'var(--color-bg-sidebar)',
-      position: 'sticky',
-      top: 0,
-      zIndex: 10,
-    }}>
+    <Box
+      sx={{
+        height: TOPBAR_HEIGHT,
+        flexShrink: 0,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        px: 2,
+        gap: 1,
+        borderBottom: '1px solid var(--color-border)',
+        backgroundColor: 'var(--color-bg-sidebar)',
+        position: 'sticky',
+        top: 0,
+        zIndex: 10,
+      }}
+    >
       <IconButton
         onClick={onMenuClick}
         aria-label="Открыть меню"
@@ -262,7 +298,10 @@ function MobileTopBar({ onMenuClick, user }) {
         <MenuOutlined />
       </IconButton>
       <BrandMark size={20} />
-      <Avatar src={user?.avatar} sx={{ width: 28, height: 28, border: '1px solid var(--color-border)' }} />
+      <Avatar
+        src={user?.avatar}
+        sx={{ width: 28, height: 28, border: '1px solid var(--color-border)' }}
+      />
     </Box>
   )
 }
@@ -286,7 +325,9 @@ export default function AppLayout() {
   }, [collapsed])
 
   // Close the mobile drawer whenever the route changes via a nav click.
-  useEffect(() => { setMobileOpen(false) }, [location.pathname])
+  useEffect(() => {
+    setMobileOpen(false)
+  }, [location.pathname])
 
   const contentSx = {
     flex: 1,
@@ -305,7 +346,14 @@ export default function AppLayout() {
 
   if (isMobile) {
     return (
-      <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', backgroundColor: 'var(--color-bg-canvas)' }}>
+      <Box
+        sx={{
+          display: 'flex',
+          flexDirection: 'column',
+          minHeight: '100vh',
+          backgroundColor: 'var(--color-bg-canvas)',
+        }}
+      >
         <MobileTopBar onMenuClick={() => setMobileOpen(true)} user={user} />
         <Drawer
           variant="temporary"

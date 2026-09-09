@@ -1,7 +1,13 @@
 import { useState, useEffect, useCallback } from 'react'
 import {
-  Box, Button, TextField, Typography,
-  FormControl, InputLabel, Select, MenuItem,
+  Box,
+  Button,
+  TextField,
+  Typography,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
 } from '@mui/material'
 import { DownloadOutlined, RefreshOutlined } from '@mui/icons-material'
 import { DataGrid } from '@mui/x-data-grid'
@@ -32,7 +38,13 @@ export default function Logs() {
   const [error, setError] = useState(null)
   const [rowCount, setRowCount] = useState(0)
   const [paginationModel, setPaginationModel] = useState({ page: 0, pageSize: 50 })
-  const [filters, setFilters] = useState({ action_type: '', discord_id: '', rule_id: '', date_from: '', date_to: '' })
+  const [filters, setFilters] = useState({
+    action_type: '',
+    discord_id: '',
+    rule_id: '',
+    date_from: '',
+    date_to: '',
+  })
   const [appliedFilters, setAppliedFilters] = useState({})
 
   const load = useCallback(async (page, pageSize, f) => {
@@ -136,7 +148,12 @@ export default function Logs() {
         title="Журнал"
         subtitle="История действий бота"
         actions={
-          <Button variant="outlined" startIcon={<DownloadOutlined />} onClick={exportCsv} size="small">
+          <Button
+            variant="outlined"
+            startIcon={<DownloadOutlined />}
+            onClick={exportCsv}
+            size="small"
+          >
             Экспорт CSV
           </Button>
         }
@@ -171,7 +188,11 @@ export default function Logs() {
               onChange={e => setFilters(f => ({ ...f, action_type: e.target.value }))}
             >
               <MenuItem value="">Все</MenuItem>
-              {ACTION_TYPES.map(t => <MenuItem key={t} value={t}>{t}</MenuItem>)}
+              {ACTION_TYPES.map(t => (
+                <MenuItem key={t} value={t}>
+                  {t}
+                </MenuItem>
+              ))}
             </Select>
           </FormControl>
           <TextField
@@ -189,7 +210,12 @@ export default function Logs() {
             onChange={e => setFilters(f => ({ ...f, rule_id: e.target.value }))}
             sx={{ width: { xs: '100%', sm: 100 } }}
           />
-          <Button variant="contained" startIcon={<RefreshOutlined />} size="small" onClick={handleSearch}>
+          <Button
+            variant="contained"
+            startIcon={<RefreshOutlined />}
+            size="small"
+            onClick={handleSearch}
+          >
             Применить
           </Button>
           <Button variant="text" size="small" onClick={handleReset}>

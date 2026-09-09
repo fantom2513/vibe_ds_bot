@@ -1,16 +1,40 @@
 import { useState, useEffect } from 'react'
 import {
-  Box, Button, Switch,
-  Table, TableBody, TableCell, TableHead, TableRow, TableContainer,
-  Paper, IconButton, TextField, Typography, Tooltip, Snackbar, Alert,
-  FormControl, InputLabel, Select, MenuItem, FormHelperText, useMediaQuery,
+  Box,
+  Button,
+  Switch,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableRow,
+  TableContainer,
+  Paper,
+  IconButton,
+  TextField,
+  Typography,
+  Tooltip,
+  Snackbar,
+  Alert,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  FormHelperText,
+  useMediaQuery,
 } from '@mui/material'
 import { useTheme } from '@mui/material/styles'
 import { AddOutlined, EditOutlined, DeleteOutlined, AccessTimeOutlined } from '@mui/icons-material'
 import { getSchedules, createSchedule, updateSchedule, deleteSchedule } from '../api/schedules'
 import { getRules } from '../api/rules'
 import {
-  PageHeader, LoadingState, ErrorState, EmptyState, StatusBadge, FormDrawer, ConfirmDialog,
+  PageHeader,
+  LoadingState,
+  ErrorState,
+  EmptyState,
+  StatusBadge,
+  FormDrawer,
+  ConfirmDialog,
 } from '../components/ui'
 import { PageWrapper } from '../styles/motion'
 import { cronDescription } from '../utils/cron'
@@ -18,9 +42,17 @@ import { cronDescription } from '../utils/cron'
 const MONO = { fontFamily: "'IBM Plex Mono', monospace", fontSize: '0.72rem' }
 
 const TIMEZONES = [
-  'Europe/Moscow', 'Europe/London', 'Europe/Berlin', 'Europe/Paris',
-  'America/New_York', 'America/Chicago', 'America/Los_Angeles',
-  'Asia/Tokyo', 'Asia/Shanghai', 'Asia/Kolkata', 'Australia/Sydney',
+  'Europe/Moscow',
+  'Europe/London',
+  'Europe/Berlin',
+  'Europe/Paris',
+  'America/New_York',
+  'America/Chicago',
+  'America/Los_Angeles',
+  'Asia/Tokyo',
+  'Asia/Shanghai',
+  'Asia/Kolkata',
+  'Australia/Sydney',
   'UTC',
 ]
 
@@ -88,12 +120,22 @@ function ScheduleRowActions({ schedule, pending, onEdit, onDelete }) {
   return (
     <Box sx={{ display: 'flex', gap: 0.5 }}>
       <Tooltip title={`Редактировать: расписание #${schedule.id}`}>
-        <IconButton size="small" aria-label={`Редактировать: расписание #${schedule.id}`} onClick={() => onEdit(schedule)}>
+        <IconButton
+          size="small"
+          aria-label={`Редактировать: расписание #${schedule.id}`}
+          onClick={() => onEdit(schedule)}
+        >
           <EditOutlined sx={{ fontSize: 15 }} />
         </IconButton>
       </Tooltip>
       <Tooltip title={`Удалить: расписание #${schedule.id}`}>
-        <IconButton size="small" color="error" aria-label={`Удалить: расписание #${schedule.id}`} onClick={() => onDelete(schedule)} disabled={pending}>
+        <IconButton
+          size="small"
+          color="error"
+          aria-label={`Удалить: расписание #${schedule.id}`}
+          onClick={() => onDelete(schedule)}
+          disabled={pending}
+        >
           <DeleteOutlined sx={{ fontSize: 15 }} />
         </IconButton>
       </Tooltip>
@@ -104,14 +146,29 @@ function ScheduleRowActions({ schedule, pending, onEdit, onDelete }) {
 function ScheduleRecord({ schedule, rules, pending, onEdit, onDelete, onToggle }) {
   return (
     <Box sx={{ border: '1px solid var(--color-border)', borderRadius: 2, p: 1.75 }}>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 1, mb: 1 }}>
+      <Box
+        sx={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'flex-start',
+          gap: 1,
+          mb: 1,
+        }}
+      >
         <Box sx={{ minWidth: 0 }}>
           <Typography sx={{ color: 'text.primary', fontWeight: 600, fontSize: '0.85rem' }}>
             {ruleName(schedule.rule_id, rules)}
           </Typography>
-          <Typography sx={{ ...MONO, color: 'text.secondary', fontSize: '0.68rem' }}>#{schedule.id}</Typography>
+          <Typography sx={{ ...MONO, color: 'text.secondary', fontSize: '0.68rem' }}>
+            #{schedule.id}
+          </Typography>
         </Box>
-        <ScheduleRowActions schedule={schedule} pending={pending} onEdit={onEdit} onDelete={onDelete} />
+        <ScheduleRowActions
+          schedule={schedule}
+          pending={pending}
+          onEdit={onEdit}
+          onDelete={onDelete}
+        />
       </Box>
       <Box sx={{ mb: 1 }}>
         <CronCell cronExpr={schedule.cron_expr} />
@@ -159,7 +216,9 @@ export default function Schedules() {
     }
   }
 
-  useEffect(() => { load() }, [])
+  useEffect(() => {
+    load()
+  }, [])
 
   const showSnack = (msg, severity = 'success') => setSnack({ msg, severity })
 
@@ -172,7 +231,7 @@ export default function Schedules() {
     setDrawerOpen(true)
   }
 
-  const openEdit = (schedule) => {
+  const openEdit = schedule => {
     setEditing(schedule)
     setForm({
       rule_id: schedule.rule_id,
@@ -189,7 +248,7 @@ export default function Schedules() {
 
   const closeDrawer = () => setDrawerOpen(false)
 
-  const handleCronChange = (value) => {
+  const handleCronChange = value => {
     setForm(f => ({ ...f, cron_expr: value }))
     setCronPreview(cronDescription(value) || '')
   }
@@ -236,7 +295,7 @@ export default function Schedules() {
     }
   }
 
-  const handleToggle = async (schedule) => {
+  const handleToggle = async schedule => {
     if (pendingScheduleIds.has(schedule.id)) return
     setPendingScheduleIds(prev => new Set(prev).add(schedule.id))
     try {
@@ -284,7 +343,10 @@ export default function Schedules() {
       />
 
       {schedules.length === 0 ? (
-        <EmptyState text="Нет расписаний. Добавьте расписание через кнопку выше." icon={AccessTimeOutlined} />
+        <EmptyState
+          text="Нет расписаний. Добавьте расписание через кнопку выше."
+          icon={AccessTimeOutlined}
+        />
       ) : isCompact ? (
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
           {schedules.map(s => (
@@ -319,15 +381,32 @@ export default function Schedules() {
                 return (
                   <TableRow key={s.id}>
                     <TableCell sx={MONO}>{s.id}</TableCell>
-                    <TableCell sx={{ color: 'text.primary' }}>{ruleName(s.rule_id, rules)}</TableCell>
-                    <TableCell sx={{ minWidth: 200 }}><CronCell cronExpr={s.cron_expr} /></TableCell>
-                    <TableCell sx={{ fontSize: '0.82rem', color: 'text.secondary' }}>{s.timezone}</TableCell>
-                    <TableCell><StatusBadge tone={actionTone(s.action)}>{actionLabel(s.action)}</StatusBadge></TableCell>
-                    <TableCell>
-                      <ScheduleStatusToggle schedule={s} pending={pending} onToggle={handleToggle} />
+                    <TableCell sx={{ color: 'text.primary' }}>
+                      {ruleName(s.rule_id, rules)}
+                    </TableCell>
+                    <TableCell sx={{ minWidth: 200 }}>
+                      <CronCell cronExpr={s.cron_expr} />
+                    </TableCell>
+                    <TableCell sx={{ fontSize: '0.82rem', color: 'text.secondary' }}>
+                      {s.timezone}
                     </TableCell>
                     <TableCell>
-                      <ScheduleRowActions schedule={s} pending={pending} onEdit={openEdit} onDelete={setDeleteTarget} />
+                      <StatusBadge tone={actionTone(s.action)}>{actionLabel(s.action)}</StatusBadge>
+                    </TableCell>
+                    <TableCell>
+                      <ScheduleStatusToggle
+                        schedule={s}
+                        pending={pending}
+                        onToggle={handleToggle}
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <ScheduleRowActions
+                        schedule={s}
+                        pending={pending}
+                        onEdit={openEdit}
+                        onDelete={setDeleteTarget}
+                      />
                     </TableCell>
                   </TableRow>
                 )
@@ -347,7 +426,9 @@ export default function Schedules() {
         width={460}
       >
         {saveError && (
-          <Alert severity="error" onClose={() => setSaveError(null)}>{saveError}</Alert>
+          <Alert severity="error" onClose={() => setSaveError(null)}>
+            {saveError}
+          </Alert>
         )}
 
         <FormControl fullWidth required error={!!errors.rule_id}>
@@ -359,7 +440,9 @@ export default function Schedules() {
             onChange={e => setForm(f => ({ ...f, rule_id: e.target.value }))}
           >
             {rules.map(r => (
-              <MenuItem key={r.id} value={r.id}>{r.name} · #{r.id}</MenuItem>
+              <MenuItem key={r.id} value={r.id}>
+                {r.name} · #{r.id}
+              </MenuItem>
             ))}
           </Select>
           {errors.rule_id && <FormHelperText>{errors.rule_id}</FormHelperText>}
@@ -372,7 +455,9 @@ export default function Schedules() {
           onChange={e => handleCronChange(e.target.value)}
           placeholder="0 22 * * *"
           error={!!errors.cron_expr}
-          helperText={errors.cron_expr || cronPreview || 'Например: 0 22 * * * (каждый день в 22:00)'}
+          helperText={
+            errors.cron_expr || cronPreview || 'Например: 0 22 * * * (каждый день в 22:00)'
+          }
           inputProps={{ style: { fontFamily: "'IBM Plex Mono', monospace" } }}
         />
 
@@ -385,7 +470,9 @@ export default function Schedules() {
             onChange={e => setForm(f => ({ ...f, timezone: e.target.value }))}
           >
             {TIMEZONES.map(tz => (
-              <MenuItem key={tz} value={tz}>{tz}</MenuItem>
+              <MenuItem key={tz} value={tz}>
+                {tz}
+              </MenuItem>
             ))}
           </Select>
         </FormControl>
@@ -399,7 +486,9 @@ export default function Schedules() {
             onChange={e => setForm(f => ({ ...f, action: e.target.value }))}
           >
             {ACTION_OPTIONS.map(o => (
-              <MenuItem key={o.value} value={o.value}>{o.label}</MenuItem>
+              <MenuItem key={o.value} value={o.value}>
+                {o.label}
+              </MenuItem>
             ))}
           </Select>
         </FormControl>

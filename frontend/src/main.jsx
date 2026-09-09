@@ -27,19 +27,19 @@ ReactDOM.createRoot(document.getElementById('root')).render(
     <BrowserRouter>
       <AuthProvider>
         <Routes>
-          <Route path="/login" element={<Login />} />
+          <Route path="/admin/login" element={<Login />} />
           <Route element={<ProtectedRoute />}>
-            <Route element={<AppLayout />}>
-              <Route path="/" element={<Dashboard />} />
-              <Route path="/rules" element={<Rules />} />
-              <Route path="/users" element={<Users />} />
-              <Route path="/kick-targets" element={<KickTargets />} />
-              <Route path="/stacking-pairs" element={<StackingPairs />} />
-              <Route path="/tracking" element={<Tracking />} />
-              <Route path="/schedules" element={<Schedules />} />
-              <Route path="/logs" element={<Logs />} />
-              <Route path="/settings" element={<Settings />} />
-              <Route path="/mute-levels" element={<MuteLevels />} />
+            <Route path="/admin" element={<AppLayout />}>
+              <Route index element={<Dashboard />} />
+              <Route path="rules" element={<Rules />} />
+              <Route path="users" element={<Users />} />
+              <Route path="kick-targets" element={<KickTargets />} />
+              <Route path="stacking-pairs" element={<StackingPairs />} />
+              <Route path="tracking" element={<Tracking />} />
+              <Route path="schedules" element={<Schedules />} />
+              <Route path="logs" element={<Logs />} />
+              <Route path="settings" element={<Settings />} />
+              <Route path="mute-levels" element={<MuteLevels />} />
             </Route>
           </Route>
         </Routes>

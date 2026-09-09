@@ -7,7 +7,7 @@ export function AuthProvider({ children }) {
 
   useEffect(() => {
     fetch('/auth/me')
-      .then(r => r.ok ? r.json() : null)
+      .then(r => (r.ok ? r.json() : null))
       .then(data => setUser(data))
       .catch(() => setUser(null))
   }, [])
@@ -15,14 +15,10 @@ export function AuthProvider({ children }) {
   const logout = async () => {
     await fetch('/auth/logout', { method: 'POST' })
     setUser(null)
-    window.location.href = '/login'
+    window.location.href = '/admin/login'
   }
 
-  return (
-    <AuthContext.Provider value={{ user, logout }}>
-      {children}
-    </AuthContext.Provider>
-  )
+  return <AuthContext.Provider value={{ user, logout }}>{children}</AuthContext.Provider>
 }
 
 export const useAuth = () => useContext(AuthContext)

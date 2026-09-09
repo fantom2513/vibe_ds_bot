@@ -34,7 +34,10 @@ a:hover {
   color: var(--accent-hover);
 }
 
-input, select, textarea, button {
+input,
+select,
+textarea,
+button {
   font-family: inherit;
   font-size: 0.95rem;
 }
@@ -62,7 +65,8 @@ input, select, textarea, button {
   color: var(--text-muted);
 }
 
-.nav a:hover, .nav a.active {
+.nav a:hover,
+.nav a.active {
   color: var(--text);
   background: var(--bg-card);
 }
@@ -189,7 +193,8 @@ table {
   border-collapse: collapse;
 }
 
-th, td {
+th,
+td {
   padding: 0.6rem 0.75rem;
   text-align: left;
   border-bottom: 1px solid var(--border);
@@ -202,7 +207,7 @@ th {
 }
 
 tr:hover td {
-  background: rgba(255,255,255,0.02);
+  background: rgba(255, 255, 255, 0.02);
 }
 
 /* Alerts */
@@ -291,8 +296,13 @@ tr:hover td {
 }
 
 @keyframes pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.4; }
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.4;
+  }
 }
 
 /* Empty state */

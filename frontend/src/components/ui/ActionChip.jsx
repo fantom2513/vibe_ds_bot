@@ -13,10 +13,6 @@ const TONE_BY_TYPE = {
 }
 
 export const ActionChip = ({ type, isDryRun }) => {
-  const tone = isDryRun ? 'neutral' : (TONE_BY_TYPE[type] || 'neutral')
-  return (
-    <StatusBadge tone={tone}>
-      {isDryRun ? `${type} · DRY` : type}
-    </StatusBadge>
-  )
+  const tone = isDryRun ? 'neutral' : TONE_BY_TYPE[type] || 'neutral'
+  return <StatusBadge tone={tone}>{isDryRun ? `${type} · DRY` : type}</StatusBadge>
 }
