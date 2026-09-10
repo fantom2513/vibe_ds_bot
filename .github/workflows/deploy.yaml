@@ -1,47 +1,85 @@
 name: Build & Deploy
 
 on:
-  push:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
     branches: [main]
   workflow_dispatch:
+    inputs:
+      bot_image:
+        description: Full GHCR bot image reference pinned by @sha256
+        required: true
+        type: string
+      frontend_image:
+        description: Full GHCR frontend image reference pinned by @sha256
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  packages: read
+  # actions: read — не в исходном списке фазы, но без него
+  # actions/download-artifact не может скачать артефакт из чужого
+  # workflow run (нужен для github-token + run-id из workflow_run):
+  # https://github.com/actions/download-artifact#permissions.
+  actions: read
+
+concurrency:
+  group: production
+  cancel-in-progress: false
 
 jobs:
-  quality:
-    runs-on: [self-hosted, linux, x64, lastelle]
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v5
-
-      - name: Set up Python
-        uses: actions/setup-python@v6
-        with:
-          python-version: '3.12'
-          cache: pip
-          cache-dependency-path: requirements-dev.lock
-
-      - name: Install test tools
-        run: |
-          python -m pip install --upgrade pip
-          python -m pip install -r requirements-dev.lock
-
-      - name: Lint backend
-        run: ruff check src tests
-
-      - name: Run backend tests
-        run: pytest -v
-
   deploy:
-    needs: quality
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.head_branch == 'main' &&
+       github.event.workflow_run.event == 'push' &&
+       github.event.workflow_run.head_repository.full_name == github.repository)
     runs-on: [self-hosted, linux, x64, lastelle]
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v5
 
-      - name: Create .env file
+      - name: Download production image digests
+        if: github.event_name == 'workflow_run'
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: production-image-digests
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Write digests from manual dispatch inputs
+        if: github.event_name == 'workflow_dispatch'
+        # Inputs go through env: and are read back as shell variables, not
+        # spliced into the script text: `${{ inputs.* }}` interpolates at
+        # YAML/expression level before bash ever parses this block, so a
+        # dispatch input containing shell metacharacters would otherwise run
+        # as arbitrary commands on the self-hosted runner, before
+        # deploy_images.py validates anything.
+        env:
+          BOT_IMAGE: ${{ inputs.bot_image }}
+          FRONTEND_IMAGE: ${{ inputs.frontend_image }}
         run: |
-          cat > .env << 'EOF'
+          printf '{"bot_image": "%s", "frontend_image": "%s"}\n' "$BOT_IMAGE" "$FRONTEND_IMAGE" > digests.json
+
+      # python3, не python: этот джоб (в отличие от бывшей quality) не
+      # ставит Python через setup-python, а голый `python` на
+      # self-hosted раннере не гарантирован — оригинальный health-check
+      # ниже уже полагался именно на python3.
+      - name: Validate digests and render production override
+        run: python3 scripts/ci/deploy_images.py digests.json docker-compose.deploy.yaml
+
+      - name: Deploy with health check and rollback
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          umask 077
+          cat > .env <<'EOF'
           DISCORD_TOKEN=${{ secrets.DISCORD_TOKEN }}
           DISCORD_GUILD_ID=${{ secrets.DISCORD_GUILD_ID }}
           DATABASE_URL=${{ secrets.DATABASE_URL }}
@@ -61,50 +99,125 @@ jobs:
           ALLOWED_DISCORD_IDS=${{ secrets.ALLOWED_DISCORD_IDS }}
           ALERT_WEBHOOK_URL=${{ secrets.ALERT_WEBHOOK_URL }}
           EOF
+          chmod 600 .env
+          # Targeted extraction, not `set -a; . ./.env; set +a`: sourcing
+          # the whole file re-parses every secret as shell, so a value
+          # containing a space/$/backtick can execute or leak into the log
+          # unmasked (GitHub's secret masking matches the exact registered
+          # string, not what shell-expansion produces from it). Compose
+          # itself reads .env via --env-file with its own parser; the only
+          # value this step's shell actually needs is POSTGRES_USER, for
+          # the pg_isready call below.
+          POSTGRES_USER=$(sed -n 's/^POSTGRES_USER=//p' .env)
 
-      - name: Stop old containers
-        run: docker compose down --remove-orphans || true
+          wait_for_healthy() {
+            local deadline=$((SECONDS + 120))
+            local postgres bot frontend
+            while (( SECONDS < deadline )); do
+              postgres=$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}missing{{end}}' discord-bot-postgres)
+              bot=$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}missing{{end}}' discord-bot-api)
+              frontend=$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}missing{{end}}' discord-bot-frontend)
+              printf 'health: postgres=%s bot-api=%s frontend=%s\n' "$postgres" "$bot" "$frontend"
+              if [[ "$postgres" == healthy && "$bot" == healthy && "$frontend" == healthy ]]; then
+                docker compose --env-file .env -f docker-compose.yml -f docker-compose.deploy.yaml exec -T postgres pg_isready -U "$POSTGRES_USER"
+                return 0
+              fi
+              sleep 5
+            done
+            return 1
+          }
 
-      - name: Build and deploy
-        run: |
-          docker compose build bot-api frontend
-          docker compose up -d
-          sleep 10
-          curl -f http://localhost:8181/api/health || exit 1
-          curl -f http://localhost:8181/ || exit 1
+          docker login ghcr.io --username "$GITHUB_ACTOR" --password-stdin <<< "$GITHUB_TOKEN"
 
-      # ВНИМАНИЕ: эта проверка сейчас фиктивна. POSTGRES_USER не задан в
-      # окружении джобы, поэтому подстановка всегда сваливается в литерал
-      # `bot`, и pg_isready спрашивает не того пользователя, под которым
-      # реально поднят postgres. Здесь исправлено только экранирование
-      # (shellcheck SC2086) — чтобы джоба герметичности была зелёной.
-      # Сама проверка чинится в фазе 8 вместе с переписыванием деплоя,
-      # где юзер приедет из секрета.
-      - name: Health check — database
-        run: docker compose exec -T postgres pg_isready -U "${POSTGRES_USER:-bot}"
-
-      - name: Health check — bot-api is running
-        run: |
-          STATUS=$(docker compose ps bot-api --format json | python3 -c "
-          import json,sys
-          data=sys.stdin.read().strip()
-          try:
-            s=json.loads(data)
-            if isinstance(s,list): s=s[0]
-            print(s.get('State',''))
-          except: print('')
-          ")
-          if echo "$STATUS" | grep -q "running"; then
-            echo "Bot API is running"
-          else
-            echo "Bot API is NOT running"
+          # First deploy / a host that lost discord-bot-api or
+          # discord-bot-frontend has nothing to roll back to. Fail here,
+          # legibly, before docker login's success masks the real cause —
+          # rather than an opaque `docker inspect: no such object` abort
+          # under set -e later.
+          bot_previous=$(docker inspect --format '{{.Config.Image}}' discord-bot-api 2>/dev/null) || bot_previous=""
+          frontend_previous=$(docker inspect --format '{{.Config.Image}}' discord-bot-frontend 2>/dev/null) || frontend_previous=""
+          if [[ -z "$bot_previous" || -z "$frontend_previous" ]]; then
+            echo '::error::no previous discord-bot-api/discord-bot-frontend container found; rollback unavailable — refusing to deploy' >&2
             exit 1
           fi
+          printf 'BOT_IMAGE=%q\nFRONTEND_IMAGE=%q\n' "$bot_previous" "$frontend_previous" > previous-images.env
+          compose=(docker compose --env-file .env -f docker-compose.yml -f docker-compose.deploy.yaml)
+          "${compose[@]}" pull bot-api frontend
+          # Captured, not left to set -e and not discarded: `up -d` itself
+          # exits non-zero once a dependency (bot-api -> postgres,
+          # frontend -> bot-api) exhausts its `service_healthy` retries,
+          # which is exactly the broken-release case rollback exists for —
+          # so a bare `set -e` abort here must not happen, the rollback
+          # guard below has to run. But a plain `|| echo` that discards the
+          # exit status is its own bug: if `up -d` fails for an unrelated
+          # reason (daemon error, name conflict, missing image) *before* it
+          # touches the running containers, the previous release is still
+          # up and still healthy, so `wait_for_healthy` below would pass on
+          # its very first check and the job would exit 0 having deployed
+          # nothing. Keep the status and fail the job below if `up -d`
+          # failed even though the health check happens to pass.
+          up_status=0
+          "${compose[@]}" up -d --no-build || up_status=$?
+          if [[ "$up_status" -ne 0 ]]; then
+            echo "::warning::compose up reported failure ($up_status); checking whether it left healthy containers to fall back on" >&2
+          fi
 
+          if ! wait_for_healthy; then
+            set -a
+            . ./previous-images.env
+            set +a
+            cat > docker-compose.rollback.yaml <<EOF
+          services:
+            bot-api:
+              image: $BOT_IMAGE
+            frontend:
+              image: $FRONTEND_IMAGE
+          EOF
+            rollback_compose=(docker compose --env-file .env -f docker-compose.yml -f docker-compose.rollback.yaml)
+            # Rollback must not assume the previous image is still cached
+            # locally — pull it in case it was already pruned/gone. Best
+            # effort: if the previous image predates the digest-pin
+            # transition (a locally built, unregistered tag) there is
+            # nothing to pull, and `up -d --no-build` below still falls
+            # back to whatever is cached locally.
+            "${rollback_compose[@]}" pull bot-api frontend || echo 'rollback pull failed; falling back to locally cached image if present'
+            # Guarded for the same reason as the main up -d above: if this
+            # also fails under set -e, the script dies before the re-check
+            # and the "rollback containers did not become healthy" error
+            # never prints — the worst outcome (zero healthy containers)
+            # would get the least visibility.
+            "${rollback_compose[@]}" up -d --no-build || echo 'rollback compose up reported failure; falling through to health check'
+            if ! wait_for_healthy; then
+              echo '::error::rollback containers did not become healthy' >&2
+            fi
+            exit 1
+          elif [[ "$up_status" -ne 0 ]]; then
+            # wait_for_healthy passed, but only because it found the
+            # previous release's containers still healthy — up -d itself
+            # never got far enough to replace them. Nothing new was
+            # actually deployed; reporting green here would be silently
+            # false.
+            echo "::error::compose up failed ($up_status) but previous containers are still healthy — refusing to report success" >&2
+            exit 1
+          fi
+          docker image prune -f
+
+      # No -f/--env-file here: if "Validate digests" itself failed (bad
+      # manual input, corrupt artifact), docker-compose.deploy.yaml and
+      # .env never got created, and these steps would die on "no such
+      # file or directory" instead of showing anything. `docker compose`
+      # resolves the project from docker-compose.yml (present from
+      # checkout) and matches already-running containers by service name
+      # regardless of which override — if any — last applied, so nothing
+      # here needs the override or .env to exist.
       - name: Show container status
         if: always()
         run: docker compose ps
 
       - name: Show recent bot-api logs
-        if: failure()
+        if: always()
         run: docker compose logs bot-api --tail=50
+
+      - name: Show recent frontend logs
+        if: always()
+        run: docker compose logs frontend --tail=50

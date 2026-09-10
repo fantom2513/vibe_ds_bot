@@ -30,6 +30,13 @@ services:
       - internal
     restart: unless-stopped
     command: ["sh", "-c", "alembic upgrade head && exec python -m src.main"]
+    healthcheck:
+      test:
+        ["CMD", "python", "-c", "from urllib.request import urlopen; urlopen('http://localhost:8000/health', timeout=3)"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 15s
 
   frontend:
     build:
@@ -39,10 +46,17 @@ services:
     ports:
       - "8181:80"
     depends_on:
-      - bot-api
+      bot-api:
+        condition: service_healthy
     networks:
       - internal
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://localhost/ || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 10s
 
   uptime-kuma:
     image: louislam/uptime-kuma:1
