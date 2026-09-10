@@ -1,13 +1,15 @@
 name: CI
 
-# Триггеров `push: main` здесь намеренно нет. Пока deploy.yaml содержит
-# собственную джобу quality, добавление push:main гоняло бы одни и те же
-# тесты дважды на каждый мерж. push:main появится в фазе 7, когда
-# build-images начнёт пушить образы в GHCR — тогда же quality уедет
-# из deploy.yaml.
+# push:main запускает этот workflow при каждом мердже в main — нужен,
+# чтобы build-images могла собрать и запушить образы в GHCR сразу после
+# зелёного CI OK. Побочный эффект: пока deploy.yaml ещё держит свою
+# джобу quality, тесты на пуше в main гоняются дважды (здесь и там) —
+# устранится отдельным шагом, когда quality уедет из deploy.yaml.
 on:
   pull_request:
   merge_group:
+  push:
+    branches: [main]
 
 # Дефолтные права GITHUB_TOKEN шире, чем нужно любой из этих джоб.
 # Задаём на уровне workflow — джоба, которой нужно больше, поднимает
@@ -416,3 +418,80 @@ jobs:
 
       - name: Report success
         run: echo "All required jobs succeeded."
+
+  build-images:
+    name: Publish production images
+    # Только настоящий пуш в main после зелёного CI OK: PR и merge_group
+    # не должны пушить образы в GHCR, а `needs: ci-ok` уже гарантирует,
+    # что все required джобы прошли (ci-ok сама трактует skipped как ок).
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: ci-ok
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      bot_image: ${{ steps.digests.outputs.bot_image }}
+      frontend_image: ${{ steps.digests.outputs.frontend_image }}
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+
+      - uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push bot-api image
+        id: build-bot
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
+        with:
+          context: .
+          file: Dockerfile.bot
+          push: true
+          tags: |
+            ghcr.io/fantom2513/vibe_ds_bot-bot-api:sha-${{ github.sha }}
+            ghcr.io/fantom2513/vibe_ds_bot-bot-api:main
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          sbom: true
+          provenance: true
+
+      - name: Build and push frontend image
+        id: build-frontend
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
+        with:
+          context: ./frontend
+          file: frontend/Dockerfile.frontend
+          push: true
+          tags: |
+            ghcr.io/fantom2513/vibe_ds_bot-frontend:sha-${{ github.sha }}
+            ghcr.io/fantom2513/vibe_ds_bot-frontend:main
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          sbom: true
+          provenance: true
+
+      # build-push-action отдаёт digest без имени репозитория (только
+      # sha256:...), а deploy_images.py (Task 1) валидирует и потребляет
+      # именно полную ссылку вида ghcr.io/.../<image>@sha256:<64 hex> —
+      # собираем её здесь и складываем в JSON с ключами bot_image/
+      # frontend_image, которых ждёт write_override_from_json.
+      - name: Write image digests
+        id: digests
+        run: |
+          set -euo pipefail
+          bot_image="ghcr.io/fantom2513/vibe_ds_bot-bot-api@${{ steps.build-bot.outputs.digest }}"
+          frontend_image="ghcr.io/fantom2513/vibe_ds_bot-frontend@${{ steps.build-frontend.outputs.digest }}"
+          printf '{"bot_image": "%s", "frontend_image": "%s"}\n' "$bot_image" "$frontend_image" > digests.json
+          echo "bot_image=$bot_image" >> "$GITHUB_OUTPUT"
+          echo "frontend_image=$frontend_image" >> "$GITHUB_OUTPUT"
+
+      - name: Upload digests artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: production-image-digests
+          path: digests.json
+          retention-days: 30
