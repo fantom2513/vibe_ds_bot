@@ -1,7 +1,7 @@
 # React Landing Redesign
 
-**Date:** 2026-09-10  
-**Status:** Approved for specification review  
+**Date:** 2026-09-10
+**Status:** Ready for user review
 **Scope:** Public Vibe landing page and its delivery route. The authenticated admin panel, API, and Discord OAuth flow are explicitly out of scope.
 
 ## Purpose
