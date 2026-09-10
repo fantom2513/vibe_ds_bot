@@ -143,13 +143,24 @@ jobs:
           printf 'BOT_IMAGE=%q\nFRONTEND_IMAGE=%q\n' "$bot_previous" "$frontend_previous" > previous-images.env
           compose=(docker compose --env-file .env -f docker-compose.yml -f docker-compose.deploy.yaml)
           "${compose[@]}" pull bot-api frontend
-          # Guarded, not left to set -e: `up -d` itself exits non-zero once
-          # a dependency (bot-api -> postgres, frontend -> bot-api)
-          # exhausts its `service_healthy` retries, which is exactly the
-          # broken-release case rollback exists for. Without the guard,
-          # set -e kills the step on this line and the rollback guard below
-          # never runs — the broken release is left running unrolled-back.
-          "${compose[@]}" up -d --no-build || echo 'compose up reported failure; falling through to health check'
+          # Captured, not left to set -e and not discarded: `up -d` itself
+          # exits non-zero once a dependency (bot-api -> postgres,
+          # frontend -> bot-api) exhausts its `service_healthy` retries,
+          # which is exactly the broken-release case rollback exists for —
+          # so a bare `set -e` abort here must not happen, the rollback
+          # guard below has to run. But a plain `|| echo` that discards the
+          # exit status is its own bug: if `up -d` fails for an unrelated
+          # reason (daemon error, name conflict, missing image) *before* it
+          # touches the running containers, the previous release is still
+          # up and still healthy, so `wait_for_healthy` below would pass on
+          # its very first check and the job would exit 0 having deployed
+          # nothing. Keep the status and fail the job below if `up -d`
+          # failed even though the health check happens to pass.
+          up_status=0
+          "${compose[@]}" up -d --no-build || up_status=$?
+          if [[ "$up_status" -ne 0 ]]; then
+            echo "::warning::compose up reported failure ($up_status); checking whether it left healthy containers to fall back on" >&2
+          fi
 
           if ! wait_for_healthy; then
             set -a
@@ -179,6 +190,14 @@ jobs:
             if ! wait_for_healthy; then
               echo '::error::rollback containers did not become healthy' >&2
             fi
+            exit 1
+          elif [[ "$up_status" -ne 0 ]]; then
+            # wait_for_healthy passed, but only because it found the
+            # previous release's containers still healthy — up -d itself
+            # never got far enough to replace them. Nothing new was
+            # actually deployed; reporting green here would be silently
+            # false.
+            echo "::error::compose up failed ($up_status) but previous containers are still healthy — refusing to report success" >&2
             exit 1
           fi
           docker image prune -f
