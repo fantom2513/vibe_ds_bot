@@ -441,7 +441,9 @@ jobs:
     # Только настоящий пуш в main после зелёного CI OK: PR и merge_group
     # не должны пушить образы в GHCR, а `needs: ci-ok` уже гарантирует,
     # что все required джобы прошли (ci-ok сама трактует skipped как ок).
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    # A skipped path-filtered CI job otherwise propagates the default
+    # `success()` guard and suppresses this publisher, even after ci-ok.
+    if: always() && github.event_name == 'push' && github.ref == 'refs/heads/main'
     needs: ci-ok
     runs-on: ubuntu-latest
     permissions:
