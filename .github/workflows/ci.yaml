@@ -360,6 +360,29 @@ jobs:
             exit 1
           fi
 
+      # Плоский `grep -F 'healthcheck:'` здесь не годится: postgres уже
+      # объявляет healthcheck сегодня, так что такой grep находит совпадение
+      # и проходит независимо от того, есть ли healthcheck у bot-api и
+      # frontend. Считаем вхождения и требуем все три (postgres, bot-api,
+      # frontend) — тогда шаг реально падает, если readiness одного из
+      # сервисов деплоя пропала.
+      - name: Verify production compose override shape
+        run: |
+          cat > docker-compose.deploy.yaml <<'EOF'
+          services:
+            bot-api:
+              image: ghcr.io/fantom2513/vibe_ds_bot-bot-api@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+            frontend:
+              image: ghcr.io/fantom2513/vibe_ds_bot-frontend@sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+          EOF
+          cp .env.example .env
+          count=$(docker compose -f docker-compose.yml -f docker-compose.deploy.yaml config | grep -c -F 'healthcheck:')
+          echo "healthcheck count: $count (expect 3: postgres, bot-api, frontend)"
+          if [ "$count" -lt 3 ]; then
+            echo "::error::expected a healthcheck on postgres, bot-api and frontend in the merged compose config, found $count"
+            exit 1
+          fi
+
   ci-ok:
     name: CI OK
     # Единственный required check в branch protection.
