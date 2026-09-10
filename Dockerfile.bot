@@ -35,6 +35,7 @@ RUN useradd --create-home --uid 10001 app
 WORKDIR /app
 
 COPY --from=builder /install /usr/local/lib/python3.12/site-packages
+COPY --from=builder /install/bin /usr/local/bin
 
 COPY --chown=app:app src/ ./src/
 COPY --chown=app:app alembic/ ./alembic/
