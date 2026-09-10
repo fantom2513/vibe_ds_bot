@@ -485,6 +485,17 @@ jobs:
           set -euo pipefail
           bot_image="ghcr.io/fantom2513/vibe_ds_bot-bot-api@${{ steps.build-bot.outputs.digest }}"
           frontend_image="ghcr.io/fantom2513/vibe_ds_bot-frontend@${{ steps.build-frontend.outputs.digest }}"
+
+          # GitHub's double-brace interpolation splices at YAML-parse time,
+          # not shell-expansion time, so `set -e` never sees an empty or
+          # malformed digest as a failure — an unset action output would
+          # silently produce a syntactically valid but broken ref (e.g.
+          # `...bot-api@`) with no non-zero exit. Check both refs by hand
+          # before they reach digests.json.
+          ref_re='^ghcr\.io/[a-z0-9._/-]+@sha256:[0-9a-f]{64}$'
+          [[ "$bot_image" =~ $ref_re ]] || { echo "::error::malformed bot_image digest: $bot_image" >&2; exit 1; }
+          [[ "$frontend_image" =~ $ref_re ]] || { echo "::error::malformed frontend_image digest: $frontend_image" >&2; exit 1; }
+
           printf '{"bot_image": "%s", "frontend_image": "%s"}\n' "$bot_image" "$frontend_image" > digests.json
           echo "bot_image=$bot_image" >> "$GITHUB_OUTPUT"
           echo "frontend_image=$frontend_image" >> "$GITHUB_OUTPUT"
