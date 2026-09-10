@@ -17,6 +17,10 @@ def test_accepts_a_complete_ghcr_digest_reference():
     "ghcr.io/fantom2513/vibe_ds_bot-bot-api:main",
     "docker.io/library/python@sha256:" + "a" * 64,
     "ghcr.io/fantom2513/vibe_ds_bot-bot-api@sha256:" + "a" * 63,
+    # Well-formed sha256 GHCR ref, but a different owner/image — must not
+    # pass just because the host and digest shape are right (a forged
+    # artifact could otherwise name any ghcr.io/<anyone>/<anything> image).
+    "ghcr.io/someone-else/vibe_ds_bot-bot-api@sha256:" + "a" * 64,
 ])
 def test_rejects_a_non_immutable_or_non_ghcr_image(value: str):
     with pytest.raises(ValueError):

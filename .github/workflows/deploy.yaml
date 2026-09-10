@@ -34,7 +34,9 @@ jobs:
     if: >-
       github.event_name == 'workflow_dispatch' ||
       (github.event.workflow_run.conclusion == 'success' &&
-       github.event.workflow_run.head_branch == 'main')
+       github.event.workflow_run.head_branch == 'main' &&
+       github.event.workflow_run.event == 'push' &&
+       github.event.workflow_run.head_repository.full_name == github.repository)
     runs-on: [self-hosted, linux, x64, lastelle]
 
     steps:
@@ -51,9 +53,17 @@ jobs:
 
       - name: Write digests from manual dispatch inputs
         if: github.event_name == 'workflow_dispatch'
+        # Inputs go through env: and are read back as shell variables, not
+        # spliced into the script text: `${{ inputs.* }}` interpolates at
+        # YAML/expression level before bash ever parses this block, so a
+        # dispatch input containing shell metacharacters would otherwise run
+        # as arbitrary commands on the self-hosted runner, before
+        # deploy_images.py validates anything.
+        env:
+          BOT_IMAGE: ${{ inputs.bot_image }}
+          FRONTEND_IMAGE: ${{ inputs.frontend_image }}
         run: |
-          printf '{"bot_image": "%s", "frontend_image": "%s"}\n' \
-            "${{ inputs.bot_image }}" "${{ inputs.frontend_image }}" > digests.json
+          printf '{"bot_image": "%s", "frontend_image": "%s"}\n' "$BOT_IMAGE" "$FRONTEND_IMAGE" > digests.json
 
       # python3, не python: этот джоб (в отличие от бывшей quality) не
       # ставит Python через setup-python, а голый `python` на
@@ -90,9 +100,15 @@ jobs:
           ALERT_WEBHOOK_URL=${{ secrets.ALERT_WEBHOOK_URL }}
           EOF
           chmod 600 .env
-          set -a
-          . ./.env
-          set +a
+          # Targeted extraction, not `set -a; . ./.env; set +a`: sourcing
+          # the whole file re-parses every secret as shell, so a value
+          # containing a space/$/backtick can execute or leak into the log
+          # unmasked (GitHub's secret masking matches the exact registered
+          # string, not what shell-expansion produces from it). Compose
+          # itself reads .env via --env-file with its own parser; the only
+          # value this step's shell actually needs is POSTGRES_USER, for
+          # the pg_isready call below.
+          POSTGRES_USER=$(sed -n 's/^POSTGRES_USER=//p' .env)
 
           wait_for_healthy() {
             local deadline=$((SECONDS + 120))
@@ -112,12 +128,28 @@ jobs:
           }
 
           docker login ghcr.io --username "$GITHUB_ACTOR" --password-stdin <<< "$GITHUB_TOKEN"
-          bot_previous=$(docker inspect --format '{{.Config.Image}}' discord-bot-api)
-          frontend_previous=$(docker inspect --format '{{.Config.Image}}' discord-bot-frontend)
+
+          # First deploy / a host that lost discord-bot-api or
+          # discord-bot-frontend has nothing to roll back to. Fail here,
+          # legibly, before docker login's success masks the real cause —
+          # rather than an opaque `docker inspect: no such object` abort
+          # under set -e later.
+          bot_previous=$(docker inspect --format '{{.Config.Image}}' discord-bot-api 2>/dev/null) || bot_previous=""
+          frontend_previous=$(docker inspect --format '{{.Config.Image}}' discord-bot-frontend 2>/dev/null) || frontend_previous=""
+          if [[ -z "$bot_previous" || -z "$frontend_previous" ]]; then
+            echo '::error::no previous discord-bot-api/discord-bot-frontend container found; rollback unavailable — refusing to deploy' >&2
+            exit 1
+          fi
           printf 'BOT_IMAGE=%q\nFRONTEND_IMAGE=%q\n' "$bot_previous" "$frontend_previous" > previous-images.env
           compose=(docker compose --env-file .env -f docker-compose.yml -f docker-compose.deploy.yaml)
           "${compose[@]}" pull bot-api frontend
-          "${compose[@]}" up -d --no-build
+          # Guarded, not left to set -e: `up -d` itself exits non-zero once
+          # a dependency (bot-api -> postgres, frontend -> bot-api)
+          # exhausts its `service_healthy` retries, which is exactly the
+          # broken-release case rollback exists for. Without the guard,
+          # set -e kills the step on this line and the rollback guard below
+          # never runs — the broken release is left running unrolled-back.
+          "${compose[@]}" up -d --no-build || echo 'compose up reported failure; falling through to health check'
 
           if ! wait_for_healthy; then
             set -a
@@ -130,7 +162,20 @@ jobs:
             frontend:
               image: $FRONTEND_IMAGE
           EOF
-            docker compose --env-file .env -f docker-compose.yml -f docker-compose.rollback.yaml up -d --no-build
+            rollback_compose=(docker compose --env-file .env -f docker-compose.yml -f docker-compose.rollback.yaml)
+            # Rollback must not assume the previous image is still cached
+            # locally — pull it in case it was already pruned/gone. Best
+            # effort: if the previous image predates the digest-pin
+            # transition (a locally built, unregistered tag) there is
+            # nothing to pull, and `up -d --no-build` below still falls
+            # back to whatever is cached locally.
+            "${rollback_compose[@]}" pull bot-api frontend || echo 'rollback pull failed; falling back to locally cached image if present'
+            # Guarded for the same reason as the main up -d above: if this
+            # also fails under set -e, the script dies before the re-check
+            # and the "rollback containers did not become healthy" error
+            # never prints — the worst outcome (zero healthy containers)
+            # would get the least visibility.
+            "${rollback_compose[@]}" up -d --no-build || echo 'rollback compose up reported failure; falling through to health check'
             if ! wait_for_healthy; then
               echo '::error::rollback containers did not become healthy' >&2
             fi
@@ -138,14 +183,22 @@ jobs:
           fi
           docker image prune -f
 
+      # No -f/--env-file here: if "Validate digests" itself failed (bad
+      # manual input, corrupt artifact), docker-compose.deploy.yaml and
+      # .env never got created, and these steps would die on "no such
+      # file or directory" instead of showing anything. `docker compose`
+      # resolves the project from docker-compose.yml (present from
+      # checkout) and matches already-running containers by service name
+      # regardless of which override — if any — last applied, so nothing
+      # here needs the override or .env to exist.
       - name: Show container status
         if: always()
-        run: docker compose --env-file .env -f docker-compose.yml -f docker-compose.deploy.yaml ps
+        run: docker compose ps
 
       - name: Show recent bot-api logs
         if: always()
-        run: docker compose --env-file .env -f docker-compose.yml -f docker-compose.deploy.yaml logs bot-api --tail=50
+        run: docker compose logs bot-api --tail=50
 
       - name: Show recent frontend logs
         if: always()
-        run: docker compose --env-file .env -f docker-compose.yml -f docker-compose.deploy.yaml logs frontend --tail=50
+        run: docker compose logs frontend --tail=50

@@ -7,7 +7,13 @@ import json
 import sys
 from pathlib import Path
 
-_IMAGE_REF = re.compile(r"^ghcr\.io/[a-z0-9._/-]+@sha256:[0-9a-f]{64}$")
+# Owner/repo pinned, not a wildcard host path: a workflow_run from a fork PR
+# can reach this validation with a forged digests.json naming any
+# ghcr.io/<anyone>/<anything>@sha256:<digest> it likes. Only this project's
+# own published images (Task 3: ghcr.io/fantom2513/vibe_ds_bot-bot-api and
+# ghcr.io/fantom2513/vibe_ds_bot-frontend) may reach docker compose pull/up
+# on the production host.
+_IMAGE_REF = re.compile(r"^ghcr\.io/fantom2513/vibe_ds_bot-(bot-api|frontend)@sha256:[0-9a-f]{64}$")
 
 
 def validate_image_ref(value: str) -> str:
