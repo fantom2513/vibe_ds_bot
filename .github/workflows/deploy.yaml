@@ -129,18 +129,23 @@ jobs:
 
           docker login ghcr.io --username "$GITHUB_ACTOR" --password-stdin <<< "$GITHUB_TOKEN"
 
-          # First deploy / a host that lost discord-bot-api or
-          # discord-bot-frontend has nothing to roll back to. Fail here,
-          # legibly, before docker login's success masks the real cause —
-          # rather than an opaque `docker inspect: no such object` abort
-          # under set -e later.
+          # A host with no prior app containers has no rollback target, but
+          # is safe to bootstrap: the regular pull/up/health path below is
+          # enough. One missing container is an unsafe partial rollback
+          # target, so refuse that state explicitly.
           bot_previous=$(docker inspect --format '{{.Config.Image}}' discord-bot-api 2>/dev/null) || bot_previous=""
           frontend_previous=$(docker inspect --format '{{.Config.Image}}' discord-bot-frontend 2>/dev/null) || frontend_previous=""
-          if [[ -z "$bot_previous" || -z "$frontend_previous" ]]; then
-            echo '::error::no previous discord-bot-api/discord-bot-frontend container found; rollback unavailable — refusing to deploy' >&2
+          bootstrap=false
+          if [[ -z "$bot_previous" && -z "$frontend_previous" ]]; then
+            bootstrap=true
+            echo "::notice::no previous containers found; performing bootstrap deploy"
+          elif [[ -z "$bot_previous" || -z "$frontend_previous" ]]; then
+            echo '::error::partial previous-container state; rollback unavailable — refusing to deploy' >&2
             exit 1
           fi
-          printf 'BOT_IMAGE=%q\nFRONTEND_IMAGE=%q\n' "$bot_previous" "$frontend_previous" > previous-images.env
+          if [[ "$bootstrap" == false ]]; then
+            printf 'BOT_IMAGE=%q\nFRONTEND_IMAGE=%q\n' "$bot_previous" "$frontend_previous" > previous-images.env
+          fi
           compose=(docker compose --env-file .env -f docker-compose.yml -f docker-compose.deploy.yaml)
           "${compose[@]}" pull bot-api frontend
           # Captured, not left to set -e and not discarded: `up -d` itself
@@ -163,6 +168,10 @@ jobs:
           fi
 
           if ! wait_for_healthy; then
+            if [[ "$bootstrap" == true ]]; then
+              echo '::error::bootstrap containers did not become healthy; no rollback target exists' >&2
+              exit 1
+            fi
             set -a
             . ./previous-images.env
             set +a
