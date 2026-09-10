@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from scripts.ci.deploy_images import render_override, validate_image_ref, write_override_from_json
+from scripts.ci.deploy_images import _main, render_override, validate_image_ref, write_override_from_json
 
 
 BOT = "ghcr.io/fantom2513/vibe_ds_bot-bot-api@sha256:" + "a" * 64
@@ -40,3 +40,42 @@ def test_json_artifact_writes_a_validated_override(tmp_path: Path):
     write_override_from_json(source, destination)
 
     assert f"image: {BOT}" in destination.read_text()
+
+
+def test_cli_writes_the_override_for_valid_input(tmp_path: Path):
+    source = tmp_path / "digests.json"
+    destination = tmp_path / "docker-compose.deploy.yaml"
+    source.write_text('{"bot_image": "' + BOT + '", "frontend_image": "' + FRONTEND + '"}')
+
+    exit_code = _main([str(source), str(destination)])
+
+    assert exit_code == 0
+    assert f"image: {BOT}" in destination.read_text()
+    assert f"image: {FRONTEND}" in destination.read_text()
+
+
+def test_cli_rejects_an_invalid_image_ref_without_writing_the_override(tmp_path: Path):
+    source = tmp_path / "digests.json"
+    destination = tmp_path / "docker-compose.deploy.yaml"
+    source.write_text('{"bot_image": "ghcr.io/fantom2513/vibe_ds_bot-bot-api:main", "frontend_image": "' + FRONTEND + '"}')
+
+    exit_code = _main([str(source), str(destination)])
+
+    assert exit_code != 0
+    assert not destination.exists()
+
+
+def test_cli_rejects_malformed_json_without_writing_the_override(tmp_path: Path):
+    source = tmp_path / "digests.json"
+    destination = tmp_path / "docker-compose.deploy.yaml"
+    source.write_text("not valid json")
+
+    exit_code = _main([str(source), str(destination)])
+
+    assert exit_code != 0
+    assert not destination.exists()
+
+
+def test_cli_reports_usage_error_for_wrong_argument_count():
+    assert _main([]) == 2
+    assert _main(["only-one-arg"]) == 2

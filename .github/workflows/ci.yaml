@@ -184,6 +184,23 @@ jobs:
         # с package.json — то есть сама команда и есть проверка.
         run: npm ci --ignore-scripts
 
+      # deploy.yaml обязан пуллить неизменяемые образы по digest и ждать
+      # health, а не останавливать стек, собирать образы на самом
+      # раннере или спать по таймеру — эти три команды и есть симптомы
+      # старого in-place деплоя, который эта фаза заменяет.
+      #
+      # grep -E, не rg: ripgrep не входит в образ ubuntu-latest
+      # (actions/runner-images#12179 закрыт как not planned), а ставить
+      # его отдельным шагом ради одной проверки — лишняя сетевая
+      # зависимость. grep -E с тем же alternation-паттерном даёт
+      # идентичный результат и код возврата.
+      - name: Verify deploy workflow stays hermetic
+        run: |
+          if grep -n -E "docker compose down|docker compose build|sleep 10" .github/workflows/deploy.yaml; then
+            echo "::error::deploy must pull immutable artifacts and poll health instead of stopping/building/sleeping"
+            exit 1
+          fi
+
       # Версия зафиксирована по той же причине, что и версия uv выше:
       # скрипт установки по умолчанию тянет последний релиз, а новый
       # actionlint с новым правилом покрасил бы CI без единого изменения
