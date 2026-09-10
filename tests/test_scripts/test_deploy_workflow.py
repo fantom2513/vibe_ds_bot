@@ -6,6 +6,9 @@ import pytest
 WORKFLOW = (
     Path(__file__).resolve().parents[2] / ".github" / "workflows" / "deploy.yaml"
 )
+CI_WORKFLOW = (
+    Path(__file__).resolve().parents[2] / ".github" / "workflows" / "ci.yaml"
+)
 BOOTSTRAP_AND_PARTIAL_FLOW = re.compile(
     r'''(?ms)
 ^          if \[\[ -z "\$bot_previous" && -z "\$frontend_previous" \]\]; then$
@@ -87,3 +90,13 @@ def test_control_flow_contract_rejects_partial_state_continuing_to_deploy():
 
     with pytest.raises(AssertionError, match="bootstrap/partial flow changed"):
         _assert_deploy_control_flow(malformed)
+
+
+def test_image_publishing_runs_after_ci_ok_when_other_ci_jobs_are_skipped():
+    """A skipped path-filtered job must not suppress the main-image publisher."""
+    workflow = CI_WORKFLOW.read_text(encoding="utf-8")
+
+    assert (
+        "if: always() && github.event_name == 'push' && github.ref == 'refs/heads/main'"
+        in workflow
+    )
