@@ -255,7 +255,13 @@ jobs:
         run: npm run build
 
       - name: Check bundle size budget
-        run: node scripts/ci/check_bundle_size.mjs frontend/dist scripts/ci/bundle-budget.json | tee -a "$GITHUB_STEP_SUMMARY"
+        # set -o pipefail: GitHub's default `bash -e {0}` does not enable
+        # it, so `node ... | tee ...` reported this step green off tee's
+        # own exit status even when the budget script printed
+        # ::error:: and exited 1 underneath it — the gate never gated.
+        run: |
+          set -o pipefail
+          node scripts/ci/check_bundle_size.mjs frontend/dist scripts/ci/bundle-budget.json | tee -a "$GITHUB_STEP_SUMMARY"
 
       - name: Run bundle script unit tests
         run: node --test scripts/ci/check_bundle_size.test.mjs
@@ -439,11 +445,12 @@ jobs:
   build-images:
     name: Publish production images
     # Только настоящий пуш в main после зелёного CI OK: PR и merge_group
-    # не должны пушить образы в GHCR, а `needs: ci-ok` уже гарантирует,
-    # что все required джобы прошли (ci-ok сама трактует skipped как ок).
-    # A skipped path-filtered CI job otherwise propagates the default
-    # `success()` guard and suppresses this publisher, even after ci-ok.
-    if: always() && github.event_name == 'push' && github.ref == 'refs/heads/main'
+    # не должны пушить образы в GHCR. `needs: ci-ok` само по себе не
+    # хватает: ci-ok объявлена с `if: always()`, чтобы агрегировать даже
+    # отменённые/упавшие зависимости, а implicit success()-guard смотрит
+    # только на то, выполнилась ли ci-ok, а не на то, что она вернула.
+    # Поэтому результат ci-ok проверяем явно, а не полагаемся на always().
+    if: needs.ci-ok.result == 'success' && github.event_name == 'push' && github.ref == 'refs/heads/main'
     needs: ci-ok
     runs-on: ubuntu-latest
     permissions:

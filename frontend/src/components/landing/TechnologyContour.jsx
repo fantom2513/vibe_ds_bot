@@ -34,12 +34,18 @@ export default function TechnologyContour() {
               </li>
             ))}
           </ul>
-          <p className="landing-technology__pipeline">GitHub Actions → Docker → Nginx → production</p>
+          <p className="landing-technology__pipeline">
+            GitHub Actions → Docker → Nginx → production
+          </p>
           <div className="landing-technology__links">
             <a href="https://github.com/fantom2513/vibe_ds_bot" target="_blank" rel="noreferrer">
               Открыть репозиторий
             </a>
-            <a href="https://github.com/fantom2513/vibe_ds_bot/actions" target="_blank" rel="noreferrer">
+            <a
+              href="https://github.com/fantom2513/vibe_ds_bot/actions"
+              target="_blank"
+              rel="noreferrer"
+            >
               Открыть workflow
             </a>
           </div>

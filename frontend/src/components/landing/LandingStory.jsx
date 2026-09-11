@@ -8,9 +8,18 @@ function StoryDemo({ id }) {
   if (id === 'overview') {
     return (
       <dl className="landing-story__status">
-        <div><dt>Контекст</dt><dd>Демонстрационный сервер</dd></div>
-        <div><dt>Набор</dt><dd>Пример данных</dd></div>
-        <div><dt>Сценарий</dt><dd>Проверка правила</dd></div>
+        <div>
+          <dt>Контекст</dt>
+          <dd>Демонстрационный сервер</dd>
+        </div>
+        <div>
+          <dt>Набор</dt>
+          <dd>Пример данных</dd>
+        </div>
+        <div>
+          <dt>Сценарий</dt>
+          <dd>Проверка правила</dd>
+        </div>
       </dl>
     )
   }
@@ -29,8 +38,14 @@ function StoryDemo({ id }) {
     <table className="landing-story__log">
       <caption>Фрагмент журнала</caption>
       <tbody>
-        <tr><th scope="row">21:00</th><td>Rule evaluated</td></tr>
-        <tr><th scope="row">21:00</th><td>Quiet mode applied</td></tr>
+        <tr>
+          <th scope="row">21:00</th>
+          <td>Rule evaluated</td>
+        </tr>
+        <tr>
+          <th scope="row">21:00</th>
+          <td>Quiet mode applied</td>
+        </tr>
       </tbody>
     </table>
   )
@@ -43,11 +58,18 @@ export default function LandingStory() {
         <div className="landing-story__copy">
           <p className="landing-eyebrow">Продуктовый контур</p>
           <h2 id="landing-story-title">От сигнала к понятному результату.</h2>
-          <p>Интерфейс показывает не декоративную активность, а путь каждого решения: состояние, правило и запись о выполнении.</p>
+          <p>
+            Интерфейс показывает не декоративную активность, а путь каждого решения: состояние,
+            правило и запись о выполнении.
+          </p>
         </div>
         <div className="landing-story__cards">
-          {STORY_STEPS.map((step) => (
-            <article key={step.id} className="landing-story__card" aria-labelledby={`story-${step.id}`}>
+          {STORY_STEPS.map(step => (
+            <article
+              key={step.id}
+              className="landing-story__card"
+              aria-labelledby={`story-${step.id}`}
+            >
               <p className="landing-story__label">{step.label}</p>
               <h3 id={`story-${step.id}`}>{step.title}</h3>
               <StoryDemo id={step.id} />

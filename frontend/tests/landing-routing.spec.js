@@ -18,12 +18,19 @@ test.afterAll(async () => {
   await devServer?.close()
 })
 
-test('renders the public React landing at root while retaining the admin login', async ({ page }) => {
+test('renders the public React landing at root while retaining the admin login', async ({
+  page,
+}) => {
   await page.goto(`${BASE_URL}/`)
 
   await expect(page).toHaveTitle(/Vibe/)
-  await expect(page.getByRole('heading', { name: 'Тишина — тоже состояние системы.' })).toBeVisible()
-  await expect(page.getByRole('link', { name: 'Открыть админку' })).toHaveAttribute('href', '/admin')
+  await expect(
+    page.getByRole('heading', { name: 'Тишина — тоже состояние системы.' })
+  ).toBeVisible()
+  await expect(page.getByRole('link', { name: 'Открыть админку' })).toHaveAttribute(
+    'href',
+    '/admin'
+  )
 
   await page.goto(`${BASE_URL}/admin/login`)
   await expect(page.getByRole('heading', { name: 'Bot Dashboard' })).toBeVisible()
@@ -48,8 +55,13 @@ test('keeps the hero asset decorative and exposes mobile in-page navigation', as
 
   await expect(page.getByRole('link', { name: 'Интерфейс' })).toBeVisible()
   await expect(page.getByRole('link', { name: 'Устройство' })).toBeVisible()
-  await expect(page.locator('img[src="/landing/singularity-core-v3.png"]')).toHaveAttribute('alt', '')
-  expect(await page.locator('html').evaluate((node) => node.scrollWidth <= node.clientWidth)).toBe(true)
+  await expect(page.locator('img[src="/landing/singularity-core-v3.png"]')).toHaveAttribute(
+    'alt',
+    ''
+  )
+  expect(await page.locator('html').evaluate(node => node.scrollWidth <= node.clientWidth)).toBe(
+    true
+  )
 })
 
 test('presents the product proof as a three-step scroll narrative', async ({ page }) => {
@@ -63,7 +75,9 @@ test('presents the product proof as a three-step scroll narrative', async ({ pag
   await expect(page.locator('.landing-story__card')).toHaveCount(3)
 })
 
-test('labels the server-state card as representative data rather than live runtime status', async ({ page }) => {
+test('labels the server-state card as representative data rather than live runtime status', async ({
+  page,
+}) => {
   await page.goto(`${BASE_URL}/`)
 
   await expect(page.getByText('Пример данных')).toBeVisible()
@@ -74,7 +88,7 @@ test('keeps the story copy sticky on wide screens and static on mobile', async (
   const css = await readFile(new URL('../src/pages/Landing.css', import.meta.url), 'utf8')
 
   expect(css).toMatch(
-    /@media\s*\(min-width:\s*641px\)[\s\S]*?\.landing-story__grid\s*\{[\s\S]*?grid-template-columns:\s*minmax\(260px,\s*\.58fr\)\s+minmax\(0,\s*1fr\)/
+    /@media\s*\(min-width:\s*641px\)[\s\S]*?\.landing-story__grid\s*\{[\s\S]*?grid-template-columns:\s*minmax\(260px,\s*0?\.58fr\)\s+minmax\(0,\s*1fr\)/
   )
   expect(css).toMatch(
     /@media\s*\(min-width:\s*641px\)[\s\S]*?\.landing-story__copy\s*\{[\s\S]*?align-self:\s*start;[\s\S]*?position:\s*sticky;[\s\S]*?top:\s*7rem/
@@ -84,10 +98,20 @@ test('keeps the story copy sticky on wide screens and static on mobile', async (
   )
 })
 
-test('shows the project technology contour without fabricated runtime metrics', async ({ page }) => {
+test('shows the project technology contour without fabricated runtime metrics', async ({
+  page,
+}) => {
   await page.goto(`${BASE_URL}/`)
 
-  for (const name of ['React', 'FastAPI', 'PostgreSQL', 'discord.py', 'Docker', 'Nginx', 'GitHub Actions']) {
+  for (const name of [
+    'React',
+    'FastAPI',
+    'PostgreSQL',
+    'discord.py',
+    'Docker',
+    'Nginx',
+    'GitHub Actions',
+  ]) {
     await expect(page.getByRole('listitem', { name })).toBeVisible()
   }
   await expect(page.getByText('GitHub Actions → Docker → Nginx → production')).toBeVisible()
@@ -95,7 +119,10 @@ test('shows the project technology contour without fabricated runtime metrics', 
     'href',
     'https://github.com/fantom2513/vibe_ds_bot/actions'
   )
-  await expect(page.getByRole('link', { name: 'Открыть workflow' })).toHaveAttribute('target', '_blank')
+  await expect(page.getByRole('link', { name: 'Открыть workflow' })).toHaveAttribute(
+    'target',
+    '_blank'
+  )
   await expect(page.getByText(/99\.9%|42 ms|Production active/)).toHaveCount(0)
 })
 
@@ -123,6 +150,8 @@ test('keeps the landing readable when motion is reduced', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' })
   await page.goto(`${BASE_URL}/`)
 
-  await expect(page.getByRole('heading', { name: 'Тишина — тоже состояние системы.' })).toBeVisible()
+  await expect(
+    page.getByRole('heading', { name: 'Тишина — тоже состояние системы.' })
+  ).toBeVisible()
   await expect(page.getByRole('link', { name: 'Посмотреть систему' })).toBeVisible()
 })
