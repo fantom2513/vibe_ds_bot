@@ -38,3 +38,13 @@ test('links the public landing nav anchors to their in-page sections', async ({ 
     '#source'
   )
 })
+
+test('keeps the hero asset decorative and exposes mobile in-page navigation', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.goto(`${BASE_URL}/`)
+
+  await expect(page.getByRole('link', { name: 'Интерфейс' })).toBeVisible()
+  await expect(page.getByRole('link', { name: 'Устройство' })).toBeVisible()
+  await expect(page.locator('img[src="/landing/singularity-core-v3.png"]')).toHaveAttribute('alt', '')
+  await expect(page.locator('html')).toEvaluate((node) => node.scrollWidth <= node.clientWidth)
+})
