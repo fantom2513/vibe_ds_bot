@@ -81,3 +81,18 @@ test('keeps the story copy sticky on wide screens and static on mobile', async (
     /@media\s*\(max-width:\s*640px\)[\s\S]*?\.landing-story__copy\s*\{[\s\S]*?position:\s*static/
   )
 })
+
+test('shows the project technology contour without fabricated runtime metrics', async ({ page }) => {
+  await page.goto(`${BASE_URL}/`)
+
+  for (const name of ['React', 'FastAPI', 'PostgreSQL', 'discord.py', 'Docker', 'Nginx', 'GitHub Actions']) {
+    await expect(page.getByRole('listitem', { name })).toBeVisible()
+  }
+  await expect(page.getByText('GitHub Actions → Docker → Nginx → production')).toBeVisible()
+  await expect(page.getByRole('link', { name: 'Открыть workflow' })).toHaveAttribute(
+    'href',
+    'https://github.com/fantom2513/vibe_ds_bot/actions'
+  )
+  await expect(page.getByRole('link', { name: 'Открыть workflow' })).toHaveAttribute('target', '_blank')
+  await expect(page.getByText(/99\.9%|42 ms|Production active/)).toHaveCount(0)
+})
