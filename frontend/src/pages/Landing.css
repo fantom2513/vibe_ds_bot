@@ -45,6 +45,12 @@
   outline-offset: 4px;
 }
 
+#interface,
+#system,
+#source {
+  scroll-margin-top: 5.5rem;
+}
+
 .landing-hero {
   padding-block: clamp(3rem, 8vw, 7rem);
 }
@@ -363,5 +369,20 @@
 
   .landing-story__copy {
     position: static;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .landing {
+    animation: none !important;
+    scroll-behavior: auto;
+    transition: none !important;
+  }
+
+  .landing *,
+  .landing *::before,
+  .landing *::after {
+    animation: none !important;
+    transition: none !important;
   }
 }
