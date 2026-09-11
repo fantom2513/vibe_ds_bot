@@ -1,6 +1,7 @@
 import './Landing.css'
 import LandingHero from '../components/landing/LandingHero'
 import LandingStory from '../components/landing/LandingStory'
+import TechnologyContour from '../components/landing/TechnologyContour'
 
 export default function Landing() {
   return (
@@ -16,6 +17,7 @@ export default function Landing() {
       </header>
       <LandingHero />
       <LandingStory />
+      <TechnologyContour />
     </main>
   )
 }
