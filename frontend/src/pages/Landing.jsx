@@ -1,5 +1,6 @@
 import './Landing.css'
 import LandingHero from '../components/landing/LandingHero'
+import LandingStory from '../components/landing/LandingStory'
 
 export default function Landing() {
   return (
@@ -14,6 +15,7 @@ export default function Landing() {
         </div>
       </header>
       <LandingHero />
+      <LandingStory />
     </main>
   )
 }
