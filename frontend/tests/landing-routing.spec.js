@@ -33,11 +33,13 @@ test('links the public landing nav anchors to their in-page sections', async ({ 
   await page.goto(`${BASE_URL}/`)
 
   await expect(page.getByRole('link', { name: 'Интерфейс' })).toHaveAttribute('href', '#interface')
-  await expect(page.getByRole('link', { name: 'Устройство' })).toHaveAttribute('href', '#system')
+  await expect(page.getByRole('link', { name: 'Устройство' })).toHaveAttribute('href', '#source')
   await expect(page.getByRole('link', { name: 'Исходный код', exact: true })).toHaveAttribute(
     'href',
     '#source'
   )
+  await expect(page.locator('#interface')).toHaveCount(1)
+  await expect(page.locator('#source')).toHaveCount(1)
 })
 
 test('keeps the hero asset decorative and exposes mobile in-page navigation', async ({ page }) => {
@@ -103,15 +105,18 @@ test('routes the React entry at root and declares reduced-motion delivery styles
     readFile(new URL('../src/pages/Landing.css', import.meta.url), 'utf8'),
   ])
 
-  expect(nginx).toMatch(
-    /location\s*=\s*\/\s*\{[\s\S]*?try_files\s+\/index\.html\s+=404;/
-  )
-  expect(nginx).toMatch(/location\s*=\s*\/admin\s*\{/)
-  expect(nginx).not.toContain('/landing/index.html')
+  const rootLocation = nginx.match(/location\s*=\s*\/\s*\{([\s\S]*?)^\s*}/m)
+  const adminLocation = nginx.match(/location\s*=\s*\/admin\s*\{([\s\S]*?)^\s*}/m)
+
+  expect(rootLocation?.[1]).toMatch(/^\s*try_files\s+\/index\.html\s+=404;/m)
+  expect(rootLocation?.[1]).not.toContain('/landing/index.html')
+  expect(adminLocation?.[1]).toMatch(/^\s*try_files\s+\/index\.html\s+=404;/m)
   expect(css).toMatch(
     /@media\s*\(prefers-reduced-motion:\s*reduce\)[\s\S]*?\.landing\s*\{[\s\S]*?animation:\s*none(?:\s*!important)?;[\s\S]*?scroll-behavior:\s*auto;[\s\S]*?transition:\s*none(?:\s*!important)?;/
   )
-  expect(css).toMatch(/#interface,[\s\S]*?#system,[\s\S]*?#source\s*\{[\s\S]*?scroll-margin-top:/)
+  expect(css).toMatch(
+    /\.landing\s+#interface,[\s\S]*?\.landing\s+#source\s*\{[\s\S]*?scroll-margin-top:/
+  )
 })
 
 test('keeps the landing readable when motion is reduced', async ({ page }) => {

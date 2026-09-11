@@ -45,9 +45,8 @@
   outline-offset: 4px;
 }
 
-#interface,
-#system,
-#source {
+.landing #interface,
+.landing #source {
   scroll-margin-top: 5.5rem;
 }
 
