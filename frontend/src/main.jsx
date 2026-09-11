@@ -9,6 +9,7 @@ import { theme } from './styles/theme'
 import { AuthProvider } from './contexts/AuthContext'
 import ProtectedRoute from './components/ProtectedRoute'
 import AppLayout from './components/AppLayout'
+import Landing from './pages/Landing'
 import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
 import Rules from './pages/Rules'
@@ -27,6 +28,7 @@ ReactDOM.createRoot(document.getElementById('root')).render(
     <BrowserRouter>
       <AuthProvider>
         <Routes>
+          <Route path="/" element={<Landing />} />
           <Route path="/admin/login" element={<Login />} />
           <Route element={<ProtectedRoute />}>
             <Route path="/admin" element={<AppLayout />}>
