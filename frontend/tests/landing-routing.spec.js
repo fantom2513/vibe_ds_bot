@@ -96,3 +96,28 @@ test('shows the project technology contour without fabricated runtime metrics', 
   await expect(page.getByRole('link', { name: 'Открыть workflow' })).toHaveAttribute('target', '_blank')
   await expect(page.getByText(/99\.9%|42 ms|Production active/)).toHaveCount(0)
 })
+
+test('routes the React entry at root and declares reduced-motion delivery styles', async () => {
+  const [nginx, css] = await Promise.all([
+    readFile(new URL('../nginx.conf', import.meta.url), 'utf8'),
+    readFile(new URL('../src/pages/Landing.css', import.meta.url), 'utf8'),
+  ])
+
+  expect(nginx).toMatch(
+    /location\s*=\s*\/\s*\{[\s\S]*?try_files\s+\/index\.html\s+=404;/
+  )
+  expect(nginx).toMatch(/location\s*=\s*\/admin\s*\{/)
+  expect(nginx).not.toContain('/landing/index.html')
+  expect(css).toMatch(
+    /@media\s*\(prefers-reduced-motion:\s*reduce\)[\s\S]*?\.landing\s*\{[\s\S]*?animation:\s*none(?:\s*!important)?;[\s\S]*?scroll-behavior:\s*auto;[\s\S]*?transition:\s*none(?:\s*!important)?;/
+  )
+  expect(css).toMatch(/#interface,[\s\S]*?#system,[\s\S]*?#source\s*\{[\s\S]*?scroll-margin-top:/)
+})
+
+test('keeps the landing readable when motion is reduced', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' })
+  await page.goto(`${BASE_URL}/`)
+
+  await expect(page.getByRole('heading', { name: 'Тишина — тоже состояние системы.' })).toBeVisible()
+  await expect(page.getByRole('link', { name: 'Посмотреть систему' })).toBeVisible()
+})
