@@ -445,12 +445,27 @@ jobs:
   build-images:
     name: Publish production images
     # Только настоящий пуш в main после зелёного CI OK: PR и merge_group
-    # не должны пушить образы в GHCR. `needs: ci-ok` само по себе не
-    # хватает: ci-ok объявлена с `if: always()`, чтобы агрегировать даже
-    # отменённые/упавшие зависимости, а implicit success()-guard смотрит
-    # только на то, выполнилась ли ci-ok, а не на то, что она вернула.
-    # Поэтому результат ci-ok проверяем явно, а не полагаемся на always().
-    if: needs.ci-ok.result == 'success' && github.event_name == 'push' && github.ref == 'refs/heads/main'
+    # не должны пушить образы в GHCR.
+    #
+    # Обе половины этого условия проверены на реальных прогонах, не только
+    # по докам:
+    #
+    # - always() обязателен, а не косметика. Без него GitHub скипает эту
+    #   джобу транзитивно, если хоть одна джоба где-то в графе выше была
+    #   skipped — даже если это не прямая зависимость (`needs: ci-ok`), а
+    #   зависимость зависимости (lint-frontend/build-frontend/docker-build,
+    #   отфильтрованные path-filter'ом при бэкенд-only пуше). Прогон
+    #   34491429556 (до always()) это показал: ci-ok = success, а
+    #   Publish production images всё равно skipped.
+    # - always() сам по себе — это «не скипай меня по каскаду», а не «я
+    #   всегда должен запускаться». Он не проверяет, что вернула ci-ok,
+    #   поэтому голого always() достаточно, чтобы образ уехал в GHCR и
+    #   тогда, когда ci-ok упала целиком. Прогон 34581073049 (always() без
+    #   явной проверки результата) это тоже показал: Lint frontend упала,
+    #   CI OK упала, а Publish production images всё равно отработала и
+    #   запушила оба образа. Отсюда needs.ci-ok.result == 'success' —
+    #   не полагаемся на implicit success(), проверяем результат вручную.
+    if: always() && needs.ci-ok.result == 'success' && github.event_name == 'push' && github.ref == 'refs/heads/main'
     needs: ci-ok
     runs-on: ubuntu-latest
     permissions:

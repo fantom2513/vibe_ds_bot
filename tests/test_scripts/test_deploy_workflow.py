@@ -93,24 +93,30 @@ def test_control_flow_contract_rejects_partial_state_continuing_to_deploy():
 
 
 def test_image_publishing_runs_after_ci_ok_when_other_ci_jobs_are_skipped():
-    """A skipped path-filtered job must not suppress the main-image publisher.
+    """The main-image publisher needs both always() and an explicit result check.
 
-    A bare `success()` (the implicit default when `if:` is omitted) skips
-    this job whenever *any* job in the run's dependency graph was skipped,
-    even one this job doesn't directly need — that's what happened before
-    this contract existed: a backend-only push skips lint-frontend/e2e/
-    docker-build, and the publisher was skipped right along with them
-    despite `ci-ok` itself reporting success. A bare `always()` overcorrects
-    the other way: it also runs when `ci-ok` fails outright, publishing
-    broken images (see the negative assertion below — reproduced for real
-    on 2026-09-11, images pushed to GHCR after a failed Lint frontend job).
-    Reading `needs.ci-ok.result` directly sidesteps both: it's an explicit
-    expression, not the implicit success() that cascades through skips.
+    Both halves of this contract were dropped once, separately, and each
+    drop reproduced for real:
+
+    - Without `always()`, GitHub skips this job transitively whenever any
+      job *anywhere upstream* in the graph was skipped — not just this
+      job's direct `needs: ci-ok`, but ci-ok's own needs (lint-frontend,
+      build-frontend, docker-build — all path-filtered out on a
+      backend-only push). Run 34491429556: ci-ok succeeded, and the
+      publisher was still skipped. A plain custom `if:` with no
+      always()/success()/failure() does not stop this cascade — only
+      always() does.
+    - `always()` alone only says "don't skip me for that cascade"; it does
+      not check what ci-ok actually returned. Run 34581073049: Lint
+      frontend and CI OK both failed, and the publisher still ran and
+      pushed both images to GHCR. Hence the explicit
+      `needs.ci-ok.result == 'success'` alongside it — not the implicit
+      success() default, which is exactly the thing that cascades through
+      skips in the first place.
     """
     workflow = CI_WORKFLOW.read_text(encoding="utf-8")
 
     assert (
-        "if: needs.ci-ok.result == 'success' && github.event_name == 'push' && github.ref == 'refs/heads/main'"
+        "if: always() && needs.ci-ok.result == 'success' && github.event_name == 'push' && github.ref == 'refs/heads/main'"
         in workflow
     )
-    assert "if: always() && github.event_name == 'push'" not in workflow
