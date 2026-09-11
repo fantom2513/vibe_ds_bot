@@ -8,9 +8,9 @@ function StoryDemo({ id }) {
   if (id === 'overview') {
     return (
       <dl className="landing-story__status">
-        <div><dt>Guild</dt><dd>Vibe community</dd></div>
-        <div><dt>Участники online</dt><dd>12</dd></div>
-        <div><dt>Режим</dt><dd>Quiet hours</dd></div>
+        <div><dt>Контекст</dt><dd>Демонстрационный сервер</dd></div>
+        <div><dt>Набор</dt><dd>Пример данных</dd></div>
+        <div><dt>Сценарий</dt><dd>Проверка правила</dd></div>
       </dl>
     )
   }

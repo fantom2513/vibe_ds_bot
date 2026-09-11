@@ -234,6 +234,7 @@
   }
 
   .landing-story__copy {
+    align-self: start;
     position: sticky;
     top: 7rem;
   }

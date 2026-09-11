@@ -61,11 +61,21 @@ test('presents the product proof as a three-step scroll narrative', async ({ pag
   await expect(page.locator('.landing-story__card')).toHaveCount(3)
 })
 
+test('labels the server-state card as representative data rather than live runtime status', async ({ page }) => {
+  await page.goto(`${BASE_URL}/`)
+
+  await expect(page.getByText('Пример данных')).toBeVisible()
+  await expect(page.getByText('Участники online')).toHaveCount(0)
+})
+
 test('keeps the story copy sticky on wide screens and static on mobile', async () => {
   const css = await readFile(new URL('../src/pages/Landing.css', import.meta.url), 'utf8')
 
   expect(css).toMatch(
-    /@media\s*\(min-width:\s*641px\)[\s\S]*?\.landing-story__copy\s*\{[\s\S]*?position:\s*sticky/
+    /@media\s*\(min-width:\s*641px\)[\s\S]*?\.landing-story__grid\s*\{[\s\S]*?grid-template-columns:\s*minmax\(260px,\s*\.58fr\)\s+minmax\(0,\s*1fr\)/
+  )
+  expect(css).toMatch(
+    /@media\s*\(min-width:\s*641px\)[\s\S]*?\.landing-story__copy\s*\{[\s\S]*?align-self:\s*start;[\s\S]*?position:\s*sticky;[\s\S]*?top:\s*7rem/
   )
   expect(css).toMatch(
     /@media\s*\(max-width:\s*640px\)[\s\S]*?\.landing-story__copy\s*\{[\s\S]*?position:\s*static/
