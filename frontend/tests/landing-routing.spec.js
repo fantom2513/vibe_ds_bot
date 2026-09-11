@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test'
 import { createServer } from 'vite'
+import { readFile } from 'node:fs/promises'
 
 const BASE_URL = 'http://127.0.0.1:5176'
 
@@ -47,4 +48,26 @@ test('keeps the hero asset decorative and exposes mobile in-page navigation', as
   await expect(page.getByRole('link', { name: 'Устройство' })).toBeVisible()
   await expect(page.locator('img[src="/landing/singularity-core-v3.png"]')).toHaveAttribute('alt', '')
   expect(await page.locator('html').evaluate((node) => node.scrollWidth <= node.clientWidth)).toBe(true)
+})
+
+test('presents the product proof as a three-step scroll narrative', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 })
+  await page.goto(`${BASE_URL}/`)
+
+  await expect(page.getByRole('heading', { name: 'Состояние сервера' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Логика правила' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Проверяемый результат' })).toBeVisible()
+  await expect(page.locator('.landing-story__copy')).toHaveCount(1)
+  await expect(page.locator('.landing-story__card')).toHaveCount(3)
+})
+
+test('keeps the story copy sticky on wide screens and static on mobile', async () => {
+  const css = await readFile(new URL('../src/pages/Landing.css', import.meta.url), 'utf8')
+
+  expect(css).toMatch(
+    /@media\s*\(min-width:\s*641px\)[\s\S]*?\.landing-story__copy\s*\{[\s\S]*?position:\s*sticky/
+  )
+  expect(css).toMatch(
+    /@media\s*\(max-width:\s*640px\)[\s\S]*?\.landing-story__copy\s*\{[\s\S]*?position:\s*static/
+  )
 })
