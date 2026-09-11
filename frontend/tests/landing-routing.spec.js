@@ -46,5 +46,5 @@ test('keeps the hero asset decorative and exposes mobile in-page navigation', as
   await expect(page.getByRole('link', { name: 'Интерфейс' })).toBeVisible()
   await expect(page.getByRole('link', { name: 'Устройство' })).toBeVisible()
   await expect(page.locator('img[src="/landing/singularity-core-v3.png"]')).toHaveAttribute('alt', '')
-  await expect(page.locator('html')).toEvaluate((node) => node.scrollWidth <= node.clientWidth)
+  expect(await page.locator('html').evaluate((node) => node.scrollWidth <= node.clientWidth)).toBe(true)
 })
