@@ -1,17 +1,19 @@
 import './Landing.css'
+import LandingHero from '../components/landing/LandingHero'
 
 export default function Landing() {
   return (
     <main id="top" className="landing">
       <header className="landing-header">
-        <nav className="landing-nav" aria-label="Основная навигация">
-          <a href="#interface">Интерфейс</a>
-          <a href="#system">Устройство</a>
-          <a href="#source">Исходный код</a>
-        </nav>
+        <div className="landing-shell">
+          <nav className="landing-nav" aria-label="Основная навигация">
+            <a href="#interface">Интерфейс</a>
+            <a href="#system">Устройство</a>
+            <a href="#source">Исходный код</a>
+          </nav>
+        </div>
       </header>
-      <h1>Тишина — тоже состояние системы.</h1>
-      <a href="/admin">Открыть админку</a>
+      <LandingHero />
     </main>
   )
 }
